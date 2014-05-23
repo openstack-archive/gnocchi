@@ -16,6 +16,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+import json
 import functools
 import uuid
 
@@ -26,17 +27,16 @@ import six
 import voluptuous
 
 from gnocchi import indexer
-from gnocchi.openstack.common import jsonutils
 from gnocchi.openstack.common import timeutils
 from gnocchi import storage
 
 
 def deserialize(schema):
-    params = jsonutils.loads(pecan.request.body)
+    params = json.loads(pecan.request.body)
     try:
         return schema(params)
     except voluptuous.Error as e:
-        pecan.abort(400, "Invalid input: %s" % e)
+        pecan.abort(400, "Invalid input: %s" % e,)
 
 
 def vexpose(schema, *vargs, **vkwargs):
