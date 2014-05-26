@@ -1,5 +1,6 @@
 #!/bin/bash -x
 memcached &
+python -m gnocchi.openstack.common.db.sqlalchemy.test_migrations
 
 wait_for_line () {
     while read line
