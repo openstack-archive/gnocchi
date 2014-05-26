@@ -14,3 +14,4 @@ sqlalchemy
 stevedore
 tooz
 voluptuous
+werkzeug
