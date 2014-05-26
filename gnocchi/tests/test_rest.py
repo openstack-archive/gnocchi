@@ -40,7 +40,7 @@ class RestTest(tests.TestCase):
 
     def test_root(self):
         result = self.app.get("/")
-        self.assertEqual("Nom nom nom.", result.body)
+        self.assertEqual(b"Nom nom nom.", result.body)
         self.assertEqual("text/plain", result.content_type)
         self.assertEqual(200, result.status_code)
 
@@ -71,7 +71,7 @@ class EntityTest(RestTest):
                                  expect_errors=True)
         self.assertEqual(result.status_code, 400)
         self.assertIn(
-            u"Entity %s does not exist" % e1,
+            b"Entity " + e1.encode('ascii') + b" does not exist",
             result.body)
 
     def test_post_entity_bad_archives(self):
@@ -81,9 +81,9 @@ class EntityTest(RestTest):
                                     expect_errors=True)
         self.assertEqual("text/plain", result.content_type)
         self.assertEqual(result.status_code, 400)
-        self.assertIn(
-            u"Invalid input: invalid list value @ data[u'archives'][0]",
-            result.body)
+        self.assertRegexpMatches(result.body.decode('ascii'),
+                                 "Invalid input: invalid list "
+                                 "value @ data\[u?'archives'\]\[0\]")
 
     def test_add_measure(self):
         result = self.app.post_json("/v1/entity",
@@ -105,7 +105,7 @@ class EntityTest(RestTest):
             expect_errors=True)
         self.assertEqual(result.status_code, 400)
         self.assertIn(
-            u"Entity %s does not exist" % e1,
+            b"Entity " + e1.encode('ascii') + b" does not exist",
             result.body)
 
     def test_get_measure(self):
@@ -418,10 +418,9 @@ class ResourceTest(RestTest):
                                     expect_errors=True)
         self.assertEqual(400, result.status_code)
         self.assertEqual("text/plain", result.content_type)
-        self.assertIn(
-            u"Invalid input: not a valid value "
-            "for dictionary value @ data[u'id']",
-            result.body)
+        self.assertRegexpMatches(result.body.decode('ascii'),
+                                 "Invalid input: not a valid value "
+                                 "for dictionary value @ data\[u?'id'\]")
 
     def test_post_resource_with_entities(self):
         result = self.app.post_json("/v1/entity",
