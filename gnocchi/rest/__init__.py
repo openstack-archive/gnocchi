@@ -297,12 +297,16 @@ class GenericResourcesController(rest.RestController):
                 ended_before = Timestamp(ended_before)
             except Exception:
                 pecan.abort(400, "Unable to parse ended_before timestamp")
+        attributes_filter = []
+        if user_id is not None:
+            attributes_filter.append(("user_id", user_id))
+        if project_id is not None:
+            attributes_filter.append(("project_id", project_id))
         return pecan.request.indexer.list_resources(
             self._resource_type,
             started_after=started_after,
             ended_before=ended_before,
-            user_id=user_id,
-            project_id=project_id)
+            attributes_filter=attributes_filter)
 
 
 class InstancesController(GenericResourcesController):
