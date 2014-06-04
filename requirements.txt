@@ -1,6 +1,7 @@
 babel
 iso8601
 lockfile>=0.9.1
+MySQL-python
 netaddr
 oslo.config
 oslotest
