@@ -81,7 +81,7 @@ class EntityController(rest.RestController):
         voluptuous.Required("value"): voluptuous.Any(float, int),
     }])
 
-    @vexpose(Measures)
+    @vexpose(Measures, 'json')
     def post_measures(self, body):
         try:
             pecan.request.storage.add_measures(
