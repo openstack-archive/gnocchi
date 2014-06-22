@@ -23,8 +23,10 @@ from stevedore import driver
 #TODO(eglynn): figure out how to accommodate multi-valued aggregation
 #              methods, where is no longer just a single aggregate
 #              value to be store per-period
-AGGREGATION_TYPES = ('mean', 'sum', 'last', 'max', 'min',
-                     'std', 'median', 'first')
+#TODO(eglynn): figure out how to accommodate aggregation methods that
+#              require the entire history of datapoints to be retained
+#              in order to be accurately calculated (e.g. median)
+AGGREGATION_TYPES = ('mean', 'sum', 'last', 'max', 'min', 'std', 'first')
 
 
 OPTS = [
