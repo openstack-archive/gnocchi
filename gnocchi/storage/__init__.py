@@ -103,8 +103,7 @@ class StorageDriver(object):
         raise NotImplementedError
 
     @staticmethod
-    def get_measures(entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='average'):
+    def get_measures(entity, from_timestamp=None, to_timestamp=None):
         """Add a measure to an entity.
 
         :param entity: The entity measured.

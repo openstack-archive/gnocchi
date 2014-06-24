@@ -95,17 +95,13 @@ class EntityController(rest.RestController):
         pecan.response.status = 204
 
     @pecan.expose('json')
-    def get_measures(self, start=None, stop=None, aggregation='mean'):
-        if aggregation not in storage.AGGREGATION_TYPES:
-            pecan.abort(400, "Invalid aggregation value %s, must be one of %s"
-                        % (aggregation, str(storage.AGGREGATION_TYPES)))
-
+    def get_measures(self, start=None, stop=None):
         try:
             # Replace timestamp keys by their string versions
             return dict((timeutils.strtime(k), v)
                         for k, v
                         in six.iteritems(pecan.request.storage.get_measures(
-                            self.entity_id, start, stop, aggregation)))
+                            self.entity_id, start, stop)))
         except storage.EntityDoesNotExist as e:
             pecan.abort(400, str(e))
 

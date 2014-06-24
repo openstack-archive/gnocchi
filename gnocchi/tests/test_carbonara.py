@@ -55,6 +55,16 @@ class TestTimeSerie(testtools.TestCase):
                                  [3, 5, 7],
                                  sampling='5Min')
         self.assertEqual(1, len(ts))
+        self.assertEqual(7, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+
+    def test_down_sampling_mean(self):
+        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
+                                  datetime.datetime(2014, 1, 1, 12, 0, 4),
+                                  datetime.datetime(2014, 1, 1, 12, 0, 9)],
+                                 [3, 5, 7],
+                                 sampling='5Min',
+                                 aggregation_method='mean')
+        self.assertEqual(1, len(ts))
         self.assertEqual(5, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
     def test_down_sampling_with_max_size(self):
@@ -63,6 +73,19 @@ class TestTimeSerie(testtools.TestCase):
                                   datetime.datetime(2014, 1, 1, 12, 1, 9),
                                   datetime.datetime(2014, 1, 1, 12, 2, 12)],
                                  [3, 5, 7, 1],
+                                 sampling='1Min',
+                                 max_size=2)
+        self.assertEqual(2, len(ts))
+        self.assertEqual(7, ts[datetime.datetime(2014, 1, 1, 12, 1, 0)])
+        self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 0)])
+
+    def test_down_sampling_with_max_size_mean(self):
+        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
+                                  datetime.datetime(2014, 1, 1, 12, 1, 4),
+                                  datetime.datetime(2014, 1, 1, 12, 1, 9),
+                                  datetime.datetime(2014, 1, 1, 12, 2, 12)],
+                                 [3, 5, 7, 1],
+                                 aggregation_method='mean',
                                  sampling='1Min',
                                  max_size=2)
         self.assertEqual(2, len(ts))
@@ -111,7 +134,7 @@ class TestTimeSerie(testtools.TestCase):
         ts.update(ts2)
 
         self.assertEqual(3, len(ts))
-        self.assertEqual(57.5, ts[datetime.datetime(2014, 1, 1, 12, 3, 0)])
+        self.assertEqual(15, ts[datetime.datetime(2014, 1, 1, 12, 3, 0)])
         self.assertEqual(27, ts[datetime.datetime(2014, 1, 1, 12, 4, )])
         self.assertEqual(6, ts[datetime.datetime(2014, 1, 1, 12, 5, )])
 
@@ -147,7 +170,7 @@ class TestTimeSerieCollection(testtools.TestCase):
         tsc = carbonara.TimeSerieCollection([ts, ts2])
         r = tsc[datetime.datetime(2014, 1, 1, 12, 0, 0)]
         self.assertEqual(3, r[datetime.datetime(2014, 1, 1, 12, 0, 0)])
-        self.assertEqual(6, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
+        self.assertEqual(7, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(1, r[datetime.datetime(2014, 1, 1, 12, 2, 0)])
 
     def test_fetch_outside_low_precision(self):
@@ -168,9 +191,9 @@ class TestTimeSerieCollection(testtools.TestCase):
         r = tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0))
         self.assertEqual(5, len(r))
         self.assertEqual(3, r[datetime.datetime(2014, 1, 1, 12, 0, 0)])
-        self.assertEqual(6, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
+        self.assertEqual(7, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(1, r[datetime.datetime(2014, 1, 1, 12, 2, 0)])
-        self.assertEqual(26, r[datetime.datetime(2014, 1, 1, 12, 5, 0)])
+        self.assertEqual(27, r[datetime.datetime(2014, 1, 1, 12, 5, 0)])
         self.assertEqual(21, r[datetime.datetime(2014, 1, 1, 12, 10, 0)])
         self.assertRaises(KeyError, r.__getitem__,
                           datetime.datetime(2014, 1, 1, 12, 6, 0))
