@@ -27,7 +27,7 @@ class TimeSerie(object):
 
     def __init__(self, timestamps, values,
                  max_size=None,
-                 sampling=None, aggregation_method='mean'):
+                 sampling=None, aggregation_method='last'):
         self.aggregation_method = aggregation_method
         self.sampling = pandas.tseries.frequencies.to_offset(sampling)
         self.max_size = max_size
@@ -69,7 +69,7 @@ class TimeSerie(object):
         return cls(values, timestamps,
                    max_size=d.get('max_size'),
                    sampling=d.get('sampling'),
-                   aggregation_method=d.get('aggregation_method', 'mean'))
+                   aggregation_method=d.get('aggregation_method', 'last'))
 
     def to_dict(self):
         return {

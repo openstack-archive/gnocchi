@@ -16,7 +16,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import gzip
-import random
 import uuid
 
 from oslo.config import cfg
@@ -72,12 +71,6 @@ class SwiftStorage(storage.StorageDriver):
             conf.swift_coordination_driver,
             str(uuid.uuid4()).encode('ascii'))
         self.coord.start()
-        # NOTE(jd) So this is a (smart?) optimization: since we're going to
-        # lock for each of this aggregation type, if we are using running
-        # Gnocchi with multiple processses, let's randomize what we iter
-        # over so there are less chances we fight for the same lock!
-        self.aggregation_types = list(storage.AGGREGATION_TYPES)
-        random.shuffle(self.aggregation_types)
 
     def create_entity(self, entity, archive):
         try:
@@ -94,23 +87,25 @@ class SwiftStorage(storage.StorageDriver):
         # would raise EntityAlreadyExists without doing a head_container()
         # before – needs https://review.openstack.org/#/c/87575/
         self.swift.put_container(entity)
-        for aggregation in self.aggregation_types:
-            tsc = carbonara.TimeSerieCollection([
-                carbonara.TimeSerie([], [],
-                                    aggregation_method=aggregation,
-                                    max_size=size,
-                                    sampling=pandas.tseries.offsets.Second(
-                                        second))
-                for second, size in archive
-            ])
-            compressed = six.BytesIO()
-            z = gzip.GzipFile(
-                fileobj=compressed, mode="wb",
-                compresslevel=self.compresslevel)
-            z.write(tsc.serialize())
-            z.close()
-            self.swift.put_object(entity, aggregation,
-                                  compressed.getvalue())
+        tsc = carbonara.TimeSerieCollection([
+            carbonara.TimeSerie([], [],
+                                max_size=size,
+                                sampling=pandas.tseries.offsets.Second(
+                                    second))
+            for second, size in archive
+        ])
+        compressed = six.BytesIO()
+        z = gzip.GzipFile(
+            fileobj=compressed, mode="wb",
+            compresslevel=self.compresslevel)
+        z.write(tsc.serialize())
+        z.close()
+        # TODO(jd): It's now dubious to have only one object in a container
+        # per entity. We should probably store each TimeSerie from the
+        # TimeSerieCollection in an object. But the question is what to use
+        # as a key?
+        self.swift.put_object(entity, 'last',
+                              compressed.getvalue())
 
     def delete_entity(self, entity):
         try:
@@ -121,44 +116,37 @@ class SwiftStorage(storage.StorageDriver):
             raise
 
     def add_measures(self, entity, measures):
-        # We are going to iterate multiple time over measures, so if it's a
-        # generator we need to build a list out of it right now.
-        measures = list(measures)
-        for aggregation in self.aggregation_types:
-            # NOTE(jd) Use a lock to not update the same entity+aggregation
-            # carbonara at the same time. If we don't do that, someone might
-            # other work might run add_measures() at the same time and we
-            # might overwrite its measures when re-puting the file in Swift.
-            # This should be replaceable by using a mechanism where we store
-            # the ETag when getting the object from Swift, then put with
-            # If-Match, and then restart the whole get/update/put if the put
-            # returned 412 (If-Match failed). But for now Swift does not
-            # support If-Match with ETag. :(
-            with self.coord.get_lock(b"gnocchi-" + entity.encode('ascii')
-                                     + b"-" + aggregation.encode('ascii')):
-                try:
-                    headers, contents = self.swift.get_object(
-                        entity, aggregation)
-                except swclient.ClientException as e:
-                    if e.http_status == 404:
-                        raise storage.EntityDoesNotExist(entity)
-                    raise
-                tsc = carbonara.TimeSerieCollection.unserialize(
-                    gzip.GzipFile(fileobj=six.BytesIO(contents)).read())
-                for measure in measures:
-                    tsc[measure.timestamp] = measure.value
-                compressed = six.BytesIO()
-                z = gzip.GzipFile(fileobj=compressed, mode="wb",
-                                  compresslevel=self.compresslevel)
-                z.write(tsc.serialize())
-                z.close()
-                self.swift.put_object(entity, aggregation,
-                                      compressed.getvalue())
+        # NOTE(jd) Use a lock to not update the same entity at the same
+        # time. If we don't do that, someone might other work might run
+        # add_measures() at the same time and we might overwrite its
+        # measures when re-puting the file in Swift. This should be
+        # replaceable by using a mechanism where we store the ETag when
+        # getting the object from Swift, then put with If-Match, and then
+        # restart the whole get/update/put if the put returned 412 (If-Match
+        # failed). But for now Swift does not support If-Match with ETag. :(
+        with self.coord.get_lock(b"gnocchi-" + entity.encode('ascii')):
+            try:
+                headers, contents = self.swift.get_object(
+                    entity, 'last')
+            except swclient.ClientException as e:
+                if e.http_status == 404:
+                    raise storage.EntityDoesNotExist(entity)
+                raise
+            tsc = carbonara.TimeSerieCollection.unserialize(
+                gzip.GzipFile(fileobj=six.BytesIO(contents)).read())
+            for measure in measures:
+                tsc[measure.timestamp] = measure.value
+            compressed = six.BytesIO()
+            z = gzip.GzipFile(fileobj=compressed, mode="wb",
+                              compresslevel=self.compresslevel)
+            z.write(tsc.serialize())
+            z.close()
+            self.swift.put_object(entity, 'last',
+                                  compressed.getvalue())
 
-    def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+    def get_measures(self, entity, from_timestamp=None, to_timestamp=None):
         try:
-            headers, contents = self.swift.get_object(entity, aggregation)
+            headers, contents = self.swift.get_object(entity, 'last')
         except swclient.ClientException as e:
             if e.http_status == 404:
                 raise storage.EntityDoesNotExist(entity)
