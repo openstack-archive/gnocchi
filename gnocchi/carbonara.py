@@ -27,8 +27,7 @@ class TimeSerie(object):
 
     def __init__(self, timestamps, values,
                  max_size=None,
-                 sampling=None, aggregation_method='last'):
-        self.aggregation_method = aggregation_method
+                 sampling=None):
         self.sampling = pandas.tseries.frequencies.to_offset(sampling)
         self.max_size = max_size
         self.ts = pandas.Series(values, timestamps)
@@ -38,8 +37,7 @@ class TimeSerie(object):
     def __eq__(self, other):
         return (self.ts.all() == other.ts.all()
                 and self.max_size == other.max_size
-                and self.sampling == other.sampling
-                and self.aggregation_method == other.aggregation_method)
+                and self.sampling == other.sampling)
 
     def __getitem__(self, key):
         return self.ts[key]
@@ -68,12 +66,10 @@ class TimeSerie(object):
             values, timestamps = (), ()
         return cls(values, timestamps,
                    max_size=d.get('max_size'),
-                   sampling=d.get('sampling'),
-                   aggregation_method=d.get('aggregation_method', 'last'))
+                   sampling=d.get('sampling'))
 
     def to_dict(self):
         return {
-            'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
             'sampling': (six.text_type(self.sampling.n)
                          + self.sampling.rule_code),
@@ -88,8 +84,7 @@ class TimeSerie(object):
 
     def _resample(self):
         if self.sampling:
-            self.ts = self.ts.resample(self.sampling,
-                                       how=self.aggregation_method)
+            self.ts = self.ts.resample(self.sampling, how='last')
 
     def update(self, ts):
         self.ts = ts.ts.combine_first(self.ts)
@@ -110,12 +105,6 @@ class TimeSerie(object):
 class TimeSerieCollection(object):
 
     def __init__(self, timeseries):
-        if timeseries:
-            agg = timeseries[0].aggregation_method
-        for ts in timeseries[1:]:
-            if ts.aggregation_method != agg:
-                raise ValueError(
-                    "All time series must use the same aggregation method")
         self.timeseries = sorted(timeseries,
                                  key=operator.attrgetter('sampling'))
 

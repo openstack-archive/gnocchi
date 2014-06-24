@@ -57,16 +57,6 @@ class TestTimeSerie(testtools.TestCase):
         self.assertEqual(1, len(ts))
         self.assertEqual(7, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
-    def test_down_sampling_mean(self):
-        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
-                                  datetime.datetime(2014, 1, 1, 12, 0, 4),
-                                  datetime.datetime(2014, 1, 1, 12, 0, 9)],
-                                 [3, 5, 7],
-                                 sampling='5Min',
-                                 aggregation_method='mean')
-        self.assertEqual(1, len(ts))
-        self.assertEqual(5, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
-
     def test_down_sampling_with_max_size(self):
         ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
                                   datetime.datetime(2014, 1, 1, 12, 1, 4),
@@ -78,45 +68,6 @@ class TestTimeSerie(testtools.TestCase):
         self.assertEqual(2, len(ts))
         self.assertEqual(7, ts[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 0)])
-
-    def test_down_sampling_with_max_size_mean(self):
-        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
-                                  datetime.datetime(2014, 1, 1, 12, 1, 4),
-                                  datetime.datetime(2014, 1, 1, 12, 1, 9),
-                                  datetime.datetime(2014, 1, 1, 12, 2, 12)],
-                                 [3, 5, 7, 1],
-                                 aggregation_method='mean',
-                                 sampling='1Min',
-                                 max_size=2)
-        self.assertEqual(2, len(ts))
-        self.assertEqual(6, ts[datetime.datetime(2014, 1, 1, 12, 1, 0)])
-        self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 0)])
-
-    def test_down_sampling_with_max_size_and_method_max(self):
-        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
-                                  datetime.datetime(2014, 1, 1, 12, 1, 4),
-                                  datetime.datetime(2014, 1, 1, 12, 1, 9),
-                                  datetime.datetime(2014, 1, 1, 12, 2, 12)],
-                                 [3, 5, 7, 1],
-                                 sampling='1Min',
-                                 max_size=2,
-                                 aggregation_method='max')
-        self.assertEqual(2, len(ts))
-        self.assertEqual(7, ts[datetime.datetime(2014, 1, 1, 12, 1, 0)])
-        self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 0)])
-
-    def test_to_dict_from_dict(self):
-        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
-                                  datetime.datetime(2014, 1, 1, 12, 1, 4),
-                                  datetime.datetime(2014, 1, 1, 12, 1, 9),
-                                  datetime.datetime(2014, 1, 1, 12, 2, 12)],
-                                 [3, 5, 7, 1],
-                                 sampling='1Min',
-                                 max_size=2,
-                                 aggregation_method='max')
-
-        ts2 = carbonara.TimeSerie.from_dict(ts.to_dict())
-        self.assertEqual(ts, ts2)
 
     def test_update(self):
         ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
