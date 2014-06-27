@@ -130,6 +130,30 @@ class TestTimeSerie(testtools.TestCase):
 
 class TestTimeSerieCollection(testtools.TestCase):
 
+    def test_with_non_multiple_sampling(self):
+        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
+                                  datetime.datetime(2014, 1, 1, 12, 1, 4),
+                                  datetime.datetime(2014, 1, 1, 12, 1, 9),
+                                  datetime.datetime(2014, 1, 1, 12, 2, 12)],
+                                 [3, 5, 7, 1],
+                                 sampling='1Min')
+        ts2 = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
+                                   datetime.datetime(2014, 1, 1, 12, 1, 4),
+                                   datetime.datetime(2014, 1, 1, 12, 1, 9),
+                                   datetime.datetime(2014, 1, 1, 12, 2, 12)],
+                                  [3, 5, 7, 1],
+                                  sampling='5Min')
+        ts3 = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
+                                   datetime.datetime(2014, 1, 1, 12, 1, 4),
+                                   datetime.datetime(2014, 1, 1, 12, 1, 9),
+                                   datetime.datetime(2014, 1, 1, 12, 2, 12)],
+                                  [3, 5, 7, 1],
+                                  sampling='8Min')
+        self.assertRaisesRegexp(ValueError,
+                                "sampling periods are not multiple",
+                                carbonara.TimeSerieCollection,
+                                [ts, ts3, ts2])
+
     def test_fetch(self):
         ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
                                   datetime.datetime(2014, 1, 1, 12, 1, 4),

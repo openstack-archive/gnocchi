@@ -16,6 +16,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 """Time series data manipulation, better with pancetta."""
+import itertools
 import operator
 
 import msgpack
@@ -115,6 +116,14 @@ class TimeSerieCollection(object):
                     "All time series must use the same aggregation method")
         self.timeseries = sorted(timeseries,
                                  key=operator.attrgetter('sampling'))
+
+        # Check that (ts1, ts2) are multiple, then (ts2, ts3), etc.
+        for ts1, ts2 in itertools.izip(self.timeseries, self.timeseries[1:]):
+            if ts2.sampling.nanos % ts1.sampling.nanos != 0:
+                raise ValueError(
+                    "Timeserie %s and timeserie %s sampling periods"
+                    " are not multiple (%dns and %dns)"
+                    % (ts1, ts2, ts1.sampling.nanos, ts2.sampling.nanos))
 
     def fetch(self, from_timestamp=None, to_timestamp=None):
         result = pandas.Series()
