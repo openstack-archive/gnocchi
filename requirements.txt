@@ -1,5 +1,6 @@
 babel
 iso8601
+influxdb >= 0.1.11
 lockfile>=0.9.1
 netaddr
 oslo.config
