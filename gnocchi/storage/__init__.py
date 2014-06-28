@@ -105,7 +105,7 @@ class StorageDriver(object):
     @staticmethod
     def get_measures(entity, from_timestamp=None, to_timestamp=None,
                      aggregation='mean', granularity=None):
-        """Add a measure to an entity.
+        """Get measures for an entity.
 
         :param entity: The entity measured.
         :param from timestamp: The timestamp to get the measure from.
