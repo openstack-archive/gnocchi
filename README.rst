@@ -1,3 +1,4 @@
+
 ========
  Gnocchi
 ========
@@ -71,7 +72,19 @@ Edit `/etc/gnocchi/gnocchi.conf`. Shown below is a sample configuration file::
     [database]
     connection = mysql://username:password@host/gnocchi
 
-To use postgresql instead, set the database connection string accordingly::
+To use InfluxDB instead of Swift as the timeseries storage layer, use the
+following storage section::
+
+    [storage]
+    driver = influx
+    influx_host = localhost
+    influx_port = 8086
+    influx_user = root
+    influx_password = root
+    influx_database = gnocchi
+
+To use postgresql instead of mysql as indexer storage layer, set the database
+connection string accordingly::
 
     connection = postgres://username:pasword@host/gnocchi
 
@@ -100,7 +113,21 @@ entity with an archive that stores one point every second for an hour
 
     curl -i http://0.0.0.0:8041/v1/entity -X POST \
       -H "Content-Type: application/json" -H "Accept: application/json" \
-      -d '{"archives": [[1, 3600]]}'
+      -d '{"archives": [[60, 3600]]}'
+
+Capture the entity UUID in an environment variable called ENTITY_ID and
+then submit some datapoints:
+
+    for i in {1..50}; do
+        ts="2013-01-01 23:23:`printf %02d $i`.`printf %03d $[($RANDOM % 1000)]`"
+        curl -i http://0.0.0.0:8041/v1/entity/$ENTITY_ID/measures -X POST \
+          -H "Content-Type: application/json" -d "[{\"timestamp\": \"$ts\", \"value\": $i.0}]"
+    done
+
+Then retrieve the mean of these datapoints via:
+
+    curl -i http://0.0.0.0:8041/v1/entity/$ENTITY_ID/measures?aggregation=mean -X GET \
+      -H "Content-Type: application/json" -H "Accept: application/json"
 
 Or::
 
