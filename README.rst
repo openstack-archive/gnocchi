@@ -1,3 +1,4 @@
+
 ========
  Gnocchi
 ========
@@ -71,7 +72,19 @@ Edit `/etc/gnocchi/gnocchi.conf`. Shown below is a sample configuration file::
     [database]
     connection = mysql://username:password@host/gnocchi
 
-To use postgresql instead, set the database connection string accordingly::
+To use InfluxDB instead of Swift as the timeseries storage layer, use the
+following storage section::
+
+    [storage]
+    driver = influx
+    influx_host = localhost
+    influx_port = 8086
+    influx_user = root
+    influx_password = root
+    influx_database = gnocchi
+
+To use postgresql instead of mysql as indexer storage layer, set the database
+connection string accordingly::
 
     connection = postgres://username:pasword@host/gnocchi
 
