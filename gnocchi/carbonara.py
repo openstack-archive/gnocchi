@@ -271,10 +271,13 @@ class TimeSerieArchive(object):
                        aggregation_method=aggregation_method)
                     for sampling, size in definitions])
 
-    def fetch(self, from_timestamp=None, to_timestamp=None):
+    def fetch(self, from_timestamp=None, to_timestamp=None, granularity=None):
         result = pandas.Series()
         for ts in self.agg_timeseries:
-            result = result.combine_first(ts[from_timestamp:to_timestamp])
+            if (granularity is None or ts._serialize_time_period(ts.sampling)
+                    == '%sS' % granularity):
+                result = result.combine_first(ts[from_timestamp:
+                                                     to_timestamp])
         return dict(result)
 
     def __eq__(self, other):
