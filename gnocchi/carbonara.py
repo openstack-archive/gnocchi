@@ -269,14 +269,16 @@ class TimeSerieArchive(object):
                        for sampling, size in definitions
                    ])
 
-    def fetch(self, from_timestamp=None, to_timestamp=None):
+    def fetch(self, from_timestamp=None, to_timestamp=None, granularity=None):
         result = pandas.Series()
         fts = pandas.Timestamp(from_timestamp,
                                unit='s') if from_timestamp else None
         tts = pandas.Timestamp(to_timestamp,
                                unit='s') if to_timestamp else None
         for ts in self.agg_timeseries:
-            result = result.combine_first(ts[fts:tts])
+            if (granularity is None or
+                ts._serialize_time_period(ts.sampling) == '%sS' % granularity):
+                result = result.combine_first(ts[fts:tts])
         return dict(result)
 
     def __eq__(self, other):
