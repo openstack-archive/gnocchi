@@ -1,0 +1,525 @@
+From 8a53deb069a12b44a8e2371e776458d6ff0576ad Mon Sep 17 00:00:00 2001
+From: Ana Malagon <atmalagon@gmail.com>
+Date: Wed, 2 Jul 2014 22:03:19 -0400
+Subject: [PATCH 2/2] Extension for moving aggregation in API layer
+
+Added extension for moving average, moving variance,
+ewma. Unit tests added.
+
+Query syntax (recognizes two parameters, granularity and center):
+
+    GET /v1/entity/UUID/measures?aggregation=moving-average&
+	granularity=30S&center=False
+or
+    GET /v1/entity/UUID/measures?aggregation=ewma&granularity=60S
+
+If granularity is not specified, the moving aggregates are computed
+on the data using the coarsest archive granularity. If 1S resolution
+data is not available, the moving aggregates are performed on the
+rolled-up timeseries.
+
+Change-Id: If40e58480f1512dd17b9c09cb75fd54c7193c257
+---
+ gnocchi/aggregates/__init__.py           |   47 +++++++++++++
+ gnocchi/aggregates/rolling_statistics.py |  113 ++++++++++++++++++++++++++++++
+ gnocchi/rest/__init__.py                 |   43 ++++++++----
+ gnocchi/rest/app.py                      |    1 -
+ gnocchi/storage/file.py                  |    2 +-
+ gnocchi/tests/test_aggregation.py        |   72 +++++++++++++++++++
+ gnocchi/tests/test_rest.py               |   89 +++++++++++++++++++++--
+ setup.cfg                                |    5 ++
+ 8 files changed, 353 insertions(+), 19 deletions(-)
+ create mode 100644 gnocchi/aggregates/__init__.py
+ create mode 100644 gnocchi/aggregates/rolling_statistics.py
+ create mode 100644 gnocchi/tests/test_aggregation.py
+
+diff --git a/gnocchi/aggregates/__init__.py b/gnocchi/aggregates/__init__.py
+new file mode 100644
+index 0000000..66645d8
+--- /dev/null
++++ b/gnocchi/aggregates/__init__.py
+@@ -0,0 +1,47 @@
++# -*- encoding: utf-8 -*-
++#
++#
++# Authors: Ana Malagon  <atmalagon@gmail.com>
++#
++# Licensed under the Apache License, Version 2.0 (the "License"); you may
++# not use this file except in compliance with the License. You may obtain
++# a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
++# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
++# License for the specific language governing permissions and limitations
++# under the License.
++
++import abc
++
++import six
++
++
++@six.add_metaclass(abc.ABCMeta)
++class CustomAggregationFailure(Exception):
++    '''Error raised when aggregation fails.'''
++
++    def __init__(self, msg):
++        self.msg = msg
++        super(CustomAggregationFailure, self).__init__(msg)
++
++
++@six.add_metaclass(abc.ABCMeta)
++class CustomAggregator(object):
++
++    @abc.abstractmethod
++    def compute(storage_object, entity_id, start, stop, granularity, **params):
++        '''Returns the custom aggregated data.
++
++        :param storage_object: The storage object to call get_measures
++        :param entity_id: Entity id
++        :param start: start timestamp
++        :param stop: stop timestamp
++        :param granularity: time window
++        :param **params: for moving aggregates, an optional paramter center
++                         can be specified
++
++        '''
+diff --git a/gnocchi/aggregates/rolling_statistics.py b/gnocchi/aggregates/rolling_statistics.py
+new file mode 100644
+index 0000000..36927ce
+--- /dev/null
++++ b/gnocchi/aggregates/rolling_statistics.py
+@@ -0,0 +1,113 @@
++# -*- encoding: utf-8 -*-
++#
++#
++# Authors: Ana Malagon  <atmalagon@gmail.com>
++#
++# Licensed under the Apache License, Version 2.0 (the "License"); you may
++# not use this file except in compliance with the License. You may obtain
++# a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
++# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
++# License for the specific language governing permissions and limitations
++# under the License.
++
++import datetime
++
++import numpy as np
++import pandas as pd
++
++from gnocchi import aggregates
++
++
++def aggregate_result(data, func, window, center=False, min_periods=1):
++    '''Performs aggregation on data.'''
++    def rolling_window(x):
++        if center:
++            dslice = data[x - datetime.timedelta(seconds=window) / 2
++                          + datetime.timedelta(milliseconds=1):
++                          x + datetime.timedelta(seconds=window) / 2
++                          - datetime.timedelta(milliseconds=1)]
++            # NOTE(atmalagon): the millisecond adjustment is so that we do
++            # not have inclusive endpoints.
++        else:
++            dslice = data[x - datetime.timedelta(seconds=window) + datetime.
++                          timedelta(milliseconds=1):x]
++        if dslice.size < min_periods:
++            return np.nan
++        else:
++            return func(dslice)
++
++    data = pd.Series(data)
++    idx = pd.DatetimeIndex(data.index)
++    data = pd.Series(data, index=idx).sort_index()
++    idx = pd.Series(data.index, index=data.index)
++    if window is None:
++        window = (idx[1] - idx[0]).total_seconds()
++    try:
++        result = idx.apply(rolling_window).dropna()
++        return result.to_dict()
++    except Exception as e:
++        raise aggregates.CustomAggregationFailure(str(e))
++
++
++class RollingMean(aggregates.CustomAggregator):
++
++    def compute(self, storage_object, entity_id, start, stop, granularity,
++                center=False):
++
++        data = storage_object.get_measures(entity_id, start, stop,
++                                           granularity=1)
++        if not data:
++            data = storage_object.get_measures(entity_id, start, stop)
++
++        if center:
++            center = (center.upper() == 'T')
++
++        return aggregate_result(data, np.mean, granularity,
++                                center, min_periods=1)
++
++
++class RollingVariance(aggregates.CustomAggregator):
++
++    def compute(self, storage_object, entity_id, start, stop, granularity,
++                center=False):
++
++        data = storage_object.get_measures(entity_id, start, stop,
++                                           granularity=1)
++
++        if not data:
++            data = storage_object.get_measures(entity_id, start, stop)
++
++        if center:
++            center = (center.upper() == 'T')
++
++        return aggregate_result(data, np.var, granularity,
++                                center, min_periods=2)
++
++
++class EWMA(aggregates.CustomAggregator):
++
++    def compute(self, storage_object, entity_id, start, stop, granularity):
++
++        data = storage_object.get_measures(entity_id, start, stop,
++                                           granularity=1)
++
++        if not data:
++            data = storage_object.get_measures(entity_id, start, stop)
++
++        data = pd.Series(data)
++        idx = pd.DatetimeIndex(data.index)
++        data = pd.Series(data, index=idx).sort_index()
++
++        result = []
++        result.append(data[0])
++        for j in range(1, len(data)):
++            delta = (data.index[j] - data.index[j - 1]).total_seconds()
++            w = np.exp(- delta / granularity)
++            result.append(result[-1] * w + data[j] * (1 - w))
++
++        return pd.Series(result, index=data.index).dropna().to_dict()
+diff --git a/gnocchi/rest/__init__.py b/gnocchi/rest/__init__.py
+index 75abb37..c2b997a 100644
+--- a/gnocchi/rest/__init__.py
++++ b/gnocchi/rest/__init__.py
+@@ -30,9 +30,12 @@ import six
+ import voluptuous
+ import werkzeug.http
+ 
++from gnocchi import aggregates
+ from gnocchi import indexer
+ from gnocchi import storage
+ 
++from stevedore import extension
++
+ 
+ def deserialize(schema):
+     try:
+@@ -77,6 +80,10 @@ class EntityController(rest.RestController):
+     def __init__(self, entity_id):
+         self.entity_id = entity_id
+ 
++        mgr = extension.ExtensionManager(namespace='gnocchi.aggregates',
++                                         invoke_on_load=True)
++
++        self.custom_aggregates = dict((x.name, x.obj) for x in mgr)
+     Measures = voluptuous.Schema([{
+         voluptuous.Required("timestamp"):
+         Timestamp,
+@@ -98,23 +105,35 @@ class EntityController(rest.RestController):
+ 
+     @pecan.expose('json')
+     def get_measures(self, start=None, stop=None, aggregation='mean',
+-                     granularity=None):
+-        if aggregation not in storage.AGGREGATION_TYPES:
+-            pecan.abort(400, "Invalid aggregation value %s, must be one of %s"
+-                        % (aggregation, str(storage.AGGREGATION_TYPES)))
++                     granularity=None, **agg_params):
++        if not (aggregation in storage.AGGREGATION_TYPES or
++                aggregation in self.custom_aggregates):
++            pecan.abort(400, "Invalid aggregation value %(aggregation)s, "
++                        "must be one of %(standard)s or custom %(custom)s"
++                        % dict(aggregation=aggregation,
++                               standard=str(storage.AGGREGATION_TYPES),
++                               custom=str(self.custom_aggregates)))
+ 
+         try:
+             if granularity:
+-                granularity = pandas.datetools.to_offset(
+-                    granularity).delta.total_seconds()
+-            # Replace timestamp keys by their string versions
+-            return dict((timeutils.strtime(k), v)
+-                        for k, v
+-                        in six.iteritems(pecan.request.storage.get_measures(
+-                            self.entity_id, start, stop, aggregation,
+-                            granularity)))
++                granularity = int(pandas.datetools.to_offset(
++                    granularity).delta.total_seconds())
++            if aggregation in self.custom_aggregates:
++                measures = self.custom_aggregates[aggregation].compute(
++                    pecan.request.storage, self.entity_id, start, stop,
++                    granularity, **agg_params)
++            else:
++                measures = pecan.request.storage.get_measures(self.entity_id,
++                                                              start, stop,
++                                                              aggregation,
++                                                              granularity)
++
++            return dict((timeutils.strtime(k), v) for k, v
++                        in six.iteritems(measures))
+         except storage.EntityDoesNotExist as e:
+             pecan.abort(404, str(e))
++        except aggregates.CustomAggregationFailure as e:
++            pecan.abort(404, str(e))
+ 
+     @pecan.expose()
+     def delete(self):
+diff --git a/gnocchi/rest/app.py b/gnocchi/rest/app.py
+index e8029e5..56fdc83 100644
+--- a/gnocchi/rest/app.py
++++ b/gnocchi/rest/app.py
+@@ -59,7 +59,6 @@ class DBHook(pecan.hooks.PecanHook):
+         state.request.storage = self.storage
+         state.request.indexer = self.indexer
+ 
+-
+ PECAN_CONFIG = {
+     'app': {
+         'root': 'gnocchi.rest.RootController',
+diff --git a/gnocchi/storage/file.py b/gnocchi/storage/file.py
+index fe3b872..9808f0a 100644
+--- a/gnocchi/storage/file.py
++++ b/gnocchi/storage/file.py
+@@ -95,7 +95,7 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
+                         aggregation_file.write(tsc.serialize())
+ 
+     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
+-                     aggregation='mean'):
++                     aggregation='mean', granularity=None):
+         path = os.path.join(self.basepath, entity, aggregation)
+ 
+         try:
+diff --git a/gnocchi/tests/test_aggregation.py b/gnocchi/tests/test_aggregation.py
+new file mode 100644
+index 0000000..34af5e4
+--- /dev/null
++++ b/gnocchi/tests/test_aggregation.py
+@@ -0,0 +1,72 @@
++# -*- encoding: utf-8 -*-
++#
++# Copyright © 2014 Openstack Foundation
++#
++# Authors: Ana Malagon <atmalagon@gmail.com>
++#
++# Licensed under the Apache License, Version 2.0 (the "License"); you may
++# not use this file except in compliance with the License. You may obtain
++# a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
++# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
++# License for the specific language governing permissions and limitations
++# under the License.
++import datetime
++
++import testscenarios
++
++from gnocchi.aggregates import rolling_statistics
++from gnocchi import storage
++from gnocchi.storage import swift
++from gnocchi import tests
++
++from stevedore import extension
++
++load_tests = testscenarios.load_tests_apply_scenarios
++
++
++class TestAggregation(tests.TestCase):
++    def test_dict(self):
++        self.conf.set_override('driver', 'swift', 'storage')
++        driver = storage.get_driver(self.conf)
++        self.assertIsInstance(driver, swift.SwiftStorage)
++        self.storage.create_entity("foo", [(1, 1)])
++        mgr = extension.ExtensionManager(namespace='gnocchi.aggregates',
++                                         invoke_on_load=True)
++
++        self.custom_aggregates = dict((x.name, x.obj) for x in mgr)
++        self.assertIsInstance(self.custom_aggregates['moving-average'],
++                              rolling_statistics.RollingMean)
++        self.assertIsInstance(self.custom_aggregates['moving-variance'],
++                              rolling_statistics.RollingVariance)
++        self.assertIsInstance(self.custom_aggregates['ewma'],
++                              rolling_statistics.EWMA)
++
++    def test_compute(self):
++        mgr = extension.ExtensionManager(namespace='gnocchi.aggregates',
++                                         invoke_on_load=True)
++        self.custom_aggregates = dict((x.name, x.obj) for x in mgr)
++        self.storage.create_entity("foo", [(1, 5)])
++        self.storage.add_measures('foo', [
++            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
++            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 2), 42),
++            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 3), 4),
++            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 4), 44),
++        ])
++
++        values = self.custom_aggregates['moving-average'].compute(
++            self.storage, 'foo', '2014-01-01 12:00:01', '2014-01-01 12:00:04',
++            granularity=2, center='False')
++        self.assertEqual(4, len(values))
++        self.assertEqual(69, values[datetime.datetime(2014, 1, 1, 12, 0, 1)])
++        self.assertEqual(55.5, values[datetime.datetime(2014, 1, 1, 12, 0, 2)])
++        self.assertEqual(23, values[datetime.datetime(2014, 1, 1, 12, 0, 3)])
++        self.assertEqual(24, values[datetime.datetime(2014, 1, 1, 12, 0, 4)])
++        self.storage.delete_entity("foo")
++        # TODO(atmalagon): test for case when center='True' (both for
++        # granularity even and odd), and case when
++        # granularity is larger than archive granularity.
+diff --git a/gnocchi/tests/test_rest.py b/gnocchi/tests/test_rest.py
+index ea78280..e955301 100644
+--- a/gnocchi/tests/test_rest.py
++++ b/gnocchi/tests/test_rest.py
+@@ -198,7 +198,7 @@ class EntityTest(RestTest):
+     def test_get_measure_aggregation_granularity(self):
+         result = self.app.post_json("/v1/entity",
+                                     params={"archives": [(1, 50), (5, 10)]})
+-        entity = jsonutils.loads(result.body)
++        entity = json.loads(result.body)
+         self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                            params=[{"timestamp": '2013-01-01 12:00:01',
+                                     "value": 123.2},
+@@ -206,23 +206,102 @@ class EntityTest(RestTest):
+                                     "value": 12345.2},
+                                    {"timestamp": '2013-01-01 12:00:02',
+                                     "value": 1234.2}])
+-        path = "/v1/entity/%s/measures?aggregation=max&granularity=%d"
++        path = "/v1/entity/%s/measures?aggregation=max&granularity=%dS"
+         ret = self.app.get(path % (entity['id'], 5))
+         self.assertEqual(ret.status_code, 200)
+-        result = jsonutils.loads(ret.body)
++        result = json.loads(ret.body)
+         self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2},
+                          result)
+         ret = self.app.get(path % (entity['id'], 1))
+         self.assertEqual(ret.status_code, 200)
+-        result = jsonutils.loads(ret.body)
++        result = json.loads(ret.body)
+         self.assertEqual(123.2, result.get('2013-01-01T12:00:01.000000'))
+         self.assertEqual(1234.2, result.get('2013-01-01T12:00:02.000000'))
+         self.assertEqual(12345.2, result.get('2013-01-01T12:00:03.000000'))
+         ret = self.app.get(path % (entity['id'], 60))
+         self.assertEqual(ret.status_code, 200)
+-        result = jsonutils.loads(ret.body)
++        result = json.loads(ret.body)
+         self.assertEqual({}, result)
+ 
++    def _test_get_measure_aggregation_custom(self, agg_method, expected):
++        result = self.app.post_json("/v1/entity",
++                                    params={"archives": [(1, 50), (2, 10)]})
++        entity = json.loads(result.body)
++        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
++                           params=[{"timestamp": '2013-01-01 12:00:01',
++                                    "value": 123.2},
++                                   {"timestamp": '2013-01-01 12:00:03',
++                                    "value": 12345.2},
++                                   {"timestamp": '2013-01-01 12:00:02',
++                                    "value": 1234.2}])
++        path = "/v1/entity/%s/measures?aggregation=%s&granularity=%s"
++        ret = self.app.get(path % (entity['id'], agg_method, '2S'))
++        self.assertEqual(ret.status_code, 200)
++        result = json.loads(ret.body)
++        self.assertAlmostEqual(expected, result.
++                               get('2013-01-01T12:00:02.000000'))
++
++    def _test_get_measure_aggregation_custom_coarse(self, agg_method,
++                                                    expected):
++        result = self.app.post_json("/v1/entity",
++                                    params={"archives": [(2, 10)]})
++        entity = json.loads(result.body)
++        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
++                           params=[{"timestamp": '2013-01-01 12:00:01',
++                                    "value": 123.2},
++                                   {"timestamp": '2013-01-01 12:00:03',
++                                    "value": 12345.2},
++                                   {"timestamp": '2013-01-01 12:00:02',
++                                    "value": 1234.2}])
++        path = "/v1/entity/%s/measures?aggregation=%s&granularity=%s"
++        ret = self.app.get(path % (entity['id'], agg_method, '4S'))
++        self.assertEqual(ret.status_code, 200)
++        result = json.loads(ret.body)
++        self.assertAlmostEqual(expected, result.
++                               get('2013-01-01T12:00:02.000000'))
++
++    def _test_get_measure_aggregation_custom_center(self, agg_method,
++                                                    expected):
++        result = self.app.post_json("/v1/entity",
++                                    params={"archives": [(1, 5)]})
++        entity = json.loads(result.body)
++        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
++                           params=[{"timestamp": '2013-01-01 12:00:01',
++                                    "value": 123.2},
++                                   {"timestamp": '2013-01-01 12:00:03',
++                                    "value": 12345.2},
++                                   {"timestamp": '2013-01-01 12:00:02',
++                                    "value": 1234.2}])
++        path = "/v1/entity/%s/measures?aggregation=%s&granularity=%s&center=%s"
++        ret = self.app.get(path % (entity['id'], agg_method, '3S', 'True'))
++        self.assertEqual(ret.status_code, 200)
++        result = json.loads(ret.body)
++        self.assertAlmostEqual(expected, result.
++                               get('2013-01-01T12:00:02.000000'))
++
++    def test_get_measure_aggregation_ewma(self):
++        self._test_get_measure_aggregation_custom('ewma', 560.3444370592642)
++        self._test_get_measure_aggregation_custom_coarse('ewma',
++                                                         2746.2633570257294)
++
++    def test_get_measure_aggregation_moving_average(self):
++        self._test_get_measure_aggregation_custom('moving-average', 678.7)
++        self._test_get_measure_aggregation_custom_center('moving-average',
++                                                         678.7)
++        # TODO(atmalagon): using center=True does not seem to give different
++        # answers from center=False. This is probably a bug, need to
++        # investigate.
++        self._test_get_measure_aggregation_custom_coarse('moving-average',
++                                                         3456.45)
++
++    def test_get_measure_aggregation_moving_variance(self):
++        self._test_get_measure_aggregation_custom('moving-variance',
++                                                  308580.25)
++        self._test_get_measure_aggregation_custom_center('moving-variance',
++                                                         308580.25)
++        self._test_get_measure_aggregation_custom_coarse('moving-variance',
++                                                         11110555.5625)
++
+ 
+ class ResourceTest(RestTest):
+ 
+diff --git a/setup.cfg b/setup.cfg
+index 0b4b175..36bf72f 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -37,6 +37,11 @@ gnocchi.indexer =
+     null = gnocchi.indexer.null:NullIndexer
+     sqlalchemy = gnocchi.indexer.sqlalchemy:SQLAlchemyIndexer
+ 
++gnocchi.aggregates =
++    moving-average = gnocchi.aggregates.rolling_statistics:RollingMean
++    moving-variance = gnocchi.aggregates.rolling_statistics:RollingVariance
++    ewma = gnocchi.aggregates.rolling_statistics:EWMA
++
+ console_scripts =
+     gnocchi-api = gnocchi.cli:api
+     gnocchi-dbsync = gnocchi.cli:storage_dbsync
+-- 
+1.7.9.5
+
