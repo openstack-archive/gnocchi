@@ -349,6 +349,27 @@ class EntityTest(RestTest):
                           '2013-01-01T00:00:00.000000': 12345.2},
                          result)
 
+    def test_get_measure_aggregation_granularity(self):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "high"})
+        entity = json.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 123.2},
+                                   {"timestamp": '2013-01-01 12:00:03',
+                                    "value": 12345.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 1234.2}])
+        path = "/v1/entity/%s/measures?aggregation=max&granularity=%s"
+        ret = self.app.get(path % (entity['id'], '5S')
+        self.assertEqual(ret.status_code, 200)
+        result = json.loads(ret.body)
+        self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2,
+                         result)
+        ret = self.app.get(path % (entity['id'], '1S')
+        self.assertEqual(123.2, result.get('2013-01-01T12:00:01.000000'))
+        self.assertEqual(1234.2, result.get('2013-01-01T12:00:02.000000'))
+        self.assertEqual(12345.2, result.get('2013-01-01T12:00:03.000000'))
 
 class ResourceTest(RestTest):
 
