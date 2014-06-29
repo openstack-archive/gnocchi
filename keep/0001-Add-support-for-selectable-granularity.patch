@@ -1,0 +1,167 @@
+From 7d3fb3d0dbdf5402e704646615b6f510207feb9b Mon Sep 17 00:00:00 2001
+From: Eoghan Glynn <eglynn@redhat.com>
+Date: Sun, 29 Jun 2014 16:24:28 +0100
+Subject: [PATCH 1/2] Add support for selectable granularity
+
+Instead of retrieving datapoints of mixed granularities from
+multi-archive entities, the caller now has the option to specify
+the required granularity in seconds.
+
+For example to explicitly select per-minute means:
+
+  GET /v1/entity/UUID/measures?aggregation=mean&granularity=60S
+
+If there is no archive of that granularity defined for the entity,
+then the storage driver is free to return an empty response, or to
+downsample to the requested granularity on-demand (in the case where
+the driver has retained sufficient finer-grained data to do so).
+
+Change-Id: I01d117e90bd352521a4e5e556cc09ed7fcefb367
+---
+ gnocchi/carbonara.py        |    6 ++++--
+ gnocchi/rest/__init__.py    |   10 ++++++++--
+ gnocchi/storage/__init__.py |    3 ++-
+ gnocchi/storage/swift.py    |    4 ++--
+ gnocchi/tests/test_rest.py  |   28 ++++++++++++++++++++++++++++
+ 5 files changed, 44 insertions(+), 7 deletions(-)
+
+diff --git a/gnocchi/carbonara.py b/gnocchi/carbonara.py
+index 809019d..bb58446 100644
+--- a/gnocchi/carbonara.py
++++ b/gnocchi/carbonara.py
+@@ -269,14 +269,16 @@ class TimeSerieArchive(object):
+                        for sampling, size in definitions
+                    ])
+ 
+-    def fetch(self, from_timestamp=None, to_timestamp=None):
++    def fetch(self, from_timestamp=None, to_timestamp=None, granularity=None):
+         result = pandas.Series()
+         fts = pandas.Timestamp(from_timestamp,
+                                unit='s') if from_timestamp else None
+         tts = pandas.Timestamp(to_timestamp,
+                                unit='s') if to_timestamp else None
+         for ts in self.agg_timeseries:
+-            result = result.combine_first(ts[fts:tts])
++            if (granularity is None or
++                ts._serialize_time_period(ts.sampling) == '%sS' % granularity):
++                result = result.combine_first(ts[fts:tts])
+         return dict(result)
+ 
+     def __eq__(self, other):
+diff --git a/gnocchi/rest/__init__.py b/gnocchi/rest/__init__.py
+index b16ea07..75abb37 100644
+--- a/gnocchi/rest/__init__.py
++++ b/gnocchi/rest/__init__.py
+@@ -23,6 +23,7 @@ import uuid
+ import iso8601
+ from oslo.utils import strutils
+ from oslo.utils import timeutils
++import pandas
+ import pecan
+ from pecan import rest
+ import six
+@@ -96,17 +97,22 @@ class EntityController(rest.RestController):
+         pecan.response.status = 204
+ 
+     @pecan.expose('json')
+-    def get_measures(self, start=None, stop=None, aggregation='mean'):
++    def get_measures(self, start=None, stop=None, aggregation='mean',
++                     granularity=None):
+         if aggregation not in storage.AGGREGATION_TYPES:
+             pecan.abort(400, "Invalid aggregation value %s, must be one of %s"
+                         % (aggregation, str(storage.AGGREGATION_TYPES)))
+ 
+         try:
++            if granularity:
++                granularity = pandas.datetools.to_offset(
++                    granularity).delta.total_seconds()
+             # Replace timestamp keys by their string versions
+             return dict((timeutils.strtime(k), v)
+                         for k, v
+                         in six.iteritems(pecan.request.storage.get_measures(
+-                            self.entity_id, start, stop, aggregation)))
++                            self.entity_id, start, stop, aggregation,
++                            granularity)))
+         except storage.EntityDoesNotExist as e:
+             pecan.abort(404, str(e))
+ 
+diff --git a/gnocchi/storage/__init__.py b/gnocchi/storage/__init__.py
+index af13e9c..e551a3d 100644
+--- a/gnocchi/storage/__init__.py
++++ b/gnocchi/storage/__init__.py
+@@ -121,12 +121,13 @@ class StorageDriver(object):
+ 
+     @staticmethod
+     def get_measures(entity, from_timestamp=None, to_timestamp=None,
+-                     aggregation='average'):
++                     aggregation='mean', granularity=None):
+         """Add a measure to an entity.
+ 
+         :param entity: The entity measured.
+         :param from timestamp: The timestamp to get the measure from.
+         :param to timestamp: The timestamp to get the measure to.
+         :param aggregation: The type of aggregation to retrieve.
++        :param granularity: The per-second granularity required.
+         """
+         raise NotImplementedError
+diff --git a/gnocchi/storage/swift.py b/gnocchi/storage/swift.py
+index 814f3ef..69860a3 100644
+--- a/gnocchi/storage/swift.py
++++ b/gnocchi/storage/swift.py
+@@ -123,7 +123,7 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
+                 self.swift.put_object(entity, aggregation, tsc.serialize())
+ 
+     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
+-                     aggregation='mean'):
++                     aggregation='mean', granularity=None):
+         try:
+             headers, contents = self.swift.get_object(entity, aggregation)
+         except swclient.ClientException as e:
+@@ -131,4 +131,4 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
+                 raise storage.EntityDoesNotExist(entity)
+             raise
+         tsc = carbonara.TimeSerieArchive.unserialize(contents)
+-        return dict(tsc.fetch(from_timestamp, to_timestamp))
++        return dict(tsc.fetch(from_timestamp, to_timestamp, granularity))
+diff --git a/gnocchi/tests/test_rest.py b/gnocchi/tests/test_rest.py
+index 873a374..ea78280 100644
+--- a/gnocchi/tests/test_rest.py
++++ b/gnocchi/tests/test_rest.py
+@@ -195,6 +195,34 @@ class EntityTest(RestTest):
+         self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2},
+                          result)
+ 
++    def test_get_measure_aggregation_granularity(self):
++        result = self.app.post_json("/v1/entity",
++                                    params={"archives": [(1, 50), (5, 10)]})
++        entity = jsonutils.loads(result.body)
++        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
++                           params=[{"timestamp": '2013-01-01 12:00:01',
++                                    "value": 123.2},
++                                   {"timestamp": '2013-01-01 12:00:03',
++                                    "value": 12345.2},
++                                   {"timestamp": '2013-01-01 12:00:02',
++                                    "value": 1234.2}])
++        path = "/v1/entity/%s/measures?aggregation=max&granularity=%d"
++        ret = self.app.get(path % (entity['id'], 5))
++        self.assertEqual(ret.status_code, 200)
++        result = jsonutils.loads(ret.body)
++        self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2},
++                         result)
++        ret = self.app.get(path % (entity['id'], 1))
++        self.assertEqual(ret.status_code, 200)
++        result = jsonutils.loads(ret.body)
++        self.assertEqual(123.2, result.get('2013-01-01T12:00:01.000000'))
++        self.assertEqual(1234.2, result.get('2013-01-01T12:00:02.000000'))
++        self.assertEqual(12345.2, result.get('2013-01-01T12:00:03.000000'))
++        ret = self.app.get(path % (entity['id'], 60))
++        self.assertEqual(ret.status_code, 200)
++        result = jsonutils.loads(ret.body)
++        self.assertEqual({}, result)
++
+ 
+ class ResourceTest(RestTest):
+ 
+-- 
+1.7.9.5
+

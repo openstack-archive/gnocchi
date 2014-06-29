@@ -1,0 +1,186 @@
+From a60f9579b7262d08b4ee64b0845e253651a14c05 Mon Sep 17 00:00:00 2001
+From: Julien Danjou <julien@danjou.info>
+Date: Mon, 22 Sep 2014 17:49:24 +0200
+Subject: [PATCH] rest: add support for create/get archive policies
+
+Change-Id: Ie460120bb98260f1568eef35fe725060033e77c8
+---
+ gnocchi/indexer/__init__.py   |    4 +++
+ gnocchi/indexer/sqlalchemy.py |    4 +++
+ gnocchi/rest/__init__.py      |   39 ++++++++++++++++++++++
+ gnocchi/tests/test_rest.py    |   72 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 119 insertions(+)
+
+diff --git a/gnocchi/indexer/__init__.py b/gnocchi/indexer/__init__.py
+index dbb85b3..37e3004 100644
+--- a/gnocchi/indexer/__init__.py
++++ b/gnocchi/indexer/__init__.py
+@@ -146,6 +146,10 @@ class IndexerDriver(object):
+         raise gnocchi.NotImplementedError
+ 
+     @staticmethod
++    def list_archive_policies():
++        raise gnocchi.NotImplementedError
++
++    @staticmethod
+     def get_archive_policy(name):
+         raise gnocchi.NotImplementedError
+ 
+diff --git a/gnocchi/indexer/sqlalchemy.py b/gnocchi/indexer/sqlalchemy.py
+index d33b7af..26c86d4 100644
+--- a/gnocchi/indexer/sqlalchemy.py
++++ b/gnocchi/indexer/sqlalchemy.py
+@@ -239,6 +239,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
+             raise indexer.UnknownResourceType(resource_type)
+         return self._RESOURCE_CLASS_MAPPER[resource_type]
+ 
++    def list_archive_policies(self):
++        session = self.engine_facade.get_session()
++        return [dict(ap) for ap in session.query(ArchivePolicy).all()]
++
+     def get_archive_policy(self, name):
+         session = self.engine_facade.get_session()
+         ap = session.query(ArchivePolicy).get(name)
+diff --git a/gnocchi/rest/__init__.py b/gnocchi/rest/__init__.py
+index ed98196..7159e56 100644
+--- a/gnocchi/rest/__init__.py
++++ b/gnocchi/rest/__init__.py
+@@ -85,6 +85,44 @@ def convert_entity_list(entities, user_id, project_id):
+     return new_entities
+ 
+ 
++def PositiveNotNullInt(value):
++    value = int(value)
++    if value <= 0:
++        raise ValueError("Value must be positive")
++    return value
++
++
++class ArchivePoliciesController(rest.RestController):
++    ArchivePolicy = voluptuous.Schema({
++        voluptuous.Required("name"): six.text_type,
++        voluptuous.Required("definition"):
++        voluptuous.All([{
++            voluptuous.Required("granularity"): PositiveNotNullInt,
++            voluptuous.Required("points"): PositiveNotNullInt,
++        }], voluptuous.Length(min=1)),
++    })
++
++    @staticmethod
++    @vexpose(ArchivePolicy, 'json')
++    def post(body):
++        # TODO(jd) Use RBAC policy to limit which user can create a policy
++        try:
++            ap = pecan.request.indexer.create_archive_policy(**body)
++        except indexer.ArchivePolicyAlreadyExists as e:
++            pecan.abort(409, e)
++        pecan.response.headers['Location'] = "/v1/archive_policy/" + ap['name']
++        pecan.response.status = 201
++        return ap
++
++    @pecan.expose('json')
++    def get_one(self, id):
++        return pecan.request.indexer.get_archive_policy(id)
++
++    @pecan.expose('json')
++    def get_all(self):
++        return pecan.request.indexer.list_archive_policies()
++
++
+ class EntityController(rest.RestController):
+     _custom_actions = {
+         'measures': ['POST', 'GET']
+@@ -431,6 +469,7 @@ class ResourcesController(rest.RestController):
+ 
+ 
+ class V1Controller(object):
++    archive_policy = ArchivePoliciesController()
+     entity = EntitiesController()
+     resource = ResourcesController()
+ 
+diff --git a/gnocchi/tests/test_rest.py b/gnocchi/tests/test_rest.py
+index 5b52da4..050f236 100644
+--- a/gnocchi/tests/test_rest.py
++++ b/gnocchi/tests/test_rest.py
+@@ -46,6 +46,78 @@ class RestTest(tests.TestCase):
+         self.assertEqual(200, result.status_code)
+ 
+ 
++class ArchivePolicyTest(RestTest):
++    def test_post_archive_policy(self):
++        name = str(uuid.uuid4())
++        definition = [{
++            "granularity": 10,
++            "points": 20,
++        }]
++        result = self.app.post_json(
++            "/v1/archive_policy",
++            params={"name": name,
++                    "definition": definition},
++            status=201)
++        self.assertEqual("application/json", result.content_type)
++        ap = json.loads(result.body)
++        self.assertEqual("http://localhost/v1/archive_policy/" + name,
++                         result.headers['Location'])
++        self.assertEqual(name, ap['name'])
++        self.assertEqual(definition, ap['definition'])
++
++    def test_post_archive_policy_and_entity(self):
++        ap = str(uuid.uuid4())
++        self.app.post_json(
++            "/v1/archive_policy",
++            params={"name": ap,
++                    "definition": [{
++                        "granularity": 10,
++                        "points": 20,
++                    }]},
++            status=201)
++        self.app.post_json(
++            "/v1/entity",
++            params={"archive_policy": ap},
++            status=201)
++
++    def test_post_archive_policy_wrong_value(self):
++        result = self.app.post_json(
++            "/v1/archive_policy",
++            params={"name": "somenewname",
++                    "definition": "foobar"},
++            expect_errors=True,
++            status=400)
++        self.assertIn('Invalid input: expected a list '
++                      'for dictionary value @ data[u\'definition\']',
++                      result.body)
++
++    def test_post_archive_already_exists(self):
++        result = self.app.post_json(
++            "/v1/archive_policy",
++            params={"name": "high",
++                    "definition": [{
++                        "granularity": 10,
++                        "points": 20,
++                    }]},
++            expect_errors=True,
++            status=409)
++        self.assertIn('Archive policy high already exists', result.body)
++
++    def test_get_archive_policy(self):
++        result = self.app.get("/v1/archive_policy/medium")
++        ap = json.loads(result.body)
++        self.assertEqual({"name": "medium",
++                          "definition": self.archive_policies['medium']},
++                         ap)
++
++    def test_list_archive_policy(self):
++        result = self.app.get("/v1/archive_policy")
++        aps = json.loads(result.body)
++        for name, definition in six.iteritems(self.archive_policies):
++            self.assertIn({"name": name,
++                           "definition": definition}, aps)
++
++
+ class EntityTest(RestTest):
+     def test_post_entity(self):
+         result = self.app.post_json("/v1/entity",
+-- 
+1.7.9.5
+
