@@ -163,7 +163,7 @@ class SwiftStorage(storage.StorageDriver):
                                       compressed.getvalue())
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean', granularity=None):
         try:
             headers, contents = self.swift.get_object(entity, aggregation)
         except swclient.ClientException as e:
@@ -171,5 +171,6 @@ class SwiftStorage(storage.StorageDriver):
                 raise storage.EntityDoesNotExist(entity)
             raise
         tsc = carbonara.TimeSerieCollection.unserialize(
-            gzip.GzipFile(fileobj=six.BytesIO(contents)).read())
+            gzip.GzipFile(fileobj=six.BytesIO(contents)).read(),
+            granularity)
         return dict(tsc.fetch(from_timestamp, to_timestamp))

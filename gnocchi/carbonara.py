@@ -146,6 +146,8 @@ class TimeSerieCollection(object):
         return self.fetch(key)
 
     @classmethod
-    def unserialize(cls, data):
+    def unserialize(cls, data, granularity=None):
         return cls([TimeSerie.from_dict(ts)
-                    for ts in msgpack.loads(data, encoding='utf-8')])
+                    for ts in msgpack.loads(data, encoding='utf-8')
+                    if (granularity is None or
+                        ts.get('sampling') == '%sS' % granularity)])
