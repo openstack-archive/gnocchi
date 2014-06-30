@@ -17,6 +17,7 @@
 # under the License.
 import datetime
 
+import pandas
 import testtools
 
 from gnocchi import carbonara
@@ -123,9 +124,29 @@ class TestTimeSerie(testtools.TestCase):
              datetime.datetime(2014, 1, 1, 12, 3, 12)],
             [3, 5, 7, 100],
             sampling='1Min',
-            max_size=3)
+            block_size='1Min',
+            max_size=10)
         s = ts.serialize()
         self.assertEqual(ts, carbonara.TimeSerie.unserialize(s))
+
+    def test_truncate_block_size(self):
+        ts = carbonara.TimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
+                                  datetime.datetime(2014, 1, 1, 12, 0, 5),
+                                  datetime.datetime(2014, 1, 1, 12, 1, 4),
+                                  datetime.datetime(2014, 1, 1, 12, 1, 9),
+                                  datetime.datetime(2014, 1, 1, 12, 2, 12)],
+                                 [3, 8, 5, 7, 1],
+                                 max_size=5,
+                                 block_size=pandas.tseries.offsets.Minute(1))
+        self.assertEqual(5, len(ts))
+        ts[datetime.datetime(2014, 1, 1, 12, 3, 19)] = 123
+        self.assertEqual(4, len(ts))
+        self.assertEqual(5, ts[datetime.datetime(2014, 1, 1, 12, 1, 4)])
+        self.assertEqual(7, ts[datetime.datetime(2014, 1, 1, 12, 1, 9)])
+        self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 12)])
+        self.assertEqual(123, ts[datetime.datetime(2014, 1, 1, 12, 3, 19)])
+        ts[datetime.datetime(2014, 1, 1, 12, 3, 20)] = 124
+        self.assertEqual(5, len(ts))
 
 
 class TestTimeSerieCollection(testtools.TestCase):

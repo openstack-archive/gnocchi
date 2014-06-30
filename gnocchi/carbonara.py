@@ -27,11 +27,13 @@ import six
 class TimeSerie(object):
 
     def __init__(self, timestamps, values,
+                 block_size=None,
                  max_size=None,
                  sampling=None, aggregation_method='mean'):
         self.aggregation_method = aggregation_method
         self.sampling = pandas.tseries.frequencies.to_offset(sampling)
         self.max_size = max_size
+        self.block_size = pandas.tseries.frequencies.to_offset(block_size)
         self.ts = pandas.Series(values, timestamps)
         self._resample()
         self._truncate()
@@ -39,6 +41,7 @@ class TimeSerie(object):
     def __eq__(self, other):
         return (self.ts.all() == other.ts.all()
                 and self.max_size == other.max_size
+                and self.block_size == other.block_size
                 and self.sampling == other.sampling
                 and self.aggregation_method == other.aggregation_method)
 
@@ -47,6 +50,7 @@ class TimeSerie(object):
 
     def __setitem__(self, key, value):
         self.ts[key] = value
+        self._truncate()
 
     def __len__(self):
         return len(self.ts)
@@ -69,23 +73,40 @@ class TimeSerie(object):
             values, timestamps = (), ()
         return cls(values, timestamps,
                    max_size=d.get('max_size'),
+                   block_size=d.get('block_size'),
                    sampling=d.get('sampling'),
                    aggregation_method=d.get('aggregation_method', 'mean'))
+
+    @staticmethod
+    def _serialize_time_period(value):
+        if value:
+            return six.text_type(value.n) + value.rule_code
 
     def to_dict(self):
         return {
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
-            'sampling': (six.text_type(self.sampling.n)
-                         + self.sampling.rule_code),
+            'block_size': self._serialize_time_period(self.block_size),
+            'sampling': self._serialize_time_period(self.sampling),
             'values': dict((six.text_type(k), float(v))
                            for k, v
                            in six.iteritems(self.ts[~self.ts.isnull()])),
         }
 
     def _truncate(self):
+        """Truncate the timeserie."""
         if self.max_size is not None:
-            self.ts = self.ts[~self.ts.isnull()][-self.max_size:]
+            # Remove empty points if any that could be added by aggregation
+            self.ts = self.ts[~self.ts.isnull()]
+            if self.block_size is not None:
+                # Change that to remove the amount of block needed to have
+                # the size <= max_size. A block is a number of "seconds" (a
+                # timespan)
+                while len(self.ts) > self.max_size:
+                    first_point = self.ts.index[0] + self.block_size
+                    self.ts = self.ts[first_point:]
+            else:
+                self.ts = self.ts[-self.max_size:]
 
     def _resample(self):
         if self.sampling:
