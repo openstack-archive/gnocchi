@@ -117,7 +117,9 @@ class InfluxStorage(storage.StorageDriver):
         LOG.debug('sending query %s' % query)
 
         try:
-            return self.influx.query(query, time_precision='u')
+            data = self.influx.query(query, time_precision='u')
+            LOG.debug('retrieved data %s' % data)
+            return data
         except influxdb.client.InfluxDBClientError as e:
             LOG.exception('query failed')
             LOG.warning('failure: %s %d' % (e.message, e.code))
@@ -171,7 +173,7 @@ class InfluxStorage(storage.StorageDriver):
 
         self._write(data, entity)
 
-    def _get_archives(self, entity):
+    def _get_archives(self, entity, granularity):
         name = '%s-archives' % entity
 
         query = 'select * from %s;' % name
@@ -181,19 +183,28 @@ class InfluxStorage(storage.StorageDriver):
             gi = data[0]['columns'].index('granularity')
             ri = data[0]['columns'].index('retention')
 
-            return [Archive(granularity=p[gi], retention=p[ri])
-                    for p in data[0]['points']]
+            archives = [Archive(granularity=p[gi], retention=p[ri])
+                        for p in data[0]['points']]
+            try:
+                g = int(granularity)
+                archives = [a for a in archives if a.granularity == g]
+                archives = (archives or
+                            [Archive(granularity=g, retention=sys.maxint)])
+            except (ValueError, TypeError):
+                    pass
+            return archives
 
         return [Archive(granularity=1, retention=sys.maxint)]
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean', granularity=None):
         """Get measures for an entity.
 
         :param entity: The entity measured.
         :param from timestamp: The timestamp to get the measure from.
         :param to timestamp: The timestamp to get the measure to.
         :param aggregation: The type of aggregation to retrieve.
+        :param granularity: The per-second granulariy required.
         """
 
         aggregation = InfluxStorage.NATIVE_AGGREGATES.get(aggregation, 'mean')
@@ -236,12 +247,10 @@ class InfluxStorage(storage.StorageDriver):
         # TODO(eglynn): batch up per-archive queries
 
         points = []
-        for archive in self._get_archives(entity):
+        for archive in self._get_archives(entity, granularity):
             query = _select(archive)
 
             data = self._query(query, entity)
-
-            LOG.debug('retrived data %s' % data)
 
             # data format returned by influx:
             #
@@ -269,7 +278,7 @@ class InfluxStorage(storage.StorageDriver):
         # TODO(eglynn): returning a dict keyed by timestamp has two
         # unfortunate side-effects:
         #  * loses any datapoint ordering provided by the DB
-        #  * finer-grain datapoints of the same timestamp mask
-        #    out coarser-grain datapoints
+        #  * finer-grain datapoints of the same timestamp mask out coarser-
+        #    grain datapoints (unless granularity is explicitly selected)
 
         return dict((_as_string(p.timestamp), p.value) for p in points)
