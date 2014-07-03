@@ -223,6 +223,32 @@ class EntityTest(RestTest):
         result = jsonutils.loads(ret.body)
         self.assertEqual({}, result)
 
+    def test_get_measure_aggregation_custom(self):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archives": [(1, 50), (5, 10)]})
+        entity = jsonutils.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 123.2},
+                                   {"timestamp": '2013-01-01 12:00:03',
+                                    "value": 12345.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 1234.2}])
+        path = "/v1/entity/%s/measures?aggregation=%s&window=%ds"
+        ret = self.app.get(path % (entity['id'], 'ewma', 2))
+        self.assertEqual(ret.status_code, 200)
+        result = jsonutils.loads(ret.body)
+        self.assertAlmostEqual(560.3444370592642,
+                                result.get('2013-01-01T12:00:02.000000'))
+        ret = self.app.get(path % (entity['id'], 'moving-average', 2))
+        self.assertEqual(ret.status_code, 200)
+        result = jsonutils.loads(ret.body)
+        self.assertEqual(678.7, result.get('2013-01-01T12:00:02.000000'))
+        ret = self.app.get(path % (entity['id'], 'moving-variance', 2))
+        self.assertEqual(ret.status_code, 200)
+        result = jsonutils.loads(ret.body)
+        self.assertAlmostEqual(555.5, result.get('2013-01-01T12:00:02.000000'))
+
 
 class ResourceTest(RestTest):
 
