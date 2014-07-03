@@ -95,7 +95,7 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
                         aggregation_file.write(tsc.serialize())
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean', granularity=None):
         path = os.path.join(self.basepath, entity, aggregation)
 
         try:
