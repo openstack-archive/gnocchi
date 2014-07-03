@@ -351,6 +351,24 @@ class EntityTest(RestTest):
 
     def test_get_measure_aggregation_granularity(self):
         result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity = json.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 123.2},
+                                   {"timestamp": '2013-01-01 12:01:03',
+                                    "value": 12345.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 1234.2}])
+        path = "/v1/entity/%s/measures?aggregation=max&granularity=%sS"
+        ret = self.app.get(path % (entity['id'], 60))
+        self.assertEqual(ret.status_code, 200)
+        result = json.loads(ret.body)
+        self.assertEqual(1234.2, result.get('2013-01-01T12:00:00.000000'))
+        self.assertEqual(12345.2, result.get('2013-01-01T12:01:00.000000'))
+
+    def _test_get_measure_aggregation_custom(self, agg_method, expected):
+        result = self.app.post_json("/v1/entity",
                                     params={"archive_policy": "high"})
         entity = json.loads(result.body)
         self.app.post_json("/v1/entity/%s/measures" % entity['id'],
@@ -360,16 +378,23 @@ class EntityTest(RestTest):
                                     "value": 12345.2},
                                    {"timestamp": '2013-01-01 12:00:02',
                                     "value": 1234.2}])
-        path = "/v1/entity/%s/measures?aggregation=max&granularity=%s"
-        ret = self.app.get(path % (entity['id'], '5S')
+        path = "/v1/entity/%s/measures?aggregation=%s&window=%sS"
+        ret = self.app.get(path % (entity['id'], agg_method, 2))
         self.assertEqual(ret.status_code, 200)
         result = json.loads(ret.body)
-        self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2,
-                         result)
-        ret = self.app.get(path % (entity['id'], '1S')
-        self.assertEqual(123.2, result.get('2013-01-01T12:00:01.000000'))
-        self.assertEqual(1234.2, result.get('2013-01-01T12:00:02.000000'))
-        self.assertEqual(12345.2, result.get('2013-01-01T12:00:03.000000'))
+        self.assertAlmostEqual(expected,
+                               result.get('2013-01-01T12:00:02.000000'))
+
+        def test_get_measure_aggregation_ewma(self):
+            self._test_get_measure_aggregation_custom('ewma', 4932.18227699)
+
+        def test_get_measure_aggregation_moving_average(self):
+            self._test_get_measure_aggregation_custom('moving-average', 6234.2)
+
+        def test_get_measure_moving_varianccce(self):
+            self._test_get_measure_aggregation_custom('moving-variance',
+                                                      37344321)
+
 
 class ResourceTest(RestTest):
 
