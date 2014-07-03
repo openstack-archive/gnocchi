@@ -27,6 +27,7 @@ import six
 import voluptuous
 import werkzeug.http
 
+from gnocchi import aggregates
 from gnocchi import indexer
 from gnocchi.openstack.common import timeutils
 from gnocchi import storage
@@ -103,11 +104,21 @@ class EntityController(rest.RestController):
 
         try:
             # Replace timestamp keys by their string versions
-            return dict((timeutils.strtime(k), v)
+            if aggregation != 'moving-average':
+                return dict((timeutils.strtime(k), v)
                         for k, v
                         in six.iteritems(pecan.request.storage.get_measures(
                             self.entity_id, start, stop, aggregation,
                             granularity)))
+            else:
+                b=pecan.request.storage.get_measures(self.entity_id,
+                  start, stop, aggregation, granularity)
+                if granularity:
+                    wi = str(granularity)+'s'
+                else:
+                    wi = '60s'
+                return pecan.request.aggregates.compute(b, wi, center=False)
+
         except storage.EntityDoesNotExist as e:
             pecan.abort(400, str(e))
 

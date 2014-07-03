@@ -15,7 +15,6 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
 import collections
 import datetime
 import sys
@@ -27,6 +26,7 @@ from oslo.config import cfg
 import influxdb
 
 from gnocchi import storage
+
 
 OPTIONS = [
     cfg.StrOpt('influx_host',
@@ -51,7 +51,7 @@ cfg.CONF.register_opts(OPTIONS, group='storage')
 LOG = logging.getLogger(__name__)
 
 Archive = collections.namedtuple('Archive', ['granularity', 'retention'])
-Format = collections.namedtuple('Fromat', ['timestamp', 'value'])
+Format = collections.namedtuple('Format', ['timestamp', 'value'])
 Point = collections.namedtuple('Point', ['timestamp', 'value'])
 
 
@@ -206,14 +206,15 @@ class InfluxStorage(storage.StorageDriver):
         :param aggregation: The type of aggregation to retrieve.
         :param granularity: The per-second granularity required.
         """
-
-        aggregation = InfluxStorage.NATIVE_AGGREGATES.get(aggregation, 'mean')
+        if aggregation != 'moving-average':
+            aggregation = InfluxStorage.NATIVE_AGGREGATES.get(aggregation,
+                                                              'mean')
 
         def _select(archive):
             params = dict(name='%s-data' % entity,
                           target='*', group_by='', limit='')
 
-            if archive.granularity > 1:
+            if archive.granularity > 1 and aggregation != 'moving-average':
                 params['target'] = '%s(value)' % aggregation
                 params['group_by'] = \
                     'group by time(%ds)' % archive.granularity
@@ -241,8 +242,12 @@ class InfluxStorage(storage.StorageDriver):
             return select % params
 
         def _format(archive):
-            value = 'value' if archive.granularity == 1 else aggregation
+            if archive.granularity == 1 or aggregation == 'moving-average':
+                value = 'value'
+            else:
+                value = aggregation
             return Format(timestamp='time', value=value)
+
 
         # TODO(eglynn): batch up per-archive queries
 
@@ -251,7 +256,6 @@ class InfluxStorage(storage.StorageDriver):
             query = _select(archive)
 
             data = self._query(query, entity)
-
             # data format returned by influx:
             #
             # unaggregated case:
@@ -264,21 +268,23 @@ class InfluxStorage(storage.StorageDriver):
             #     "columns": ["time", aggregate],
             #     "points":  [[epoch_seconds, value]]}]
 
+            # TODO(atmalagon): add query parameter for window size,
+            # generalize flag for 'rolling' aggregates.
+
             if data:
                 format = _format(archive)
                 ti = data[0]['columns'].index(format.timestamp)
                 vi = data[0]['columns'].index(format.value)
-
                 points.extend([Point(timestamp=p[ti], value=p[vi])
                                for p in data[0]['points']])
-
-        def _as_string(timestamp):
-            return datetime.datetime.utcfromtimestamp(timestamp / 1000000.0)
 
         # TODO(eglynn): returning a dict keyed by timestamp has two
         # unfortunate side-effects:
         #  * loses any datapoint ordering provided by the DB
         #  * finer-grain datapoints of the same timestamp mask out coarser-
         #    grain datapoints (unless granularity is explicitly selected)
+
+        def _as_string(timestamp):
+            return datetime.datetime.utcfromtimestamp(timestamp / 1000000.0)
 
         return dict((_as_string(p.timestamp), p.value) for p in points)
