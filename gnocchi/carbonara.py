@@ -277,7 +277,7 @@ class TimeSerieArchive(object):
             if (granularity is None or ts._serialize_time_period(ts.sampling)
                     == '%sS' % granularity):
                 result = result.combine_first(ts[from_timestamp:
-                                                     to_timestamp])
+                                                 to_timestamp])
         return dict(result)
 
     def __eq__(self, other):
