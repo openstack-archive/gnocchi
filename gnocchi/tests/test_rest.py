@@ -475,24 +475,52 @@ class EntityTest(RestTest):
 
     def test_get_measure_aggregation_granularity(self):
         result = self.app.post_json("/v1/entity",
-                                    params={"archive_policy": "high"})
+                                    params={"archive_policy": "medium"})
         entity = json.loads(result.body)
         self.app.post_json("/v1/entity/%s/measures" % entity['id'],
                            params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 123.2},
+                                   {"timestamp": '2013-01-01 12:01:03',
+                                    "value": 12345.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 1234.2}])
+        path = "/v1/entity/%s/measures?aggregation=max&granularity=%dS"
+        ret = self.app.get(path % (entity['id'], 60))
+        self.assertEqual(ret.status_code, 200)
+        result = json.loads(ret.body)
+        self.assertEqual(1234.2, result.get('2013-01-01T12:00:00.000000'))
+        self.assertEqual(12345.2, result.get('2013-01-01T12:01:00.000000'))
+
+    def _test_get_measure_aggregation_custom(self, agg_method, expected):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "high"})
+        entity = json.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:00',
+                                    "value": 12.2},
+                                   {"timestamp": '2013-01-01 12:00:01',
                                     "value": 123.2},
                                    {"timestamp": '2013-01-01 12:00:03',
                                     "value": 12345.2},
                                    {"timestamp": '2013-01-01 12:00:02',
                                     "value": 1234.2}])
-        path = "/v1/entity/%s/measures?aggregation=max&granularity=%s"
-        ret = self.app.get(path % (entity['id'], '5S'))
+        path = "/v1/entity/%s/measures?aggregation=%s&window=%dS&center=%s"
+        ret = self.app.get(path % (entity['id'], agg_method, 2, 'False'))
         self.assertEqual(ret.status_code, 200)
         result = json.loads(ret.body)
-        self.assertEqual(12345.2, result.get('2013-01-01T12:00:00.000000'))
-        ret = self.app.get(path % (entity['id'], '1S'))
-        self.assertEqual(123.2, result.get('2013-01-01T12:00:01.000000'))
-        self.assertEqual(1234.2, result.get('2013-01-01T12:00:02.000000'))
-        self.assertEqual(12345.2, result.get('2013-01-01T12:00:03.000000'))
+        self.assertAlmostEqual(expected,
+                               result.get('2013-01-01T12:00:01.000000'))
+
+        def test_get_measure_aggregation_ewma(self):
+            self._test_get_measure_aggregation_custom('ewma',
+                                                      55.87509677189)
+
+        def test_get_measure_aggregation_moving_average(self):
+            self._test_get_measure_aggregation_custom('moving-average', 678.7)
+
+        def test_get_measure_moving_variance(self):
+            self._test_get_measure_aggregation_custom('moving-variance',
+                                                      308580.25)
 
 
 class ResourceTest(RestTest):
