@@ -59,7 +59,6 @@ class DBHook(pecan.hooks.PecanHook):
         state.request.storage = self.storage
         state.request.indexer = self.indexer
 
-
 PECAN_CONFIG = {
     'app': {
         'root': 'gnocchi.rest.RootController',

@@ -15,18 +15,18 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
 import collections
 import datetime
+import logging
 import sys
 
 from gnocchi.openstack.common import timeutils
-import logging
-from oslo.config import cfg
 
+from oslo.config import cfg
 import influxdb
 
 from gnocchi import storage
+
 
 OPTIONS = [
     cfg.StrOpt('influx_host',
@@ -206,7 +206,6 @@ class InfluxStorage(storage.StorageDriver):
         :param aggregation: The type of aggregation to retrieve.
         :param granularity: The per-second granularity required.
         """
-
         aggregation = InfluxStorage.NATIVE_AGGREGATES.get(aggregation, 'mean')
 
         def _select(archive):
@@ -251,7 +250,6 @@ class InfluxStorage(storage.StorageDriver):
             query = _select(archive)
 
             data = self._query(query, entity)
-
             # data format returned by influx:
             #
             # unaggregated case:
@@ -268,7 +266,6 @@ class InfluxStorage(storage.StorageDriver):
                 format = _format(archive)
                 ti = data[0]['columns'].index(format.timestamp)
                 vi = data[0]['columns'].index(format.value)
-
                 points.extend([Point(timestamp=p[ti], value=p[vi])
                                for p in data[0]['points']])
 

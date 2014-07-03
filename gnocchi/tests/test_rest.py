@@ -223,6 +223,33 @@ class EntityTest(RestTest):
         result = jsonutils.loads(ret.body)
         self.assertEqual({}, result)
 
+    def _test_get_measure_aggregation_custom(self, agg_method, expected):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archives": [(1, 50), (5, 10)]})
+        entity = jsonutils.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 123.2},
+                                   {"timestamp": '2013-01-01 12:00:03',
+                                    "value": 12345.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 1234.2}])
+        path = "/v1/entity/%s/measures?aggregation=%s&granularity=%s"
+        ret = self.app.get(path % (entity['id'], agg_method, '2s'))
+        self.assertEqual(ret.status_code, 200)
+        result = jsonutils.loads(ret.body)
+        self.asserAlmostEqual(expected,
+                              result.get('2013-01-01T12:00:02.000000'))
+
+    def test_get_measure_aggregation_ewma(self):
+        self._test_get_measure_aggregation_custom('ewma', 560.3444370592642)
+
+    def test_get_measure_aggregation_moving_average(self):
+        self._test_get_measure_aggregation_custom('moving-average', 678.7)
+
+    def test_get_measure_aggregation_moving_variance(self):
+        self._test_get_measure_aggregation_custom('moving-variance', 555.5)
+
 
 class ResourceTest(RestTest):
 
