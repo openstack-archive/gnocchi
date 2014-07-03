@@ -20,10 +20,10 @@ import collections
 from oslo.config import cfg
 from stevedore import driver
 
-# TODO(eglynn): figure out how to accommodate multi-valued aggregation
-#               methods, where there is no longer just a single aggregate
-#               value to be stored per-period (e.g. ohlc)
-AGGREGATION_TYPES = ('mean', 'sum', 'last', 'max', 'min',
+#TODO(eglynn): figure out how to accommodate multi-valued aggregation
+#              methods, where there is no longer just a single aggregate
+#              value to be stored per-period (e.g. ohlc)
+AGGREGATION_TYPES = ('moving-average', 'mean', 'sum', 'last', 'max', 'min',
                      'std', 'median', 'first')
 
 

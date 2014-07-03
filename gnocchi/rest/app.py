@@ -23,6 +23,7 @@ import netaddr
 from oslo.config import cfg
 import pecan
 
+from gnocchi import aggregates
 from gnocchi import indexer
 from gnocchi.openstack.common import log
 from gnocchi import storage
@@ -51,14 +52,15 @@ cfg.CONF.register_opts(API_SERVICE_OPTS, opt_group)
 
 class DBHook(pecan.hooks.PecanHook):
 
-    def __init__(self, storage, indexer):
+    def __init__(self, storage, indexer, aggregates):
         self.storage = storage
         self.indexer = indexer
+        self.aggregates = aggregates
 
     def before(self, state):
         state.request.storage = self.storage
         state.request.indexer = self.indexer
-
+        state.request.aggregates = self.aggregates
 
 PECAN_CONFIG = {
     'app': {
@@ -77,10 +79,13 @@ def setup_app(pecan_config=PECAN_CONFIG):
     i = pecan_config.get('indexer')
     if not i:
         i = indexer.get_driver(conf)
+    a = pecan_config.get('aggregates')
+    if not a:
+        a = aggregates.get_driver(conf)
     return pecan.make_app(
         pecan_config['app']['root'],
         debug=conf.debug,
-        hooks=(DBHook(s, i),),
+        hooks=(DBHook(s, i, a),),
         guess_content_type_from_ext=False,
     )
 
