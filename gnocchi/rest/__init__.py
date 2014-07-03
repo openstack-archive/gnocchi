@@ -28,9 +28,11 @@ import voluptuous
 import werkzeug.http
 
 from gnocchi import indexer
+from gnocchi.openstack.common import log
 from gnocchi.openstack.common import timeutils
 from gnocchi import storage
 
+LOG = log.getLogger(__name__)
 
 def deserialize(schema):
     try:
@@ -96,18 +98,35 @@ class EntityController(rest.RestController):
 
     @pecan.expose('json')
     def get_measures(self, start=None, stop=None, aggregation='mean',
-                     granularity=None):
-        if aggregation not in storage.AGGREGATION_TYPES:
+                     granularity=None,**agg_params):
+        def make_dict(ext):
+            return (ext.name, ext.obj)
+        CUSTOM_AGGREGATES=dict()
+        for name, obj in pecan.request.aggregates.map(make_dict):
+            CUSTOM_AGGREGATES[name]=obj
+        if (aggregation not in storage.AGGREGATION_TYPES and
+            aggregation not in CUSTOM_AGGREGATES):
             pecan.abort(400, "Invalid aggregation value %s, must be one of %s"
-                        % (aggregation, str(storage.AGGREGATION_TYPES)))
+                        % (aggregation, str(storage.AGGREGATION_TYPES),
+                           str(CUSTOM_AGGREGATES.keys())))
 
         try:
+           if aggregation in CUSTOM_AGGREGATES:
+                b = pecan.request.storage.get_measures(self.entity_id,
+                                                       start, stop,
+                                                       aggregation='mean',
+                                                       granularity=1)
+                return CUSTOM_AGGREGATES[aggregation].compute(b, **agg_params)
+
             # Replace timestamp keys by their string versions
-            return dict((timeutils.strtime(k), v)
-                        for k, v
-                        in six.iteritems(pecan.request.storage.get_measures(
-                            self.entity_id, start, stop, aggregation,
-                            granularity)))
+           else:
+                return dict((timeutils.strtime(k), v)
+                            for k, v
+                            in six.iteritems(pecan.request.storage.
+                                             get_measures(self.entity_id,
+                                                          start, stop,
+                                                          aggregation,
+                                                          granularity)))
         except storage.EntityDoesNotExist as e:
             pecan.abort(400, str(e))
 
