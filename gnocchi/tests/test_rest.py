@@ -318,6 +318,14 @@ class ResourceTest(RestTest):
         self.attributes['ended_at'] = None
         self.assertEqual(self.attributes, result)
 
+    def test_get_non_existing_resource(self):
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type
+                              + "/"
+                              + self.attributes['id'],
+                              expect_errors=True)
+        self.assertEqual(404, result.status_code)
+
     def test_patch_resource_entities(self):
         result = self.app.post_json("/v1/resource/" + self.resource_type,
                                     params=self.attributes)
@@ -491,6 +499,9 @@ class ResourceTest(RestTest):
         self.assertEqual(200, result.status_code)
 
     def test_list_resources_by_unknown_field(self):
+        self.app.post_json(
+            "/v1/resource/" + self.resource_type,
+            params=self.attributes)
         result = self.app.get("/v1/resource/" + self.resource_type,
                               params={"foo": "bar"},
                               expect_errors=True)
@@ -499,6 +510,11 @@ class ResourceTest(RestTest):
         self.assertIn(b"Resource " + self.resource_type
                       + b" has no foo attribute",
                       result.body)
+
+    def test_list_non_existing_resources(self):
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type)
+        self.assertEqual(200, result.status_code)
 
     def test_list_resources_by_user(self):
         u1 = str(uuid.uuid4())
