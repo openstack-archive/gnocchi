@@ -16,7 +16,7 @@ mkfifo ${MYSQL_DATA}/out
 mysqld --datadir=${MYSQL_DATA} --pid-file=${MYSQL_DATA}/mysql.pid --socket=${MYSQL_DATA}/mysql.socket --skip-networking --skip-grant-tables &> ${MYSQL_DATA}/out &
 # Wait for MySQL to start listening to connections
 wait_for_line "mysqld: ready for connections." ${MYSQL_DATA}/out
-export GNOCCHI_TEST_MYSQL_URLgre="mysql://root@localhost/test?unix_socket=${MYSQL_DATA}/mysql.socket&charset=utf8"
+export GNOCCHI_TEST_MYSQL_URL="mysql://root@localhost/test?unix_socket=${MYSQL_DATA}/mysql.socket&charset=utf8"
 
 python setup.py testr --slowest --testr-args="$*"
 
