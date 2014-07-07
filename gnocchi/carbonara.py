@@ -276,8 +276,6 @@ class TimeSerieArchive(object):
             agg.update(timeserie)
 
     def set_values(self, values):
-        # FIXME(jd) Why convert here and not in all TimeSerie types?
-        # timestamp = pandas.Timestamp(timestamp, unit='s')
         self.timeserie.set_values(
             values,
             before_truncate_callback=self._update_aggregated_timeseries)
