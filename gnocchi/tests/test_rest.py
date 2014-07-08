@@ -491,8 +491,7 @@ class ResourceTest(RestTest):
         self.assertEqual(200, result.status_code)
 
     def test_list_resources_by_unknown_field(self):
-        result = self.app.get("/v1/resource/" + self.resource_type,
-                              params={"foo": "bar"},
+        result = self.app.get("/v1/resource/" + self.resource_type + "/",
                               expect_errors=True)
         self.assertEqual(400, result.status_code)
         self.assertEqual("text/plain", result.content_type)

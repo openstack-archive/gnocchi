@@ -274,8 +274,11 @@ class GenericResourcesController(rest.RestController):
     Resource = ResourceSchema({})
 
     @pecan.expose()
-    def _lookup(self, id, *remainder):
-        return self._resource_rest_class(id), remainder
+    def _lookup(self, *remainder):
+        if remainder:
+            id = remainder[0]
+            return self._resource_rest_class(id), remainder[1:]
+        return remainder
 
     @pecan.expose('json')
     def post(self):
