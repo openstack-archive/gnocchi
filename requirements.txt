@@ -8,6 +8,7 @@ pandas<0.14  # Until https://github.com/pydata/pandas/issues/7284 is fixed
 pecan
 posix_ipc
 python-swiftclient
+requests>=1.1
 six
 sqlalchemy
 stevedore
