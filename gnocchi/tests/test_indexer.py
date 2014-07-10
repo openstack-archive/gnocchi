@@ -305,6 +305,41 @@ class TestIndexerDriver(tests.TestCase):
             attributes_filter={"user_id": str(uuid.uuid4())})
         self.assertEqual(len(resources), 0)
 
+    def test_list_resources_by_user_with_details(self):
+        r1 = uuid.uuid4()
+        u1 = str(uuid.uuid4())
+        g = self.index.create_resource('generic', r1, u1, "bar")
+        r2 = uuid.uuid4()
+        i = self.index.create_resource('instance', r2, u1, "bar",
+                                       flavor_id=123,
+                                       image_ref="foo",
+                                       host="dwq",
+                                       display_name="foobar")
+        resources = self.index.list_resources(
+            'generic',
+            attributes_filter={"user_id": u1},
+            details=True,
+        )
+        for r in resources:
+            del r['started_at']
+        self.assertEqual(resources,
+                         [{'project_id': u'bar',
+                           'ended_at': None,
+                           'entities': {},
+                           'user_id': u1,
+                           'type': 'generic',
+                           'id': r1},
+                          {'user_id': u1,
+                           'entities': {},
+                           'host': u'dwq',
+                           'image_ref': u'foo',
+                           'flavor_id': 123,
+                           'ended_at': None,
+                           'project_id': u'bar',
+                           'type': 'instance',
+                           'id': r2,
+                           'display_name': u'foobar'}])
+
     def test_list_resources_by_project(self):
         r1 = uuid.uuid4()
         p1 = str(uuid.uuid4())
