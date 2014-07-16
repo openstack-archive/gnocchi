@@ -394,11 +394,6 @@ class TimeSerieArchive(object):
     @staticmethod
     def aggregated(timeseries, from_timestamp=None, to_timestamp=None,
                    aggregation='mean', needed_percent_of_overlap=100.0):
-
-        index = ['timestamp', 'granularity']
-        columns = ['timestamp', 'granularity', 'value']
-        dataframes = []
-
         if not timeseries:
             return []
 
@@ -407,16 +402,27 @@ class TimeSerieArchive(object):
         granularities = granularities[0].intersection(*granularities[1:])
         if len(granularities) == 0:
             raise UnAggregableTimeseries('No granularity match')
-
+        timeseries_raw = []
         for timeserie in timeseries:
             timeserie_raw = timeserie.fetch(
                 from_timestamp, to_timestamp,
                 lambda ts: ts.sampling in granularities)
-
             if timeserie_raw:
-                dataframe = pandas.DataFrame(timeserie_raw, columns=columns)
-                dataframe = dataframe.set_index(index)
-                dataframes.append(dataframe)
+                timeseries_raw.append(timeserie_raw)
+        return aggregate_dataframes(timeseries_raw, len(timeseries),
+                                    from_timestamp, to_timestamp, aggregation,
+                                    needed_percent_of_overlap)
+
+
+def aggregate_dataframes(datas, count, from_timestamp=None, to_timestamp=None,
+                         aggregation="mean", needed_percent_of_overlap=100.0):
+        index = ['timestamp', 'granularity']
+        columns = ['timestamp', 'granularity', 'value']
+        dataframes = []
+        for data in datas:
+            dataframe = pandas.DataFrame(data, columns=columns)
+            dataframe = dataframe.set_index(index)
+            dataframes.append(dataframe)
 
         if not dataframes:
             return []
@@ -427,7 +433,7 @@ class TimeSerieArchive(object):
         maybe_next_timestamp_is_left_boundary = False
         holes = 0
         for (timestamp, __), group in grouped:
-            if group.count()['value'] != len(timeseries):
+            if group.count()['value'] != count:
                 maybe_next_timestamp_is_left_boundary = True
                 holes += 1
             elif maybe_next_timestamp_is_left_boundary:
