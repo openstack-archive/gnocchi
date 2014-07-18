@@ -285,3 +285,27 @@ class TestTimeSerieArchive(testtools.TestCase):
         self.assertEqual(tsc,
                          carbonara.TimeSerieArchive.unserialize(
                              tsc.serialize()))
+
+    def test_from_dict_resampling_stddev(self):
+        d = {'timeserie': {'values': {u'2013-01-01 23:45:01.182000': 1.0,
+                                      u'2013-01-01 23:45:02.975000': 2.0,
+                                      u'2013-01-01 23:45:03.689000': 3.0,
+                                      u'2013-01-01 23:45:04.292000': 4.0,
+                                      u'2013-01-01 23:45:05.416000': 5.0,
+                                      u'2013-01-01 23:45:06.995000': 6.0,
+                                      u'2013-01-01 23:45:07.065000': 7.0,
+                                      u'2013-01-01 23:45:08.634000': 8.0,
+                                      u'2013-01-01 23:45:09.572000': 9.0,
+                                      u'2013-01-01 23:45:10.672000': 10.0},
+                           'timespan': u'120S'},
+             'archives': [{'aggregation_method': u'std',
+                           'block_size': u'60S',
+                           'values': {u'2013-01-01 23:45:00':
+                                      3.0276503540974917},
+                           'max_size': 3600,
+                           'sampling': u'60S'}]}
+        timeseries = carbonara.TimeSerieArchive.from_dict(d)
+        measure = timeseries.fetch()
+        self.assertEqual(1, len(measure))
+        ts = pandas.Timestamp('2013-01-01 23:45:00', tz=None)
+        self.assertAlmostEquals(measure.get(ts), 3.0276503540974917)

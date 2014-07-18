@@ -221,7 +221,7 @@ class AggregatedTimeSerie(TimeSerie):
                 self.ts = self.ts[-self.max_size:]
 
     def _resample(self):
-        if self.sampling:
+        if self.sampling and len(self.ts) > 1:
             self.ts = self.ts.resample(self.sampling,
                                        how=self.aggregation_method)
 
