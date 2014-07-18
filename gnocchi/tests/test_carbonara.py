@@ -285,3 +285,29 @@ class TestTimeSerieArchive(testtools.TestCase):
         self.assertEqual(tsc,
                          carbonara.TimeSerieArchive.unserialize(
                              tsc.serialize()))
+
+    def test_truncation(self):
+        # start with an empty timeseries with a single (60, 3600) archive,
+        # as it would be stored
+        d = {'timeserie': {'values': {},
+                           'timespan': u'120S'},
+             'archives': [{'aggregation_method': u'mean',
+                           'block_size': u'60S',
+                           'values': {},
+                           'max_size': 3600,
+                           'sampling': u'60S'}]}
+
+        # inject single datspoints 61s apart, round-triping to and from
+        # the storage representation on each iteration
+        for i in xrange(1, 11):
+            timeseries = carbonara.TimeSerieArchive.from_dict(d)
+            measures = timeseries.fetch()
+            self.assertEqual(i - 1, len(measures))
+            timeseries.set_values([
+                (datetime.datetime(2014, 1, 1, 12, i, i), float(i))
+            ])
+            d = timeseries.to_dict()
+            # since we could keep up to 3600 acrhived datapoints, we
+            # expected all 10 of the *aggregated* (as opposed to raw)
+            # datapoints not to be discarded
+            self.assertEqual(i, len(d['archives'][0]['values']))
