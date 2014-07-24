@@ -206,19 +206,19 @@ class EntityTest(RestTest):
                                     "value": 12345.2},
                                    {"timestamp": '2013-01-01 12:00:02',
                                     "value": 1234.2}])
-        path = "/v1/entity/%s/measures?aggregation=max&granularity=%d"
-        ret = self.app.get(path % (entity['id'], 5))
+        path = "/v1/entity/%s/measures?aggregation=max&granularity=%s"
+        ret = self.app.get(path % (entity['id'], '5S'))
         self.assertEqual(ret.status_code, 200)
         result = jsonutils.loads(ret.body)
         self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2},
                          result)
-        ret = self.app.get(path % (entity['id'], 1))
+        ret = self.app.get(path % (entity['id'], '1S'))
         self.assertEqual(ret.status_code, 200)
         result = jsonutils.loads(ret.body)
         self.assertEqual(123.2, result.get('2013-01-01T12:00:01.000000'))
         self.assertEqual(1234.2, result.get('2013-01-01T12:00:02.000000'))
         self.assertEqual(12345.2, result.get('2013-01-01T12:00:03.000000'))
-        ret = self.app.get(path % (entity['id'], 60))
+        ret = self.app.get(path % (entity['id'], '1Min'))
         self.assertEqual(ret.status_code, 200)
         result = jsonutils.loads(ret.body)
         self.assertEqual({}, result)

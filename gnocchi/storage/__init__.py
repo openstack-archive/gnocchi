@@ -108,6 +108,6 @@ class StorageDriver(object):
         :param from timestamp: The timestamp to get the measure from.
         :param to timestamp: The timestamp to get the measure to.
         :param aggregation: The type of aggregation to retrieve.
-        :param granularity: The per-second granularity required.
+        :param granularity: The granularity required (frequency string).
         """
         raise NotImplementedError
