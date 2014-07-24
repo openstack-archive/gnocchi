@@ -583,6 +583,123 @@ class ResourceTest(RestTest):
         else:
             self.fail("Some resources were not found")
 
+    def test_list_resources_with_bad_details(self):
+        result = self.app.get("/v1/resource/generic?details=awesome",
+                              expect_errors=True)
+        self.assertEqual(400, result.status_code)
+        self.assertIn(
+            "Unable to parse details value in query: "
+            "Unrecognized value 'awesome', acceptable values are",
+            result.body)
+
+    def test_list_resources_with_bad_details_in_accept(self):
+        result = self.app.get("/v1/resource/generic",
+                              headers={
+                                  "Accept": "application/json; details=foo",
+                              },
+                              expect_errors=True)
+        self.assertEqual(400, result.status_code)
+        self.assertIn(
+            "Unable to parse details value in Accept: "
+            "Unrecognized value 'foo', acceptable values are",
+            result.body)
+
+    def test_list_resources_with_details(self):
+        # NOTE(jd) So this test is a bit fuzzy right now as we uses the same
+        # database for all tests and the tests are running concurrently, but
+        # for now it'll be better than nothing.
+        result = self.app.post_json(
+            "/v1/resource/generic",
+            params={
+                "id": str(uuid.uuid4()),
+                "started_at": "2014-01-01 02:02:02",
+                "user_id": "foo",
+                "project_id": "bar",
+            })
+        g = jsonutils.loads(result.body)
+        result = self.app.post_json(
+            "/v1/resource/" + self.resource_type,
+            params=self.attributes)
+        i = jsonutils.loads(result.body)
+        result = self.app.get("/v1/resource/generic?details=true")
+        self.assertEqual(200, result.status_code)
+        resources = jsonutils.loads(result.body)
+        self.assertGreaterEqual(len(resources), 2)
+
+        i_found = False
+        g_found = False
+        for r in resources:
+            if r['id'] == str(g['id']):
+                self.assertEqual(g, r)
+                g_found = True
+            elif r['id'] == str(i['id']):
+                i_found = True
+                # Check we got all the details
+                self.assertEqual(i, r)
+            if i_found and g_found:
+                break
+        else:
+            self.fail("Some resources were not found")
+
+        result = self.app.get("/v1/resource/" + self.resource_type)
+        resources = jsonutils.loads(result.body)
+        self.assertGreaterEqual(len(resources), 1)
+        for r in resources:
+            if r['id'] == str(i['id']):
+                self.assertEqual(i, r)
+                break
+        else:
+            self.fail("Some resources were not found")
+
+    def test_list_resources_with_details_via_accept(self):
+        # NOTE(jd) So this test is a bit fuzzy right now as we uses the same
+        # database for all tests and the tests are running concurrently, but
+        # for now it'll be better than nothing.
+        result = self.app.post_json(
+            "/v1/resource/generic",
+            params={
+                "id": str(uuid.uuid4()),
+                "started_at": "2014-01-01 02:02:02",
+                "user_id": "foo",
+                "project_id": "bar",
+            })
+        g = jsonutils.loads(result.body)
+        result = self.app.post_json(
+            "/v1/resource/" + self.resource_type,
+            params=self.attributes)
+        i = jsonutils.loads(result.body)
+        result = self.app.get(
+            "/v1/resource/generic",
+            headers={"Accept": "application/json; details=true"})
+        self.assertEqual(200, result.status_code)
+        resources = jsonutils.loads(result.body)
+        self.assertGreaterEqual(len(resources), 2)
+
+        i_found = False
+        g_found = False
+        for r in resources:
+            if r['id'] == str(g['id']):
+                self.assertEqual(g, r)
+                g_found = True
+            elif r['id'] == str(i['id']):
+                i_found = True
+                # Check we got all the details
+                self.assertEqual(i, r)
+            if i_found and g_found:
+                break
+        else:
+            self.fail("Some resources were not found")
+
+        result = self.app.get("/v1/resource/" + self.resource_type)
+        resources = jsonutils.loads(result.body)
+        self.assertGreaterEqual(len(resources), 1)
+        for r in resources:
+            if r['id'] == str(i['id']):
+                self.assertEqual(i, r)
+                break
+        else:
+            self.fail("Some resources were not found")
+
     def test_list_resources_started_after(self):
         # NOTE(jd) So this test is a bit fuzzy right now as we uses the same
         # database for all tests and the tests are running concurrently, but
