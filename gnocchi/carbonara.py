@@ -308,5 +308,6 @@ class TimeSerieArchive(object):
         return cls([TimeSerie.from_dict(ts)
                     for ts in msgpack.loads(data, encoding='utf-8')
                     if (granularity is None or
-                        ts.get('sampling') == '%sS' % granularity)])
-
+                        ts.get('sampling') == '%dS' % pandas.datetools
+                        .to_offset(granularity)
+                        .delta.total_seconds())])
