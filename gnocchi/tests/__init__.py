@@ -17,6 +17,8 @@
 # under the License.
 import functools
 import os
+import shutil
+import tempfile
 
 import six
 from swiftclient import exceptions as swexc
@@ -112,6 +114,7 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
 
     storage_backends = [
         ('swift', dict(storage_engine='swift')),
+        ('file', dict(storage_engine='file')),
     ]
 
     scenarios = testscenarios.multiply_scenarios(storage_backends,
@@ -132,6 +135,17 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
         self.conf.set_override('debug', True)
 
         self.conf.set_override('driver', self.indexer_engine, 'indexer')
+
+        if self.storage_engine == 'file':
+            self.conf.import_opt('file_basepath',
+                                 'gnocchi.storage.file',
+                                 group='storage')
+
+            self.tempdir = tempfile.mkdtemp('-gnocchi-tests')
+            self.conf.set_override('file_basepath',
+                                   self.tempdir,
+                                   'storage')
+
         self.index = indexer.get_driver(self.conf)
         pre_connect_func = getattr(self, "_pre_connect_" + self.indexer_engine,
                                    None)
@@ -156,4 +170,6 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
 
     def tearDown(self):
         self.index.disconnect()
+        if self.storage_engine == 'file':
+            shutil.rmtree(self.tempdir)
         super(TestCase, self).tearDown()
