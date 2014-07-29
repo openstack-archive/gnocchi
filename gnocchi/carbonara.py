@@ -304,8 +304,10 @@ class TimeSerieArchive(object):
                    [AggregatedTimeSerie.from_dict(a) for a in d['archives']])
 
     @classmethod
-    def unserialize(cls, data):
-        return cls.from_dict(msgpack.loads(data, encoding='utf-8'))
+    def unserialize(cls, data, granularity=None):
+        ts = msgpack.loads(data, encoding='utf-8')
+        if granularity is None or ts.get('sampling') == '%sS' % granularity:
+            return cls.from_dict(ts)
 
     def serialize(self):
         return msgpack.dumps(self.to_dict())
