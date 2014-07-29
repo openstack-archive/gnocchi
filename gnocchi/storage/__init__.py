@@ -16,9 +16,12 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import collections
+import random
+import uuid
 
 from oslo.config import cfg
 from stevedore import driver
+from tooz import coordination
 
 # TODO(eglynn): figure out how to accommodate multi-valued aggregation
 #               methods, where there is no longer just a single aggregate
@@ -74,10 +77,24 @@ def get_driver(conf):
                        conf.storage)
 
 
+class CoordinatorMixin(object):
+    coord = None
+
+    def _init_coordinator(self, url):
+        self.coord = coordination.get_coordinator(
+            url,
+            str(uuid.uuid4()).encode('ascii'))
+        self.coord.start()
+        # NOTE(jd) So this is a (smart?) optimization: since we're going to
+        # lock for each of this aggregation type, if we are using running
+        # Gnocchi with multiple processses, let's randomize what we iter
+        # over so there are less chances we fight for the same lock!
+        random.shuffle(self.aggregation_types)
+
+
 class StorageDriver(object):
-    @staticmethod
-    def __init__(conf):
-        pass
+    def __init__(self, conf):
+        self.aggregation_types = list(AGGREGATION_TYPES)
 
     @staticmethod
     def create_entity(entity, archive):
