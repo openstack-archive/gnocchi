@@ -76,7 +76,7 @@ class SwiftStorage(storage.StorageDriver):
         self.aggregation_types = list(storage.AGGREGATION_TYPES)
         random.shuffle(self.aggregation_types)
 
-    def create_entity(self, entity, archive):
+    def create_entity(self, entity, archive_policy):
         # TODO(jd) A container per user in their account?
         resp = {}
         self.swift.put_container(entity, response_dict=resp)
@@ -90,7 +90,7 @@ class SwiftStorage(storage.StorageDriver):
             # may want to store it as its own object.
             tsc = carbonara.TimeSerieArchive.from_definitions(
                 [(pandas.tseries.offsets.Second(second), size)
-                 for second, size in archive],
+                 for second, size in storage.ARCHIVE_POLICIES[archive_policy]],
                 aggregation_method=aggregation)
             self.swift.put_object(entity, aggregation,
                                   tsc.serialize())
