@@ -251,6 +251,25 @@ class EntityTest(RestTest):
         self._test_get_measure_aggregation_custom('moving-variance',
                                                   308580.25)
 
+    def test_get_measure_aggregation_holt_winters(self):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archives": [(1, 50), (2, 10)]})
+        entity = json.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 123.2},
+                                   {"timestamp": '2013-01-01 12:00:03',
+                                    "value": 12345.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 1234.2}])
+        path = "/v1/entity/%s/measures?aggregation=%s&granularity=%s&%s"
+        ret = self.app.get(path % (entity['id'], 'holt-winters', '2S',
+                                   'alpha=0.1&beta=0.9'))
+        self.assertEqual(ret.status_code, 200)
+        result = json.loads(ret.body)
+        self.assertAlmostEqual(2845.0800000, result.
+                               get('2013-01-01T12:00:02.000000'))
+
 
 class ResourceTest(RestTest):
 
