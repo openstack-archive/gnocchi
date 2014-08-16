@@ -19,8 +19,8 @@ import datetime
 
 import testscenarios
 
-from gnocchi import storage
 from gnocchi.aggregates import rolling_statistics
+from gnocchi import storage
 from gnocchi.storage import swift
 from gnocchi import tests
 
