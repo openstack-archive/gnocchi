@@ -243,12 +243,15 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                                            name=name))
             try:
                 session.flush()
-            except exception.DBError as e:
-                # TODO(jd) Add an exception in oslo.db to match foreign key
-                # issues
-                if isinstance(e.inner_exception,
-                              sqlalchemy.exc.IntegrityError):
-                    raise indexer.NoSuchEntity("???")
+            except exception.DBReferenceError as e:
+                if e.table == 'resource_entity':
+                    if e.key == 'entity_id':
+                        # FIXME(jd) Add a way to oslo.db to give the value
+                        # that was incorrect
+                        raise indexer.NoSuchEntity("???")
+                    if e.key == 'resource_id':
+                        raise indexer.NoSuchResource(uuid)
+                raise
 
         return self._resource_to_dict(r)
 
@@ -302,14 +305,15 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                                                name=name))
             try:
                 session.flush()
-            except exception.DBError as e:
-                # TODO(jd) Add an exception in oslo.db to match
-                # foreign key issues
-                if isinstance(e.inner_exception,
-                              sqlalchemy.exc.IntegrityError):
-                    # FIXME(jd) This could also be a non existent
-                    # resource!
-                    raise indexer.NoSuchEntity("???")
+            except exception.DBReferenceError as e:
+                if e.table == 'resource_entity':
+                    if e.key == 'entity_id':
+                        # FIXME(jd) Add a way to oslo.db to give the value
+                        # that was incorrect
+                        raise indexer.NoSuchEntity("???")
+                    if e.key == 'resource_id':
+                        raise indexer.NoSuchResource(uuid)
+                raise
 
         return self._resource_to_dict(r)
 

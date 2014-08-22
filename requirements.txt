@@ -3,7 +3,7 @@ iso8601
 lockfile>=0.9.1
 netaddr
 oslo.config>=1.4.0.0a1
-oslo.db
+oslo.db>=0.4.0
 oslo.utils
 oslotest
 pandas<0.14  # Until https://github.com/pydata/pandas/issues/7284 is fixed
