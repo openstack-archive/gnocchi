@@ -68,11 +68,15 @@ class FakeSwiftClient(object):
                 response_dict['status'] = 201
         self.kvs[container] = {}
 
-    def put_object(self, container, key, obj):
+    def put_object(self, container, key, obj, headers=None):
         if hasattr(obj, "seek"):
             obj.seek(0)
             obj = obj.read()
             # TODO(jd) Maybe we should reset the seek(), but well…
+        if headers and headers.get('If-None-Match') == '*':
+            if key in self.kvs[container]:
+                raise swexc.ClientException("Precondition failed",
+                                            http_status=412)
         self.kvs[container][key] = obj
 
     def get_object(self, container, key):

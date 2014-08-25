@@ -18,6 +18,7 @@
 import random
 import uuid
 
+import msgpack
 from oslo.config import cfg
 import pandas
 from swiftclient import client as swclient
@@ -57,6 +58,8 @@ cfg.CONF.register_opts(OPTIONS, group="storage")
 
 
 class SwiftStorage(storage.StorageDriver):
+    _POLICIES_CONTAINER = "policies"
+
     def __init__(self, conf):
         self.swift = swclient.Connection(
             auth_version=conf.swift_auth_version,
@@ -75,6 +78,18 @@ class SwiftStorage(storage.StorageDriver):
         # over so there are less chances we fight for the same lock!
         self.aggregation_types = list(storage.AGGREGATION_TYPES)
         random.shuffle(self.aggregation_types)
+        self.swift.put_container(self._POLICIES_CONTAINER)
+
+    def create_archive_policy(self, name, policies):
+        try:
+            self.swift.put_object(self._POLICIES_CONTAINER,
+                                  name,
+                                  msgpack.dumps(policies),
+                                  headers={"If-None-Match": "*"})
+        except swclient.ClientException as e:
+            if e.http_status == 412:
+                raise storage.ArchivePolicyAlreadyExists(name)
+            raise
 
     def create_entity(self, entity, archive_policy):
         # TODO(jd) A container per user in their account?

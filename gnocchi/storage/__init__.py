@@ -90,6 +90,15 @@ class EntityAlreadyExists(Exception):
             "Entity %s already exists" % entity)
 
 
+class ArchivePolicyAlreadyExists(Exception):
+    """Error raised when an archive policy already exists."""
+
+    def __init__(self, name):
+        self.name = name
+        super(ArchivePolicyAlreadyExists, self).__init__(
+            "Archive policy '%s' already exists" % name)
+
+
 def _get_driver(name, conf):
     """Return the driver named name.
 
@@ -111,6 +120,15 @@ class StorageDriver(object):
     @staticmethod
     def __init__(conf):
         pass
+
+    @staticmethod
+    def create_archive_policy(name, policies):
+        """Create an archive policy.
+
+        :param name: The archive policy name.
+        :param policies: The list of policy for that policy.
+        """
+        raise NotImplementedError
 
     @staticmethod
     def create_entity(entity, archive_policy):
