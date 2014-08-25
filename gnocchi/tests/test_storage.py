@@ -98,3 +98,22 @@ class TestStorageDriver(tests.TestCase):
         self.assertRaises(storage.EntityDoesNotExist,
                           self.storage.get_measures,
                           'foo', 0)
+
+    def test_create_archive_entity(self):
+        self.storage.create_archive_policy(
+            "foo",
+            [
+                storage.ArchivePolicy(42, 42),
+                storage.ArchivePolicy(43, 43),
+            ])
+
+    def test_create_archive_entity_already_exists(self):
+        self.storage.create_archive_policy(
+            "foo",
+            [
+                storage.ArchivePolicy(42, 42),
+                storage.ArchivePolicy(43, 43),
+            ])
+        self.assertRaises(storage.ArchivePolicyAlreadyExists,
+                          self.storage.create_archive_policy,
+                          "foo", [])
