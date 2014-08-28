@@ -37,6 +37,12 @@ class TestIndexer(tests.TestCase):
 
 class TestIndexerDriver(tests.TestCase):
 
+    def test_create_archive_policy_already_exists(self):
+        # NOTE(jd) This archive policy
+        # is created by gnocchi.tests on setUp() :)
+        self.assertRaises(indexer.ArchivePolicyAlreadyExists,
+                          self.index.create_archive_policy, "high", {})
+
     def test_create_resource(self):
         r1 = uuid.uuid4()
         rc = self.index.create_resource('generic', r1, "foo", "bar")
@@ -52,6 +58,18 @@ class TestIndexerDriver(tests.TestCase):
         rg = self.index.get_resource('generic', r1)
         self.assertEqual(str(rc['id']), rg['id'])
         self.assertEqual(rc['entities'], rg['entities'])
+
+    def test_create_resource_unknown_attribute_fkey(self):
+        r1 = uuid.uuid4()
+        try:
+            self.index.create_resource('entity', r1, "foo", "bar",
+                                       archive_policy="foobar")
+        except indexer.ResourceValueError as e:
+            self.assertEqual('entity', e.resource_type)
+            self.assertEqual('archive_policy', e.attribute)
+            self.assertEqual("foobar", e.value)
+        else:
+            self.fail("No exception raised")
 
     def test_create_non_existent_entity(self):
         e = uuid.uuid4()
@@ -133,10 +151,12 @@ class TestIndexerDriver(tests.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        self.index.create_resource('entity', e1, "foo", "bar",
-                                   archive_policy="low")
-        self.index.create_resource('entity', e2, "foo", "bar",
-                                   archive_policy="low")
+        self.index.create_resource(
+            'entity', e1, "foo", "bar",
+            archive_policy="high")
+        self.index.create_resource(
+            'entity', e2, "foo", "bar",
+            archive_policy="high")
         rc = self.index.create_resource('generic', r1, "foo", "bar",
                                         entities={'foo': e1, 'bar': e2})
         self.assertIsNotNone(rc['started_at'])
@@ -200,12 +220,14 @@ class TestIndexerDriver(tests.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        self.index.create_resource('entity', e1, "foo", "bar",
-                                   archive_policy="low")
+        self.index.create_resource(
+            'entity', e1, "foo", "bar",
+            archive_policy="high")
         self.index.create_resource('generic', r1, "foo", "bar",
                                    entities={'foo': e1})
-        self.index.create_resource('entity', e2, "foo", "bar",
-                                   archive_policy="low")
+        self.index.create_resource(
+            'entity', e2, "foo", "bar",
+            archive_policy="high")
         rc = self.index.update_resource('generic', r1, entities={'bar': e2})
         r = self.index.get_resource('generic', r1)
         self.assertEqual(rc, r)
@@ -281,8 +303,9 @@ class TestIndexerDriver(tests.TestCase):
     def test_update_non_existent_resource(self):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
-        self.index.create_resource('entity', e1, "foo", "bar",
-                                   archive_policy="low")
+        self.index.create_resource(
+            'entity', e1, "foo", "bar",
+            archive_policy="high")
         self.assertRaises(indexer.NoSuchResource,
                           self.index.update_resource,
                           'generic',
@@ -301,10 +324,12 @@ class TestIndexerDriver(tests.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        self.index.create_resource('entity', e1, "foo", "bar",
-                                   archive_policy="low")
-        self.index.create_resource('entity', e2, "foo", "bar",
-                                   archive_policy="low")
+        self.index.create_resource(
+            'entity', e1, "foo", "bar",
+            archive_policy="high")
+        self.index.create_resource(
+            'entity', e2, "foo", "bar",
+            archive_policy="high")
         self.index.create_resource('generic', r1, "foo", "bar",
                                    entities={'foo': e1, 'bar': e2})
         self.index.delete_entity(e1)
