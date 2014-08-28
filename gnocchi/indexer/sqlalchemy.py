@@ -21,6 +21,7 @@ import datetime
 import decimal
 import itertools
 import operator
+import uuid
 
 from oslo.db import exception
 from oslo.db import options
@@ -120,6 +121,7 @@ class Resource(Base, GnocchiBase):
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            primary_key=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('entity', 'generic', 'instance',
+                                             'archive_policy',
                                              name="resource_type_enum"),
                              nullable=False, default='generic')
     user_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
@@ -137,6 +139,13 @@ class Resource(Base, GnocchiBase):
         ResourceEntity)
 
 
+class ArchivePolicy(Base, GnocchiBase):
+    __tablename__ = 'archive_policy'
+
+    name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True)
+    definition = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=False)
+
+
 class Entity(Resource):
     __tablename__ = 'entity'
 
@@ -144,7 +153,11 @@ class Entity(Resource):
                            sqlalchemy.ForeignKey('resource.id',
                                                  ondelete="CASCADE"),
                            primary_key=True)
-    archive_policy = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    archive_policy = sqlalchemy.Column(
+        sqlalchemy.String(255),
+        sqlalchemy.ForeignKey('archive_policy.name',
+                              ondelete="RESTRICT"),
+        nullable=False)
 
 
 class Instance(Resource):
@@ -188,6 +201,22 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             raise indexer.UnknownResourceType(resource_type)
         return self._RESOURCE_CLASS_MAPPER[resource_type]
 
+    def get_archive_policy(self, name):
+        session = self.engine_facade.get_session()
+        ap = session.query(ArchivePolicy).get(name)
+        if ap:
+            return dict(ap)
+
+    def create_archive_policy(self, name, definition):
+        ap = ArchivePolicy(name=name, definition=definition)
+        session = self.engine_facade.get_session()
+        session.add(ap)
+        try:
+            session.flush()
+        except exception.DBDuplicateEntry:
+            raise indexer.ArchivePolicyAlreadyExists(name)
+        return dict(ap)
+
     def create_resource(self, resource_type, id, user_id, project_id,
                         started_at=None, ended_at=None, entities=None,
                         **kwargs):
@@ -211,6 +240,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 session.flush()
             except exception.DBDuplicateEntry:
                 raise indexer.ResourceAlreadyExists(id)
+            except exception.DBReferenceError as ex:
+                raise indexer.ResourceValueError(r.type,
+                                                 ex.key,
+                                                 getattr(r, ex.key))
             if entities is None:
                 entities = {}
             for name, e in entities.iteritems():
@@ -232,6 +265,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     @staticmethod
     def _resource_to_dict(resource):
         r = dict(resource)
+        # FIXME(jd) Convert UUID to string; would be better if Pecan JSON
+        # serializer could be patched to handle that.
+        for k, v in six.iteritems(r):
+            if isinstance(v, uuid.UUID):
+                r[k] = six.text_type(v)
         r['id'] = str(resource.id)
         r['entities'] = dict((k.name, str(k.entity_id))
                              for k in resource.entities)
