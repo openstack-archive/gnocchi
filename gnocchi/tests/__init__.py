@@ -15,8 +15,10 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import collections
 import functools
 import os
+import uuid
 
 import fixtures
 from oslo.config import fixture as config_fixture
@@ -98,8 +100,39 @@ class FakeSwiftClient(object):
                                         http_status=404)
 
 
+ArchivePolicy = collections.namedtuple('ArchivePolicy',
+                                       ['granularity', 'points'])
+
+
 @six.add_metaclass(SkipNotImplementedMeta)
 class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
+
+    ARCHIVE_POLICIES = {
+        'low': [
+            # 5 minutes resolution for an hour
+            ArchivePolicy(300, 12),
+            # 1 hour resolution for a day
+            ArchivePolicy(3600, 24),
+            # 1 day resolution for a month
+            ArchivePolicy(3600 * 24, 30),
+        ],
+        'medium': [
+            # 1 minute resolution for an hour
+            ArchivePolicy(60, 60),
+            # 1 hour resolution for a week
+            ArchivePolicy(3600, 7 * 24),
+            # 1 day resolution for a year
+            ArchivePolicy(3600 * 24, 365),
+        ],
+        'high': [
+            # 1 second resolution for a day
+            ArchivePolicy(1, 3600 * 24),
+            # 1 minute resolution for a month
+            ArchivePolicy(60, 60 * 24 * 30),
+            # 1 hour resolution for a year
+            ArchivePolicy(3600, 365 * 24),
+        ],
+    }
 
     indexer_backends = [
         ('null', dict(indexer_engine='null')),
@@ -146,6 +179,17 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
         # parallel.
         with lockutils.lock("gnocchi-tests-db-lock", external=True):
             self.index.upgrade()
+
+        # Create basic archive policies
+        self.archive_policies = dict([
+            (name, self.index.create_resource(
+                'archive_policy',
+                str(uuid.uuid4()),
+                "admin", "admin",
+                name=name,
+                definition=definition))
+            for name, definition in six.iteritems(self.ARCHIVE_POLICIES)
+        ])
 
         self.useFixture(mockpatch.Patch(
             'swiftclient.client.Connection',

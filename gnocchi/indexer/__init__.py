@@ -90,6 +90,17 @@ class ResourceAttributeError(AttributeError):
         self.attribute = attribute
 
 
+class ResourceValueError(ValueError):
+    """Error raised when an attribute value is invalid for a resource type."""
+    def __init__(self, resource_type, attribute, value):
+        super(ResourceValueError, self).__init__(
+            "Value %s for attribute %s on resource type %s is invalid"
+            % (value, attribute, resource_type))
+        self.resource_type = resource_type
+        self.attribute = attribute
+        self.value = value
+
+
 class IndexerDriver(object):
     @staticmethod
     def __init__(conf):

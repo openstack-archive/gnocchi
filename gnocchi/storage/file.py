@@ -55,7 +55,7 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
             # may want to store it as its own object.
             tsc = carbonara.TimeSerieArchive.from_definitions(
                 [(pandas.tseries.offsets.Second(second), size)
-                 for second, size in storage.ARCHIVE_POLICIES[archive_policy]],
+                 for second, size in archive_policy['definition']],
                 aggregation_method=aggregation)
             aggregation_path = os.path.join(path, aggregation)
             with open(aggregation_path, 'wb') as aggregation_file:
