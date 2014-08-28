@@ -137,7 +137,8 @@ class EntitiesController(rest.RestController):
         id = uuid.uuid4()
         pecan.request.storage.create_entity(str(id), archive_policy)
         pecan.request.indexer.create_resource('entity', id,
-                                              user_id, project_id)
+                                              user_id, project_id,
+                                              archive_policy=archive_policy)
         return id
 
     @vexpose(Entity, 'json')

@@ -119,6 +119,7 @@ class Resource(Base, GnocchiBase):
 
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType, primary_key=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('entity', 'generic', 'instance',
+                                             'archive_policy',
                                              name="resource_type_enum"),
                              nullable=False, default='generic')
     user_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
@@ -136,6 +137,22 @@ class Resource(Base, GnocchiBase):
         ResourceEntity)
 
 
+class ArchivePolicy(Resource):
+    __tablename__ = 'archive_policy'
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint('name', 'project_id'),
+    )
+
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType,
+                           sqlalchemy.ForeignKey('resource.id',
+                                                 ondelete="CASCADE"),
+                           primary_key=True)
+    project_id = sqlalchemy.Column(sqlalchemy.String(255),
+                                   nullable=False)
+    name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    definition = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=False)
+
+
 class Entity(Resource):
     __tablename__ = 'entity'
 
@@ -143,6 +160,12 @@ class Entity(Resource):
                            sqlalchemy.ForeignKey('resource.id',
                                                  ondelete="CASCADE"),
                            primary_key=True)
+    archive_policy_id = sqlalchemy.Column(
+        sqlalchemy_utils.UUIDType,
+        sqlalchemy.ForeignKey('archive_policy.id',
+                              ondelete="RESTRICT"),
+        nullable=False)
+    archive_policy = ???)
 
 
 class Instance(Resource):
@@ -163,6 +186,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     # TODO(jd) Use stevedore instead to allow extending?
     _RESOURCE_CLASS_MAPPER = {
         'entity': Entity,
+        'archive_policy': ArchivePolicy,
         'generic': Resource,
         'instance': Instance,
     }
