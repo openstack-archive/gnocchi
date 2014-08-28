@@ -49,13 +49,15 @@ class RestTest(tests.TestCase):
 class EntityTest(RestTest):
     def test_post_entity(self):
         result = self.app.post_json("/v1/entity",
-                                    params={"archive_policy": "medium"})
+                                    params={"archive_policy":
+                                            self.archive_policies['medium']})
         self.assertEqual("application/json", result.content_type)
         self.assertEqual(201, result.status_code)
         entity = json.loads(result.body)
         self.assertEqual("http://localhost/v1/entity/" + entity['id'],
                          result.headers['Location'])
-        self.assertEqual(entity['archive_policy'], "medium")
+        self.assertEqual(entity['archive_policy'],
+                         self.archive_policies['medium'])
 
     def test_delete_entity(self):
         result = self.app.post_json("/v1/entity",
