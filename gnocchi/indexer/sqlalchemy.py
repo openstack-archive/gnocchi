@@ -21,6 +21,7 @@ import datetime
 import decimal
 import itertools
 import operator
+import uuid
 
 from oslo.db import exception
 from oslo.db import options
@@ -120,6 +121,7 @@ class Resource(Base, GnocchiBase):
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            primary_key=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('entity', 'generic', 'instance',
+                                             'archive_policy',
                                              name="resource_type_enum"),
                              nullable=False, default='generic')
     user_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
@@ -137,6 +139,18 @@ class Resource(Base, GnocchiBase):
         ResourceEntity)
 
 
+class ArchivePolicy(Resource):
+    __tablename__ = 'archive_policy'
+
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                           sqlalchemy.ForeignKey('resource.id',
+                                                 ondelete="CASCADE"),
+                           primary_key=True)
+
+    name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    definition = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=False)
+
+
 class Entity(Resource):
     __tablename__ = 'entity'
 
@@ -144,7 +158,11 @@ class Entity(Resource):
                            sqlalchemy.ForeignKey('resource.id',
                                                  ondelete="CASCADE"),
                            primary_key=True)
-    archive_policy = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    archive_policy = sqlalchemy.Column(
+        sqlalchemy_utils.UUIDType(binary=False),
+        sqlalchemy.ForeignKey('archive_policy.id',
+                              ondelete="RESTRICT"),
+        nullable=False)
 
 
 class Instance(Resource):
@@ -165,6 +183,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     # TODO(jd) Use stevedore instead to allow extending?
     _RESOURCE_CLASS_MAPPER = {
         'entity': Entity,
+        'archive_policy': ArchivePolicy,
         'generic': Resource,
         'instance': Instance,
     }
@@ -231,6 +250,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     @staticmethod
     def _resource_to_dict(resource):
         r = dict(resource)
+        # FIXME(jd) Convert UUID to string; would be better if Pecan JSON
+        # serializer could be patched to handle that.
+        for k, v in six.iteritems(r):
+            if isinstance(v, uuid.UUID):
+                r[k] = six.text_type(v)
         r['id'] = str(resource.id)
         r['entities'] = dict((k.name, str(k.entity_id))
                              for k in resource.entities)
