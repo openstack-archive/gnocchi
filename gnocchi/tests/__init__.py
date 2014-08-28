@@ -17,6 +17,7 @@
 # under the License.
 import functools
 import os
+import uuid
 
 import fixtures
 from oslo.config import fixture as config_fixture
@@ -150,6 +151,17 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
         # parallel.
         with lockutils.lock("gnocchi-tests-db-lock", external=True):
             self.index.upgrade()
+
+        # Create basic archive policies
+        self.archive_policies = dict([
+            (name, self.index.create_resource(
+                'archive_policy',
+                str(uuid.uuid4()),
+                "admin", "admin",
+                name=name,
+                definition=definition)['id'])
+            for name, definition in six.iteritems(storage.ARCHIVE_POLICIES)
+        ])
 
         self.useFixture(mockpatch.Patch(
             'swiftclient.client.Connection',
