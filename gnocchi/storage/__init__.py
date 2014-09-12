@@ -23,6 +23,8 @@ from oslo.config import cfg
 from stevedore import driver
 from tooz import coordination
 
+import gnocchi
+
 # TODO(eglynn): figure out how to accommodate multi-valued aggregation
 #               methods, where there is no longer just a single aggregate
 #               value to be stored per-period (e.g. ohlc)
@@ -108,7 +110,7 @@ class StorageDriver(object):
                         A list of (seconds, points) that indicates how many
                         points to keep every seconds interval in archives.
         """
-        raise NotImplementedError
+        raise gnocchi.NotImplementedError
 
     @staticmethod
     def add_measures(entity, measures):
@@ -117,7 +119,7 @@ class StorageDriver(object):
         :param entity: The entity measured.
         :param measures: The actual measures.
         """
-        raise NotImplementedError
+        raise gnocchi.NotImplementedError
 
     @staticmethod
     def get_measures(entity, from_timestamp=None, to_timestamp=None,
@@ -129,4 +131,4 @@ class StorageDriver(object):
         :param to timestamp: The timestamp to get the measure to.
         :param aggregation: The type of aggregation to retrieve.
         """
-        raise NotImplementedError
+        raise gnocchi.NotImplementedError
