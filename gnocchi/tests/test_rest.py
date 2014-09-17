@@ -370,6 +370,46 @@ class ResourceTest(RestTest):
                               expect_errors=True)
         self.assertEqual(404, result.status_code)
 
+    def test_post_append_entities_already_exists(self):
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        entities = {'foo': {'archive_policy': "high"}}
+        result = self.app.post_json("/v1/resource/" + self.resource_type
+                                    + "/" + self.attributes['id']
+                                    + "/entity",
+                                    params=entities)
+        self.assertEqual(204, result.status_code)
+
+        entities = {'foo': {'archive_policy': "low"}}
+        result = self.app.post_json("/v1/resource/" + self.resource_type
+                                    + "/" + self.attributes['id']
+                                    + "/entity",
+                                    params=entities)
+        self.assertEqual(409, result.status_code)
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type + "/"
+                              + self.attributes['id'])
+        result = json.loads(result.body)
+        self.assertTrue(uuid.UUID(result['entities']['foo']))
+
+    def test_post_append_entities(self):
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        entities = {'foo': {'archive_policy': "high"}}
+        result = self.app.post_json("/v1/resource/" + self.resource_type
+                                    + "/" + self.attributes['id']
+                                    + "/entity",
+                                    params=entities)
+        self.assertEqual(204, result.status_code)
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type + "/"
+                              + self.attributes['id'])
+        result = json.loads(result.body)
+        self.assertTrue(uuid.UUID(result['entities']['foo']))
+
     def test_patch_resource_entities(self):
         result = self.app.post_json("/v1/resource/" + self.resource_type,
                                     params=self.attributes)
