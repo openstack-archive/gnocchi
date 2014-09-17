@@ -284,6 +284,10 @@ class GenericResourceController(rest.RestController):
         pecan.response.status = 204
 
 
+class ProjectController(GenericResourceController):
+    _resource_type = 'project'
+
+
 class InstanceController(GenericResourceController):
     _resource_type = 'instance'
 
@@ -364,6 +368,11 @@ class GenericResourcesController(rest.RestController):
             pecan.abort(400, e)
 
 
+class ProjectsController(GenericResourcesController):
+    _resource_type = 'project'
+    _resource_rest_class = ProjectController
+
+
 class InstancesController(GenericResourcesController):
     _resource_type = 'instance'
     _resource_rest_class = InstanceController
@@ -379,6 +388,7 @@ class InstancesController(GenericResourcesController):
 class ResourcesController(rest.RestController):
     generic = GenericResourcesController()
     instance = InstancesController()
+    project = ProjectsController()
 
 
 class V1Controller(object):
