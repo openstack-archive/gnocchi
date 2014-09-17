@@ -69,7 +69,8 @@ def Timestamp(v):
 
 
 def convert_entity_list(entities, user_id, project_id):
-    # Replace None as value for an entity by a brand a new entity
+    # Replace an archive policy as value for an entity by a brand a
+    # new entity
     new_entities = {}
     for k, v in six.iteritems(entities):
         if isinstance(v, uuid.UUID):
@@ -205,10 +206,10 @@ class NamedEntityController(rest.RestController):
             pecan.request.indexer.update_resource(
                 self.resource_type, self.resource_id, entities=entities,
                 append_entities=True)
-        except ValueError as e:
+        except (indexer.NoSuchEntity, ValueError) as e:
             pecan.abort(400, e)
-        except indexer.ResourceAlreadyExists as e:
-            pecan.abort(409, e)
+        except indexer.NoSuchResource as e:
+            pecan.abort(404, e)
         pecan.response.status = 204
 
 
