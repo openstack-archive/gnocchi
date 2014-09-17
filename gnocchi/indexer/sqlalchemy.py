@@ -236,8 +236,39 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                              for k in resource.entities)
         return r
 
+    def append_entities_to_resource(self, resource_type, uuid,
+                                    entities):
+
+        resource_cls = self._resource_type_to_class(resource_type)
+        session = self.engine_facade.get_session()
+        with session.begin():
+            q = session.query(
+                resource_cls).filter(
+                    resource_cls.id == uuid).with_for_update()
+            r = q.first()
+            if r is None:
+                raise indexer.NoSuchResource(uuid)
+
+            for name, e in entities.iteritems():
+                session.add(ResourceEntity(resource_id=uuid,
+                                           entity_id=e,
+                                           name=name))
+
+            try:
+                session.flush()
+            except exception.DBReferenceError as e:
+                if e.table == 'resource_entity':
+                    if e.key == 'entity_id':
+                        # FIXME(jd) Add a way to oslo.db to give the value
+                        # that was incorrect
+                        raise indexer.NoSuchEntity("???")
+                    if e.key == 'resource_id':
+                        raise indexer.NoSuchResource(uuid)
+                raise
+
     def update_resource(self, resource_type,
                         uuid, ended_at=_marker, entities=_marker,
+                        append_entities=False,
                         **kwargs):
         resource_cls = self._resource_type_to_class(resource_type)
         session = self.engine_facade.get_session()
@@ -270,8 +301,9 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             r.type, attribute)
 
             if entities is not _marker:
-                session.query(ResourceEntity).filter(
-                    ResourceEntity.resource_id == uuid).delete()
+                if not append_entities:
+                    session.query(ResourceEntity).filter(
+                        ResourceEntity.resource_id == uuid).delete()
                 for name, e in entities.iteritems():
                     session.add(ResourceEntity(resource_id=uuid,
                                                entity_id=e,
