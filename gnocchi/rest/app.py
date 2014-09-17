@@ -80,7 +80,6 @@ def setup_app(pecan_config=PECAN_CONFIG):
     i.connect()
     return pecan.make_app(
         pecan_config['app']['root'],
-        debug=conf.debug,
         hooks=(DBHook(s, i),),
         guess_content_type_from_ext=False,
     )
