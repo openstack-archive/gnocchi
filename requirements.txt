@@ -1,4 +1,5 @@
 babel
+http://tarballs.openstack.org/ceilometer/ceilometer-master.tar.gz#egg=ceilometer
 iso8601
 lockfile>=0.9.1
 netaddr
@@ -14,6 +15,7 @@ python-swiftclient
 pytimeparse
 # pytimeparse misses this dep for now
 future
+requests
 six
 sqlalchemy
 sqlalchemy-utils
