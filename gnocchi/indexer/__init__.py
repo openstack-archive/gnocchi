@@ -127,6 +127,7 @@ class IndexerDriver(object):
     @staticmethod
     def update_resource(resource_type, uuid, ended_at=_marker,
                         entities=_marker,
+                        append_entities=False,
                         **kwargs):
         raise gnocchi.NotImplementedError
 
