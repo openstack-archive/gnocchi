@@ -275,6 +275,10 @@ class GenericResourceController(rest.RestController):
         pecan.response.status = 204
 
 
+class SwiftAccountResourceController(GenericResourceController):
+    _resource_type = 'swiftaccount'
+
+
 class InstanceResourceController(GenericResourceController):
     _resource_type = 'instance'
 
@@ -363,6 +367,11 @@ class GenericResourcesController(rest.RestController):
             pecan.abort(400, e)
 
 
+class SwiftAccountsResourcesController(GenericResourcesController):
+    _resource_type = 'swiftaccount'
+    _resource_rest_class = SwiftAccountResourceController
+
+
 class InstancesResourcesController(GenericResourcesController):
     _resource_type = 'instance'
     _resource_rest_class = InstanceResourceController
@@ -388,6 +397,7 @@ class ResourcesController(rest.RestController):
     generic = GenericResourcesController()
     entity = EntitiesResourcesController()
     instance = InstancesResourcesController()
+    swiftaccount = SwiftAccountsResourcesController()
 
 
 class V1Controller(object):
