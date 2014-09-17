@@ -135,6 +135,11 @@ class IndexerDriver(object):
         raise gnocchi.NotImplementedError
 
     @staticmethod
+    def append_entities_to_resource(self, resource_type, uuid,
+                                    entities):
+        raise gnocchi.NotImplementedError
+
+    @staticmethod
     def create_entity(id):
         raise gnocchi.NotImplementedError
 
