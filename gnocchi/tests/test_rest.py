@@ -46,6 +46,93 @@ class RestTest(tests.TestCase):
         self.assertEqual(200, result.status_code)
 
 
+class ArchivePolicyTest(RestTest):
+    def test_post_archive_policy(self):
+        definition = [{
+            "granularity": 10,
+            "points": 20,
+        }]
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params={"name": "high",
+                    "definition": definition},
+            status=201)
+        self.assertEqual("application/json", result.content_type)
+        ap = json.loads(result.body)
+        self.assertEqual("http://localhost/v1/archive_policy/" + ap['id'],
+                         result.headers['Location'])
+        self.assertEqual("high", ap['name'])
+        self.assertEqual(definition, ap['definition'])
+
+    def test_post_archive_policy_and_entity(self):
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params={"name": "high",
+                    "definition": [{
+                        "granularity": 10,
+                        "points": 20,
+                    }]},
+            status=201)
+        ap = json.loads(result.body)
+        self.app.post_json(
+            "/v1/entity",
+            params={"archive_policy": ap['id']},
+            status=201)
+
+    def test_post_archive_policy_wrong_value(self):
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params={"name": "high",
+                    "definition": "foobar"},
+            expect_errors=True,
+            status=400)
+        self.assertIn('Invalid input: expected a list '
+                      'for dictionary value @ data[u\'definition\']',
+                      result.body)
+
+    def test_get_archive_policy(self):
+        definition = [{
+            "granularity": 10,
+            "points": 20,
+        }]
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params={"name": "high",
+                    "definition": definition},
+            status=201)
+        result_get = self.app.get(result.headers['Location'])
+        ap = json.loads(result.body)
+        ap_get = json.loads(result_get.body)
+        self.assertDictContainsSubset(ap, ap_get)
+        self.assertIn('user_id', ap_get)
+        self.assertIn('project_id', ap_get)
+        self.assertIn('started_at', ap_get)
+        self.assertIsNone(ap_get['ended_at'])
+
+    def test_list_archive_policy(self):
+        definition = [{
+            "granularity": 10,
+            "points": 20,
+        }]
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params={"name": "high",
+                    "definition": definition},
+            status=201)
+        created_ap = json.loads(result.body)
+        result = self.app.get("/v1/archive_policy")
+        for ap in json.loads(result.body):
+            if ap['id'] == created_ap['id']:
+                self.assertDictContainsSubset(created_ap, ap)
+                self.assertIn('user_id', ap)
+                self.assertIn('project_id', ap)
+                self.assertIn('started_at', ap)
+                self.assertIsNone(ap['ended_at'])
+                break
+        else:
+            self.fail("Archive policy not found")
+
+
 class EntityTest(RestTest):
     def test_post_entity(self):
         result = self.app.post_json(
