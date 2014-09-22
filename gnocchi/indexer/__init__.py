@@ -138,6 +138,10 @@ class IndexerDriver(object):
         raise gnocchi.NotImplementedError
 
     @staticmethod
+    def list_archive_policies():
+        raise gnocchi.NotImplementedError
+
+    @staticmethod
     def get_archive_policy(name):
         raise gnocchi.NotImplementedError
 
