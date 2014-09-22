@@ -15,7 +15,6 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-import collections
 import functools
 import os
 import uuid
@@ -100,37 +99,33 @@ class FakeSwiftClient(object):
                                         http_status=404)
 
 
-ArchivePolicy = collections.namedtuple('ArchivePolicy',
-                                       ['granularity', 'points'])
-
-
 @six.add_metaclass(SkipNotImplementedMeta)
 class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
 
     ARCHIVE_POLICIES = {
         'low': [
             # 5 minutes resolution for an hour
-            ArchivePolicy(300, 12),
+            {"granularity": 300, "points": 12},
             # 1 hour resolution for a day
-            ArchivePolicy(3600, 24),
+            {"granularity": 3600, "points": 24},
             # 1 day resolution for a month
-            ArchivePolicy(3600 * 24, 30),
+            {"granularity": 3600 * 24, "points": 30},
         ],
         'medium': [
             # 1 minute resolution for an hour
-            ArchivePolicy(60, 60),
+            {"granularity": 60, "points": 60},
             # 1 hour resolution for a week
-            ArchivePolicy(3600, 7 * 24),
+            {"granularity": 3600, "points": 7 * 24},
             # 1 day resolution for a year
-            ArchivePolicy(3600 * 24, 365),
+            {"granularity": 3600 * 24, "points": 365},
         ],
         'high': [
             # 1 second resolution for a day
-            ArchivePolicy(1, 3600 * 24),
+            {"granularity": 1, "points": 3600 * 24},
             # 1 minute resolution for a month
-            ArchivePolicy(60, 60 * 24 * 30),
+            {"granularity": 60, "points": 60 * 24 * 30},
             # 1 hour resolution for a year
-            ArchivePolicy(3600, 365 * 24),
+            {"granularity": 3600, "points": 365 * 24},
         ],
     }
 

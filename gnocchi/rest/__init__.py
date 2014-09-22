@@ -68,6 +68,51 @@ def Timestamp(v):
     return datetime.datetime.utcfromtimestamp(v)
 
 
+def PositiveNotNullInt(value):
+    value = int(value)
+    if value <= 0:
+        raise ValueError("Value must be positive")
+    return value
+
+
+class ArchivePoliciesController(rest.RestController):
+    ArchivePolicy = voluptuous.Schema({
+        voluptuous.Required("name"): six.text_type,
+        voluptuous.Required("definition"):
+        voluptuous.All([{
+            voluptuous.Required("granularity"): PositiveNotNullInt,
+            voluptuous.Required("points"): PositiveNotNullInt,
+        }],
+                       voluptuous.Length(min=1)),
+    })
+
+    @staticmethod
+    @vexpose(ArchivePolicy, 'json')
+    def post(body):
+        # TODO(jd) Use policy to limit what the user can create as policy
+        id = uuid.uuid4()
+        # FIXME(jd) Use the real user_id/project_id
+        ap = pecan.request.indexer.create_resource(
+            'archive_policy', id,
+            "admin", "admin",
+            name=body['name'],
+            definition=body['definition'])
+
+        pecan.response.headers['Location'] = "/v1/archive_policy/" + str(id)
+        pecan.response.status = 201
+        return {"id": ap['id'],
+                "name": ap['name'],
+                "definition": ap['definition']}
+
+    @pecan.expose('json')
+    def get_one(self, id):
+        return pecan.request.indexer.get_resource('archive_policy', id)
+
+    @pecan.expose('json')
+    def get_all(self):
+        return pecan.request.indexer.list_resources('archive_policy')
+
+
 class EntityController(rest.RestController):
     _custom_actions = {
         'measures': ['POST', 'GET']
@@ -151,7 +196,7 @@ class EntitiesController(rest.RestController):
         pecan.request.indexer.create_resource('entity', id,
                                               user_id, project_id,
                                               archive_policy=policy['id'])
-        pecan.request.storage.create_entity(str(id), policy)
+        pecan.request.storage.create_entity(str(id), policy['definition'])
         return id
 
     @vexpose(Entity, 'json')
@@ -394,6 +439,7 @@ class ResourcesController(rest.RestController):
 
 
 class V1Controller(object):
+    archive_policy = ArchivePoliciesController()
     entity = EntitiesController()
     resource = ResourcesController()
 
