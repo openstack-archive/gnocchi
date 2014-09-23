@@ -20,6 +20,7 @@ mysql -S ${MYSQL_DATA}/mysql.socket -e 'CREATE DATABASE test;'
 python setup.py testr --slowest --testr-args="$*"
 
 ret=$?
+mysql -S ${MYSQL_DATA}/mysql.socket -e 'SHOW ENGINE INNODB STATUS'
 kill $(jobs -p)
 rm -rf "${MYSQL_DATA}"
 exit $ret
