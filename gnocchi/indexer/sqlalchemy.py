@@ -100,6 +100,9 @@ class GnocchiBase(models.ModelBase):
 
 class ResourceEntity(Base, GnocchiBase):
     __tablename__ = 'resource_entity'
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint('resource_id', 'name', name="name_unique"),
+    )
 
     resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                                     sqlalchemy.ForeignKey('resource.id',
