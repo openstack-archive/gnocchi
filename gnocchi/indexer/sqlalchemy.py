@@ -39,6 +39,8 @@ from gnocchi import indexer
 
 Base = declarative.declarative_base()
 
+COMMON_TABLES_ARGS = {'mysql_charset': "utf8",
+                      'mysql_engine': "InnoDB"}
 
 _marker = indexer._marker
 
@@ -94,12 +96,15 @@ class PreciseTimestamp(types.TypeDecorator):
 
 
 class GnocchiBase(models.ModelBase):
-    __table_args__ = {'mysql_charset': "utf8",
-                      'mysql_engine': "InnoDB"}
+    pass
 
 
 class ResourceEntity(Base, GnocchiBase):
     __tablename__ = 'resource_entity'
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint('resource_id', 'name', name="name_unique"),
+        COMMON_TABLES_ARGS,
+    )
 
     resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                                     sqlalchemy.ForeignKey('resource.id',
@@ -116,6 +121,10 @@ class ResourceEntity(Base, GnocchiBase):
 
 class Resource(Base, GnocchiBase):
     __tablename__ = 'resource'
+    __table_args__ = (
+        sqlalchemy.Index('ix_resource_id', 'id'),
+        COMMON_TABLES_ARGS,
+    )
 
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            primary_key=True)
@@ -139,6 +148,10 @@ class Resource(Base, GnocchiBase):
 
 class Entity(Resource):
     __tablename__ = 'entity'
+    __table_args__ = (
+        sqlalchemy.Index('ix_entity_id', 'id'),
+        COMMON_TABLES_ARGS,
+    )
 
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            sqlalchemy.ForeignKey('resource.id',
@@ -149,6 +162,10 @@ class Entity(Resource):
 
 class Instance(Resource):
     __tablename__ = 'instance'
+    __table_args__ = (
+        sqlalchemy.Index('ix_instance_id', 'id'),
+        COMMON_TABLES_ARGS,
+    )
 
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            sqlalchemy.ForeignKey('resource.id',
