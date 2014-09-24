@@ -204,8 +204,8 @@ class ResourceTest(RestTest):
         ('generic', dict(
             attributes={
                 "started_at": "2014-01-03 02:02:02",
-                "user_id": "foo",
-                "project_id": "bar",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
             },
             patchable_attributes={
                 "ended_at": "2014-01-03 02:02:02",
@@ -214,8 +214,8 @@ class ResourceTest(RestTest):
         ('instance', dict(
             attributes={
                 "started_at": "2014-01-03 02:02:02",
-                "user_id": "foo",
-                "project_id": "bar",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
                 "host": "foo",
                 "image_ref": "imageref!",
                 "flavor_id": 123,
@@ -597,8 +597,8 @@ class ResourceTest(RestTest):
             params={
                 "id": str(uuid.uuid4()),
                 "started_at": "2014-01-01 02:02:02",
-                "user_id": "foo",
-                "project_id": "bar",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
             })
         g = json.loads(result.body)
         result = self.app.post_json(
@@ -642,8 +642,8 @@ class ResourceTest(RestTest):
             params={
                 "id": str(uuid.uuid4()),
                 "started_at": "2014-01-01 02:02:02",
-                "user_id": "foo",
-                "project_id": "bar",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
             })
         g = json.loads(result.body)
         result = self.app.post_json(
@@ -712,8 +712,8 @@ class ResourceTest(RestTest):
             params={
                 "id": str(uuid.uuid4()),
                 "started_at": "2014-01-01 02:02:02",
-                "user_id": "foo",
-                "project_id": "bar",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
             })
         g = json.loads(result.body)
         result = self.app.post_json(
