@@ -94,10 +94,8 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
                     with open(aggregation_path, 'wb') as aggregation_file:
                         aggregation_file.write(tsc.serialize())
 
-    def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+    def _get_time_serie_archive(self, entity, aggregation):
         path = os.path.join(self.basepath, entity, aggregation)
-
         try:
             with open(path, 'rb') as aggregation_file:
                 contents = aggregation_file.read()
@@ -105,5 +103,16 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
             if e.errno == errno.ENOENT:
                 raise storage.EntityDoesNotExist(entity)
             raise
-        tsc = carbonara.TimeSerieArchive.unserialize(contents)
+        return carbonara.TimeSerieArchive.unserialize(contents)
+
+    def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
+                     aggregation='mean'):
+        tsc = self._get_time_serie_archive(entity, aggregation)
+        return dict(tsc.fetch(from_timestamp, to_timestamp))
+
+    def get_aggregated_measures(self, entities, from_timestamp=None,
+                                to_timestamp=None, aggregation='mean'):
+        tss = [self._get_time_serie_archive(entity, aggregation)
+               for entity in entities]
+        tsc = carbonara.TimeSerieArchive.aggregated(tss, aggregation)
         return dict(tsc.fetch(from_timestamp, to_timestamp))
