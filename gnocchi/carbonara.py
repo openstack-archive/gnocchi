@@ -33,6 +33,10 @@ class NoDeloreanAvailable(Exception):
             "%s is before %s" % (bad_timestamp, first_timestamp))
 
 
+class UnAggregableTimeseries(Exception):
+    """Error raised when timeseries cannot be aggregated."""
+
+
 class TimeSerie(object):
 
     def __init__(self, timestamps=None, values=None):
@@ -78,7 +82,9 @@ class TimeSerie(object):
         """
         return cls(*cls._timestamps_and_values_from_dict(d['values']))
 
-    def to_dict(self):
+    def to_dict(self, only_definitions=False):
+        if only_definitions:
+            return {}
         return {
             'values': dict((six.text_type(k), float(v))
                            for k, v
@@ -156,8 +162,8 @@ class BoundTimeSerie(TimeSerie):
                    block_size=d.get('block_size'),
                    back_window=d.get('back_window'))
 
-    def to_dict(self):
-        basic = super(BoundTimeSerie, self).to_dict()
+    def to_dict(self, only_definitions=False):
+        basic = super(BoundTimeSerie, self).to_dict(only_definitions)
         basic.update({
             'block_size': self._serialize_time_period(self.block_size),
             'back_window': self.back_window,
@@ -221,8 +227,8 @@ class AggregatedTimeSerie(TimeSerie):
                    sampling=d.get('sampling'),
                    aggregation_method=d.get('aggregation_method', 'mean'))
 
-    def to_dict(self):
-        d = super(AggregatedTimeSerie, self).to_dict()
+    def to_dict(self, only_definitions=False):
+        d = super(AggregatedTimeSerie, self).to_dict(only_definitions)
         d.update({
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
@@ -338,10 +344,11 @@ class TimeSerieArchive(object):
             values,
             before_truncate_callback=self._update_aggregated_timeseries)
 
-    def to_dict(self):
+    def to_dict(self, only_definitions=False):
         return {
-            "timeserie": self.full_res_timeserie.to_dict(),
-            "archives": [ts.to_dict() for ts in self.agg_timeseries],
+            "timeserie": self.full_res_timeserie.to_dict(only_definitions),
+            "archives": [ts.to_dict(only_definitions)
+                         for ts in self.agg_timeseries],
         }
 
     @classmethod
@@ -355,3 +362,47 @@ class TimeSerieArchive(object):
 
     def serialize(self):
         return msgpack.dumps(self.to_dict())
+
+    @classmethod
+    def aggregated(cls, in_timeseries, from_timestamp=None, to_timestamp=None,
+                   aggregation='mean'):
+
+        index = ['timestamp', 'granularity']
+        columns = ['timestamp', 'granularity', 'value']
+        ref_definition = None
+        dataframes = []
+        for timeserie in in_timeseries:
+
+            # TODO(sileht): Currently the whole definition need to match
+            # between timeseries, but for example if the granularity matches,
+            # the number of points retained doesn't match, but there's enough
+            # of an overlap to satisfy the timerange span of the query we can
+            # allow it too.
+            definition = timeserie.to_dict(only_definitions=True)
+            if ref_definition is None:
+                ref_definition = definition
+            elif ref_definition != definition:
+                raise UnAggregableTimeseries
+
+            values = timeserie.fetch(from_timestamp, to_timestamp)
+            if values:
+                dataframe = pandas.DataFrame(values, columns=columns)
+                dataframe = dataframe.set_index(index)
+                dataframes.append(dataframe)
+
+        if not dataframes:
+            return []
+
+        grouped = pandas.concat(dataframes).groupby(level=index)
+        # NOTE(sileht): this call the aggregation method on already
+        # aggregated values, for some kind of aggregation this can
+        # result can looks wierd, but this is the best we can do
+        # because we don't have anymore the raw datapoints in those case.
+        # FIXME(sileht): so should we bailout is case of stddev and median ?
+        agg_timeserie = getattr(grouped, aggregation)()
+        points = (agg_timeserie.reset_index()
+                  .sort(['granularity', 'timestamp'], ascending=[0, 1])
+                  .itertuples())
+        points = [(timestamp, granularity, value)
+                  for __, timestamp, granularity, value in points]
+        return points
