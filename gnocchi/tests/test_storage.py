@@ -94,7 +94,83 @@ class TestStorageDriver(tests.TestCase):
         self.assertEqual(1, len(values))
         self.assertEqual(69, values[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
-    def test_get_measure_unknown_entity(self):
+    def test_add_and_get_cross_entity_measures(self):
+        self.storage.create_entity("foo", self.archive_policies['low'])
+        self.storage.create_entity("bar", self.archive_policies['low'])
+        self.storage.add_measures('foo', [
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 44),
+        ])
+        self.storage.add_measures('bar', [
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 41), 2),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 10, 31), 4),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 4),
+        ])
+
+        values = self.storage.get_cross_entity_measures(['foo', 'bar'])
+        self.assertEqual(4, len(values))
+        self.assertEqual(22.25, values[datetime.datetime(2014, 1, 1, 0, 0, 0)])
+        self.assertEqual(39, values[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+        self.assertEqual(12.5, values[datetime.datetime(2014, 1, 1, 12, 5, 0)])
+        self.assertEqual(24, values[datetime.datetime(2014, 1, 1, 12, 10, 0)])
+
+        values = self.storage.get_cross_entity_measures(
+            ['foo', 'bar'],
+            from_timestamp='2014-01-01 12:10:00')
+        self.assertEqual(1, len(values))
+        self.assertEqual(24, values[datetime.datetime(2014, 1, 1, 12, 10, 0)])
+
+        values = self.storage.get_cross_entity_measures(
+            ['foo', 'bar'], to_timestamp='2014-01-01 12:05:00')
+        self.assertEqual(3, len(values))
+        self.assertEqual(22.25, values[datetime.datetime(2014, 1, 1, 0, 0, 0)])
+        self.assertEqual(39, values[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+        self.assertEqual(12.5, values[datetime.datetime(2014, 1, 1, 12, 5, 0)])
+
+        values = self.storage.get_cross_entity_measures(
+            ['foo', 'bar'],
+            to_timestamp='2014-01-01 12:10:10',
+            from_timestamp='2014-01-01 12:10:10')
+        self.assertEqual({}, values)
+
+        values = self.storage.get_cross_entity_measures(
+            ['foo', 'bar'],
+            from_timestamp='2014-01-01 12:00:00',
+            to_timestamp='2014-01-01 12:00:01')
+        self.assertEqual(1, len(values))
+        self.assertEqual(39.0, values[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+
+    def test_add_and_get_cross_entity_measures_with_holes(self):
+        self.storage.create_entity("foo", self.archive_policies['low'])
+        self.storage.create_entity("bar", self.archive_policies['low'])
+        self.storage.add_measures('foo', [
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 42),
+        ])
+        self.storage.add_measures('bar', [
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
+        ])
+
+        values = self.storage.get_cross_entity_measures(['foo', 'bar'])
+        self.assertEqual(4, len(values))
+        self.assertEqual(22.375,
+                         values[datetime.datetime(2014, 1, 1, 0, 0, 0)])
+        self.assertEqual(39, values[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+        self.assertEqual(23, values[datetime.datetime(2014, 1, 1, 12, 5, 0)])
+        self.assertEqual(22, values[datetime.datetime(2014, 1, 1, 12, 10, 0)])
+
+    def test_get_measures_unknown_entity(self):
         self.assertRaises(storage.EntityDoesNotExist,
                           self.storage.get_measures,
                           'foo', 0)
+
+    def test_get_cross_entity_measures_unknown_entity(self):
+        self.assertRaises(storage.EntityDoesNotExist,
+                          self.storage.get_cross_entity_measures,
+                          ['foo', 'bar'], 0)
