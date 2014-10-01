@@ -392,6 +392,9 @@ class ResourceTest(RestTest):
         self.attributes['ended_at'] = None
         self.attributes['entities'] = {}
         self.assertEqual(resource, self.attributes)
+        result = self.app.get("/v1/resource/" + self.resource_type)
+        resources = json.loads(result.body)
+        self.assertEqual(1, len(resources))
 
     def test_post_resource_already_exist(self):
         result = self.app.post_json(
