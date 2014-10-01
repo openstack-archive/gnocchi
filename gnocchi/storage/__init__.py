@@ -122,9 +122,21 @@ class StorageDriver(object):
     @staticmethod
     def get_measures(entity, from_timestamp=None, to_timestamp=None,
                      aggregation='average'):
-        """Add a measure to an entity.
+        """Get measures of an entity.
 
         :param entity: The entity measured.
+        :param from timestamp: The timestamp to get the measure from.
+        :param to timestamp: The timestamp to get the measure to.
+        :param aggregation: The type of aggregation to retrieve.
+        """
+        raise gnocchi.NotImplementedError
+
+    @staticmethod
+    def get_aggregated_measures(entities, from_timestamp=None,
+                                to_timestamp=None, aggregation='average'):
+        """Get aggregated measures of entities.
+
+        :param entities: The entities measured to aggregate.
         :param from timestamp: The timestamp to get the measure from.
         :param to timestamp: The timestamp to get the measure to.
         :param aggregation: The type of aggregation to retrieve.
