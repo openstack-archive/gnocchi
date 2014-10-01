@@ -34,6 +34,8 @@ from gnocchi import carbonara
 from gnocchi import indexer
 from gnocchi import storage
 
+LOGICAL_AND = '∧'
+
 
 def get_user_and_project():
     return (pecan.request.headers.get('X-User-Id'),
@@ -200,6 +202,33 @@ class ArchivePoliciesController(rest.RestController):
                         pecan.request.indexer.list_archive_policies()))
 
 
+class AggregatedEntityController(rest.RestController):
+    _custom_actions = {
+        'measures': ['GET']
+    }
+
+    def __init__(self, entity_ids):
+        self.entity_ids = entity_ids
+
+    @pecan.expose('json')
+    def get_measures(self, start=None, stop=None, aggregation='mean'):
+        if aggregation not in storage.AGGREGATION_TYPES:
+            pecan.abort(400, 'Invalid aggregation value %s, must be one of %s'
+                        % (aggregation, str(storage.AGGREGATION_TYPES)))
+
+        try:
+            # Replace timestamp keys by their string versions
+            return dict((timeutils.strtime(k), v)
+                        for k, v in six.iteritems(
+                            pecan.request.storage.get_cross_entity_measures(
+                                self.entity_ids, start, stop, aggregation)))
+        except carbonara.UnAggregableTimeseries as e:
+            pecan.abort(400, "One of the entity to aggregated doesn't have "
+                        "the archive policies")
+        except storage.EntityDoesNotExist as e:
+            pecan.abort(404, str(e))
+
+
 class EntityController(rest.RestController):
     _custom_actions = {
         'measures': ['POST', 'GET']
@@ -317,14 +346,63 @@ class NamedEntityController(rest.RestController):
 
     @pecan.expose()
     def _lookup(self, name, *remainder):
+        try:
+            uuid.UUID(self.resource_id)
+        except ValueError:
+            return (self._lookup_aggregated_entity(self.resource_id, name),
+                    remainder)
+        else:
+            return self._lookup_entity(name), remainder
+
+    def _lookup_entity(self, name):
         # TODO(jd) There might be an slight optimization to do by using a
         # dedicated driver method rather than get_resource, which might be
         # heavier.
         resource = pecan.request.indexer.get_resource(
             'generic', self.resource_id)
         if name in resource['entities']:
-            return EntityController(resource['entities'][name]), remainder
+            return EntityController(resource['entities'][name])
         pecan.abort(404)
+
+    def _lookup_aggregated_entity(self, query, name):
+        attrs_filter = self._get_filters_from_query(query)
+        resources = pecan.request.indexer.list_resources(
+            self.resource_type, attributes_filter=attrs_filter)
+        return AggregatedEntityController([r['entities'][name]
+                                           for r in resources])
+
+    def _get_filters_from_query(self, query):
+        # TODO(sileht): Implements more filters not just ∧
+        parsed_query = {}
+        for fragment in query.split(LOGICAL_AND):
+            try:
+                fragment = six.text_type(fragment)
+            except ValueError:
+                pecan.abort(400, "Invalid input: %s" % query)
+
+            fragment = fragment.split('=', 1)
+            if len(fragment) != 2:
+                pecan.abort(400, "Invalid input: %s" % query)
+
+            parsed_query[fragment[0]] = fragment[1]
+
+        # TODO(sileht): for now to reduce the number of voluptuous
+        # schema definition used we allows to filter only on Patchable
+        # attributes, (voluptuous schema of Postable attributes
+        # have 'required' set and we don't want to force to put all
+        # the filters into the query)
+        try:
+            ctrl = getattr(ResourcesController, self.resource_type)
+            schema = ctrl._resource_rest_class.ResourcePatch
+        except AttributeError:
+            pecan.abort(404)
+
+        try:
+            filters = schema(parsed_query)
+        except voluptuous.Error as e:
+            pecan.abort(400, "Invalid input: %s" % e)
+
+        return filters
 
     @vexpose(Entities)
     def post(self, body):
