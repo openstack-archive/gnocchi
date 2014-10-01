@@ -931,4 +931,72 @@ class ResourceTest(RestTest):
                 "/v1/resource/generic",
                 headers={"Accept": "application/json; details=true"}))
 
+    def test_get_resource_named_entity_measure_aggregation(self):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity1 = json.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity1['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 8},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 16}])
+
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity2 = json.loads(result.body)
+        self.app.post_json("/v1/entity/%s/measures" % entity2['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 0},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 4}])
+
+        # NOTE(sileht): because the database is never cleaned between each test
+        # we must ensure that the query will not match resources from an other
+        # test, to achieve this we set a different server_group on each test.
+        server_group = str(uuid.uuid4())
+        if self.resource_type == 'instance':
+            self.attributes['server_group'] = server_group
+
+        self.attributes['entities'] = {'foo': entity1['id']}
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        self.attributes['id'] = str(uuid.uuid4())
+        self.attributes['entities'] = {'foo': entity2['id']}
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type
+                              + "/server_group=" + server_group
+                              + "∧display_name=myinstance"
+                              + "/entity/foo/measures?aggregation=max",
+                              expect_errors=True)
+
+        if self.resource_type == 'instance':
+            self.assertEqual(200, result.status_code)
+            measures = json.loads(result.body)
+            self.assertEqual({'2013-01-01T12:00:00.000000': 16.0,
+                              '2013-01-01T00:00:00.000000': 16.0},
+                             measures)
+        else:
+            self.assertEqual(400, result.status_code)
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type
+                              + "/server_group=" + server_group
+                              + "∧display_name=myinstance"
+                              + "/entity/foo/measures?aggregation=min",
+                              expect_errors=True)
+
+        if self.resource_type == 'instance':
+            self.assertEqual(200, result.status_code)
+            measures = json.loads(result.body)
+            self.assertEqual({'2013-01-01T12:00:00.000000': 0.0,
+                              '2013-01-01T00:00:00.000000': 0.0},
+                             measures)
+        else:
+            self.assertEqual(400, result.status_code)
+
+
 ResourceTest.generate_scenarios()

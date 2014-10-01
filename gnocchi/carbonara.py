@@ -16,6 +16,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 """Time series data manipulation, better with pancetta."""
+import itertools
 import operator
 
 import msgpack
@@ -311,3 +312,37 @@ class TimeSerieArchive(object):
 
     def serialize(self):
         return msgpack.dumps(self.to_dict())
+
+    @classmethod
+    def aggregated(cls, in_timeseries, aggregation='mean'):
+
+        def dimension(agg_ts):
+            return (agg_ts.max_size, agg_ts.block_size,
+                    agg_ts.sampling, agg_ts.aggregation_method)
+
+        # TODO(sileht): check that all TimeSerieArchive
+        # have the same number of aggregate with the same
+        # archive configuration
+        timeseries = []
+        agg_timeseries = {}
+        for ts in in_timeseries:
+            timeseries.append(ts.timeserie.ts)
+            for agg_ts in ts.agg_timeseries:
+                agg_timeseries.setdefault(
+                    dimension(agg_ts), []).append(agg_ts)
+
+        merged_agg_timeseries = []
+        for dim in agg_timeseries:
+            tss = list(itertools.chain(
+                ts.ts for ts in agg_timeseries[dim]))
+            ts = AggregatedTimeSerie(None, None, *dim)
+            grouped = pandas.concat(tss).groupby(level=0)
+            # NOTE(sileht): Does that make sense to do that on
+            # std and median ?
+            values = getattr(grouped, aggregation)().sort_index().iteritems()
+            ts.set_values(values)
+            merged_agg_timeseries.append(ts)
+
+        r = pandas.concat(timeseries)
+        r = r.sort_index()
+        return TimeSerieArchive(r, merged_agg_timeseries)
