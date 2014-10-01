@@ -16,6 +16,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 """Time series data manipulation, better with pancetta."""
+import itertools
 import operator
 
 import msgpack
@@ -25,6 +26,10 @@ import six
 
 class NoDeloreanAvailable(Exception):
     """Error raised when trying to insert a value that is too old."""
+
+
+class UnAggregableTimeseries(Exception):
+    """Error raised when timeseries cannot be aggregated."""
 
 
 class TimeSerie(object):
@@ -307,3 +312,49 @@ class TimeSerieArchive(object):
 
     def serialize(self):
         return msgpack.dumps(self.to_dict())
+
+    @classmethod
+    def aggregated(cls, in_timeseries, aggregation='mean'):
+
+        def dimension(agg_ts):
+            return (agg_ts.max_size, agg_ts.block_size,
+                    agg_ts.sampling, agg_ts.aggregation_method)
+
+        # We need to ensure that all aggregated timeserie inside
+        # all the TimeSerieArchive have the same dimension
+        # otherwise bailout because the result can be wrong
+        agg_timeseries = {}
+        first_ts = in_timeseries.pop()
+        timeseries = [first_ts.timeserie.ts]
+        for agg_ts in first_ts.agg_timeseries:
+            agg_timeseries.setdefault(dimension(agg_ts), []).append(agg_ts)
+
+        for ts in in_timeseries:
+            timeseries.append(ts.timeserie.ts)
+            for agg_ts in ts.agg_timeseries:
+                dim = dimension(agg_ts)
+                if dim not in agg_timeseries:
+                    raise UnAggregableTimeseries
+                agg_timeseries[dim].append(agg_ts)
+
+        n_ts_per_dimension = None
+        merged_agg_timeseries = []
+        for dim in agg_timeseries:
+            if n_ts_per_dimension is None:
+                n_ts_per_dimension = len(agg_timeseries[dim])
+            elif n_ts_per_dimension != len(agg_timeseries[dim]):
+                raise UnAggregableTimeseries
+
+            tss = list(itertools.chain(
+                ts.ts for ts in agg_timeseries[dim]))
+            ts = AggregatedTimeSerie(None, None, *dim)
+            grouped = pandas.concat(tss).groupby(level=0)
+            # NOTE(sileht): Does that make sense to do that on
+            # std and median ?
+            values = getattr(grouped, aggregation)().sort_index().iteritems()
+            ts.set_values(values)
+            merged_agg_timeseries.append(ts)
+
+        r = pandas.concat(timeseries)
+        r = r.sort_index()
+        return cls(r, merged_agg_timeseries)

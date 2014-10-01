@@ -122,13 +122,23 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 tsc.set_values([(m.timestamp, m.value) for m in measures])
                 self.swift.put_object(entity, aggregation, tsc.serialize())
 
-    def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+    def _get_time_serie_archive(self, entity, aggregation):
         try:
             headers, contents = self.swift.get_object(entity, aggregation)
         except swclient.ClientException as e:
             if e.http_status == 404:
                 raise storage.EntityDoesNotExist(entity)
             raise
-        tsc = carbonara.TimeSerieArchive.unserialize(contents)
+        return carbonara.TimeSerieArchive.unserialize(contents)
+
+    def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
+                     aggregation='mean'):
+        tsc = self._get_time_serie_archive(entity, aggregation)
+        return dict(tsc.fetch(from_timestamp, to_timestamp))
+
+    def get_cross_entity_measures(self, entities, from_timestamp=None,
+                                  to_timestamp=None, aggregation='mean'):
+        tss = [self._get_time_serie_archive(entity, aggregation)
+               for entity in entities]
+        tsc = carbonara.TimeSerieArchive.aggregated(tss, aggregation)
         return dict(tsc.fetch(from_timestamp, to_timestamp))
