@@ -22,6 +22,7 @@ import uuid
 from oslo.utils import timeutils
 import pecan
 import six
+from six.moves.urllib import parse as url_parse
 import testscenarios
 import webtest
 
@@ -1045,5 +1046,156 @@ class ResourceTest(RestTest):
             lambda: self.app.get(
                 "/v1/resource/generic",
                 headers={"Accept": "application/json; details=true"}))
+
+    def test_get_res_named_entity_measure_aggregated_policies_invalid(self):
+        # NOTE(sileht): This is a bit ugly, but this is a workaround for this
+        # webob bug:
+        #  https://github.com/Pylons/webob/issues/164
+        binary_kwargs = {}
+        if six.PY3:
+            rest.LOGICAL_AND = '+'
+            binary_kwargs['encoding'] = 'utf-8'
+
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "low"})
+        entity1 = json.loads(result.text)
+        self.app.post_json("/v1/entity/%s/measures" % entity1['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 16}])
+
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity2 = json.loads(result.text)
+        self.app.post_json("/v1/entity/%s/measures" % entity2['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 4}])
+
+        # NOTE(sileht): because the database is never cleaned between each test
+        # we must ensure that the query will not match resources from an other
+        # test, to achieve this we set a different server_group on each test.
+        server_group = str(uuid.uuid4())
+        if self.resource_type == 'instance':
+            self.attributes['server_group'] = server_group
+
+        self.attributes['entities'] = {'foo': entity1['id']}
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        self.attributes['id'] = str(uuid.uuid4())
+        self.attributes['entities'] = {'foo': entity2['id']}
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type
+                              + "/server_group=" + server_group
+                              + url_parse.quote(rest.LOGICAL_AND)
+                              + "display_name=myinstance"
+                              + "/entity/foo/measures?aggregation=max",
+                              expect_errors=True)
+        self.assertEqual(400, result.status_code)
+        if self.resource_type == 'instance':
+            self.assertIn(b"One of the entity to aggregated doesn't have the "
+                          b"archive policies",
+                          result.body)
+
+    def test_get_res_named_entity_measure_aggregation_query_invalid(self):
+        # NOTE(sileht): This is a bit ugly, but this is a workaround for this
+        # webob bug:
+        #  https://github.com/Pylons/webob/issues/164
+        binary_kwargs = {}
+        if six.PY3:
+            rest.LOGICAL_AND = '+'
+            binary_kwargs['encoding'] = 'utf-8'
+
+        invalid_query = ("server_group"
+                         + url_parse.quote(rest.LOGICAL_AND)
+                         + "display_name=myinstance")
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type + "/"
+                              + invalid_query
+                              + "/entity/foo/measures?aggregation=max",
+                              expect_errors=True)
+        self.assertEqual(400, result.status_code)
+        self.assertIn(b'server_group'
+                      + six.binary_type(rest.LOGICAL_AND, **binary_kwargs)
+                      + b'display_name=myinstance',
+                      result.body)
+
+    def test_get_res_named_entity_measure_aggregation_nominal(self):
+        # NOTE(sileht): This is a bit ugly, but this is a workaround for this
+        # webob bug:
+        #  https://github.com/Pylons/webob/issues/164
+        if six.PY3:
+            rest.LOGICAL_AND = '+'
+
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity1 = json.loads(result.text)
+        self.app.post_json("/v1/entity/%s/measures" % entity1['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 8},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 16}])
+
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity2 = json.loads(result.text)
+        self.app.post_json("/v1/entity/%s/measures" % entity2['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 0},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 4}])
+
+        # NOTE(sileht): because the database is never cleaned between each test
+        # we must ensure that the query will not match resources from an other
+        # test, to achieve this we set a different server_group on each test.
+        server_group = str(uuid.uuid4())
+        if self.resource_type == 'instance':
+            self.attributes['server_group'] = server_group
+
+        self.attributes['entities'] = {'foo': entity1['id']}
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        self.attributes['id'] = str(uuid.uuid4())
+        self.attributes['entities'] = {'foo': entity2['id']}
+        self.app.post_json("/v1/resource/" + self.resource_type,
+                           params=self.attributes)
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type
+                              + "/server_group=" + server_group
+                              + url_parse.quote(rest.LOGICAL_AND)
+                              + "display_name=myinstance"
+                              + "/entity/foo/measures?aggregation=max",
+                              expect_errors=True)
+
+        if self.resource_type == 'instance':
+            self.assertEqual(200, result.status_code, result.text)
+            measures = json.loads(result.text)
+            self.assertEqual({'2013-01-01T12:00:00.000000': 16.0,
+                              '2013-01-01T00:00:00.000000': 16.0},
+                             measures)
+        else:
+            self.assertEqual(400, result.status_code)
+
+        result = self.app.get("/v1/resource/"
+                              + self.resource_type
+                              + "/server_group=" + server_group
+                              + url_parse.quote(rest.LOGICAL_AND)
+                              + "display_name=myinstance"
+                              + "/entity/foo/measures?aggregation=min",
+                              expect_errors=True)
+
+        if self.resource_type == 'instance':
+            self.assertEqual(200, result.status_code)
+            measures = json.loads(result.text)
+            self.assertEqual({'2013-01-01T12:00:00.000000': 0.0,
+                              '2013-01-01T00:00:00.000000': 0.0},
+                             measures)
+        else:
+            self.assertEqual(400, result.status_code)
 
 ResourceTest.generate_scenarios()
