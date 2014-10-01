@@ -351,3 +351,30 @@ class TestTimeSerieArchive(testtools.TestCase):
             # we expect all 10 of the *aggregated* (as opposed to raw)
             # datapoints not to be discarded
             self.assertEqual(i, len(d['archives'][0]['values']))
+
+    def test_aggregated(self):
+        tsc1 = carbonara.TimeSerieArchive.from_definitions(
+            [(pandas.tseries.offsets.Minute(1), 60),
+             (pandas.tseries.offsets.Minute(5), 24)])
+        tsc2 = carbonara.TimeSerieArchive.from_definitions(
+            [(pandas.tseries.offsets.Minute(1), 60),
+             (pandas.tseries.offsets.Minute(5), 24)])
+
+        tsc1.set_values([(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
+                        (datetime.datetime(2014, 1, 1, 12, 1, 4), 4),
+                        (datetime.datetime(2014, 1, 1, 12, 1, 9), 7),
+                        (datetime.datetime(2014, 1, 1, 12, 2, 1), 15),
+                        (datetime.datetime(2014, 1, 1, 12, 2, 12), 1)])
+
+        tsc2.set_values([(datetime.datetime(2014, 1, 1, 12, 0, 0), 5),
+                        (datetime.datetime(2014, 1, 1, 12, 1, 4), 6),
+                        (datetime.datetime(2014, 1, 1, 12, 1, 9), 1),
+                        (datetime.datetime(2014, 1, 1, 12, 2, 1), 3),
+                        (datetime.datetime(2014, 1, 1, 12, 2, 12), 11)])
+
+        tsc = carbonara.TimeSerieArchive.aggregated([tsc1, tsc2])
+        r = tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0))
+
+        self.assertEqual(4, r[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+        self.assertEqual(4.5, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
+        self.assertEqual(7.5, r[datetime.datetime(2014, 1, 1, 12, 2, 0)])
