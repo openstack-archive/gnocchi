@@ -28,6 +28,7 @@ import testscenarios
 import testtools
 from testtools import testcase
 from tooz import coordination
+from tooz.drivers import ipc
 
 import gnocchi
 from gnocchi import indexer
@@ -155,6 +156,8 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
 
     def setUp(self):
         super(TestCase, self).setUp()
+        self._track_tooz_locks()
+
         self.conf = self.useFixture(config_fixture.Config()).conf
         self.conf.import_opt('debug', 'gnocchi.openstack.common.log')
         self.conf.set_override('debug', True)
@@ -204,8 +207,22 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
 
         self.conf.set_override('driver', self.storage_engine, 'storage')
         self.storage = storage.get_driver(self.conf)
-        self.addCleanup(self.storage.coord.stop)
 
     def tearDown(self):
         self.index.disconnect()
         super(TestCase, self).tearDown()
+
+    def _track_tooz_locks(self):
+        self._tooz_locks = []
+        self.addCleanup(map, lambda l: l.destroy(),
+                        self._tooz_locks)
+        real_get_lock = ipc.IPCDriver.get_lock
+
+        def fake_get_lock(myself, name):
+            l = real_get_lock(myself, name)
+            self._tooz_locks.append(l)
+            return l
+
+        self.useFixture(mockpatch.PatchObject(ipc.IPCDriver, 'get_lock',
+                                              side_effect=fake_get_lock,
+                                              autospec=True))
