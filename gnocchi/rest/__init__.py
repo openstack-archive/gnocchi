@@ -29,6 +29,7 @@ import six
 import voluptuous
 import werkzeug.http
 
+from gnocchi import carbonara
 from gnocchi import indexer
 from gnocchi import storage
 
@@ -147,6 +148,8 @@ class EntityController(rest.RestController):
                     m['timestamp'],
                     m['value']) for m in body))
         except storage.EntityDoesNotExist as e:
+            pecan.abort(404, str(e))
+        except carbonara.NoDeloreanAvailable as e:
             pecan.abort(404, str(e))
         # NOTE(jd) Until https://bugs.launchpad.net/pecan/+bug/1311629 is fixed
         pecan.response.status = 204
