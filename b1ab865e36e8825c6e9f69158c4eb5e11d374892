@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Submitted-by: Jenkins
+Submitted-at: Fri, 03 Oct 2014 15:49:10 +0000
+Reviewed-on: https://review.openstack.org/125992
+Project: stackforge/gnocchi
+Branch: refs/heads/master
