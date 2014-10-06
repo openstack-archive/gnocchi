@@ -117,8 +117,10 @@ class ArchivePolicyItem(object):
     @property
     def granularity(self):
         if self._granularity is None:
-            self._granularity = (timeparse.timeparse(self._timespan)
-                                 / self._points)
+            self._granularity = six.text_type(
+                datetime.timedelta(
+                    seconds=(timeparse.timeparse(self._timespan)
+                             / self._points)))
         return self._granularity
 
     @property
@@ -153,10 +155,10 @@ class ArchivePoliciesController(rest.RestController):
         voluptuous.Required("definition"):
         voluptuous.All([
             voluptuous.Any({
-                voluptuous.Required("granularity"): PositiveNotNullInt,
+                voluptuous.Required("granularity"): Timespan,
                 voluptuous.Required("points"): PositiveNotNullInt,
             }, {
-                voluptuous.Required("granularity"): PositiveNotNullInt,
+                voluptuous.Required("granularity"): Timespan,
                 voluptuous.Required("timespan"): Timespan,
             }, {
                 voluptuous.Required("points"): PositiveNotNullInt,

@@ -102,7 +102,7 @@ class ArchivePolicyTest(RestTest):
             params={"name": name,
                     "definition":
                     [{
-                        "granularity": 10,
+                        "granularity": "1 minute",
                         "points": 20,
                     }]},
             status=201)
@@ -112,9 +112,9 @@ class ArchivePolicyTest(RestTest):
                          result.headers['Location'])
         self.assertEqual(name, ap['name'])
         self.assertEqual([{
-            "granularity": 10,
+            "granularity": "0:01:00",
             "points": 20,
-            "timespan": "0:03:20",
+            "timespan": "0:20:00",
         }], ap['definition'])
 
     def test_post_archive_policy_with_timespan(self):
