@@ -97,7 +97,10 @@ def PositiveNotNullInt(value):
 def Timespan(value):
     if value is None:
         raise ValueError("Invalid timespan")
-    seconds = timeparse.timeparse(value)
+    try:
+        seconds = timeparse.timeparse(six.text_type(value))
+    except Exception:
+        raise ValueError("Unable to parse timespan")
     if seconds is None:
         raise ValueError("Unable to parse timespan")
     if seconds <= 0:
@@ -119,13 +122,13 @@ class ArchivePolicyItem(object):
     @property
     def granularity(self):
         if self._granularity is None:
-            self._granularity = self._timespan / self._points
+            self._granularity = self._timespan / float(self._points)
         return self._granularity
 
     @property
     def points(self):
         if self._points is None:
-            self._points = self._timespan / self._granularity
+            self._points = int(self._timespan / self._granularity)
         return self._points
 
     @property
@@ -146,7 +149,8 @@ class ArchivePolicyItem(object):
         return {
             'timespan': six.text_type(
                 datetime.timedelta(seconds=self.timespan)),
-            'granularity': self.granularity,
+            'granularity': six.text_type(
+                datetime.timedelta(seconds=self.granularity)),
             'points': self.points
         }
 
@@ -163,10 +167,10 @@ class ArchivePoliciesController(rest.RestController):
         voluptuous.Required("definition"):
         voluptuous.All([
             voluptuous.Any({
-                voluptuous.Required("granularity"): PositiveNotNullInt,
+                voluptuous.Required("granularity"): Timespan,
                 voluptuous.Required("points"): PositiveNotNullInt,
             }, {
-                voluptuous.Required("granularity"): PositiveNotNullInt,
+                voluptuous.Required("granularity"): Timespan,
                 voluptuous.Required("timespan"): Timespan,
             }, {
                 voluptuous.Required("points"): PositiveNotNullInt,
