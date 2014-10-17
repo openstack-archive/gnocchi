@@ -177,7 +177,8 @@ class ArchivePoliciesController(rest.RestController):
             ap = pecan.request.indexer.create_archive_policy(**body)
         except indexer.ArchivePolicyAlreadyExists as e:
             pecan.abort(409, e)
-        pecan.response.headers['Location'] = "/v1/archive_policy/" + ap['name']
+        pecan.response.headers['Location'] = ("/v1/archive_policy/"
+                                              + str(ap['name']))
         pecan.response.status = 201
         return ArchivePolicyItem.archive_policy_to_human_readable(ap)
 
@@ -471,7 +472,7 @@ class GenericResourcesController(rest.RestController):
             pecan.abort(409, e)
         pecan.response.headers['Location'] = ("/v1/resource/"
                                               + self._resource_type + "/"
-                                              + resource['id'])
+                                              + str(resource['id']))
         pecan.response.status = 201
         return resource
 
