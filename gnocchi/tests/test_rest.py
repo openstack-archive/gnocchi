@@ -117,6 +117,29 @@ class ArchivePolicyTest(RestTest):
             "timespan": "0:20:00",
         }], ap['definition'])
 
+    def test_post_archive_policy_unicode(self):
+        name = 'æ' + str(uuid.uuid4())
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params={"name": name,
+                    "definition":
+                    [{
+                        "granularity": "1 minute",
+                        "points": 20,
+                    }]},
+            headers={'content-type': 'application/json; charset=UTF-8'},
+            status=201)
+        self.assertEqual("application/json", result.content_type)
+        ap = json.loads(result.text)
+        self.assertEqual("http://localhost/v1/archive_policy/" + name,
+                         result.headers['Location'])
+        self.assertEqual(name.decode('utf-8'), ap['name'])
+        self.assertEqual([{
+            "granularity": "0:01:00",
+            "points": 20,
+            "timespan": "0:20:00",
+        }], ap['definition'])
+
     def test_post_archive_policy_with_timespan(self):
         name = str(uuid.uuid4())
         result = self.app.post_json(
