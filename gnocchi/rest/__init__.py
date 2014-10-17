@@ -27,6 +27,7 @@ import pecan
 from pecan import rest
 from pytimeparse import timeparse
 import six
+from six.moves.urllib import parse as urllib_parse
 import voluptuous
 import werkzeug.http
 
@@ -177,7 +178,11 @@ class ArchivePoliciesController(rest.RestController):
             ap = pecan.request.indexer.create_archive_policy(**body)
         except indexer.ArchivePolicyAlreadyExists as e:
             pecan.abort(409, e)
-        pecan.response.headers['Location'] = "/v1/archive_policy/" + ap['name']
+
+        location = "/v1/archive_policy/" + ap['name']
+        if six.PY2:
+            location = location.encode('utf-8')
+        pecan.response.headers['Location'] = urllib_parse.quote(location)
         pecan.response.status = 201
         return ArchivePolicyItem.archive_policy_to_human_readable(ap)
 
