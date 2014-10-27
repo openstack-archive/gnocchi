@@ -92,7 +92,6 @@ class TimeSerie(object):
 
 
 class BoundTimeSerie(TimeSerie):
-
     def __init__(self, timestamps=None, values=None,
                  timespan=None):
         super(BoundTimeSerie, self).__init__(timestamps, values)
@@ -111,13 +110,6 @@ class BoundTimeSerie(TimeSerie):
         return 1
 
     def set_values(self, values, before_truncate_callback=None):
-        if self.timespan is not None and len(self.ts):
-            # Check that the smallest timestamp does not go too much back in
-            # time.
-            # TODO(jd) convert keys to timestamp to be sure we can subtract?
-            if (min(map(operator.itemgetter(0), values))
-               < (self.ts.index[-1] - self.timespan)):
-                raise NoDeloreanAvailable
         super(BoundTimeSerie, self).set_values(values)
         if before_truncate_callback:
             before_truncate_callback(self)
@@ -150,6 +142,49 @@ class BoundTimeSerie(TimeSerie):
                 if timestamp >= (self.ts.index[-1] - self.timespan):
                     self.ts = self.ts[timestamp:]
                     break
+
+
+class BoundLimitedTimeSerie(BoundTimeSerie):
+    def __init__(self, timestamps=None, values=None,
+                 timespan=None, timespan_set=None):
+        """Create a bound and limited time serie.
+
+        This time serie has a limit of retention (timespan) and a limit where
+        you can set the values (timespan_set).
+
+        """
+        super(BoundLimitedTimeSerie, self).__init__(timestamps,
+                                                    values, timespan)
+        self.timespan_set = pandas.tseries.frequencies.to_offset(timespan_set)
+
+    def __eq__(self, other):
+        return (super(BoundLimitedTimeSerie, self).__eq__(other)
+                and self.timespan_set == other.timespan_set)
+
+    def set_values(self, values, before_truncate_callback=None):
+        if self.timespan_set is not None and len(self.ts):
+            # Check that the smallest timestamp does not go too much back in
+            # time.
+            # TODO(jd) convert keys to timestamp to be sure we can subtract?
+            if (min(map(operator.itemgetter(0), values))
+               < (self.ts.index[-1] - self.timespan_set)):
+                raise NoDeloreanAvailable
+        super(BoundLimitedTimeSerie, self).set_values(values,
+                                                      before_truncate_callback)
+
+    @classmethod
+    def from_dict(cls, d):
+        timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
+        return cls(timestamps, values,
+                   timespan=d.get('timespan'),
+                   timespan_set=d.get('timespan_set'))
+
+    def to_dict(self):
+        basic = super(BoundLimitedTimeSerie, self).to_dict()
+        basic.update({
+            'timespan_set': self._serialize_time_period(self.timespan_set),
+        })
+        return basic
 
 
 class AggregatedTimeSerie(TimeSerie):
@@ -264,7 +299,8 @@ class TimeSerieArchive(object):
         block_size = definitions[-1][0]
 
         # Limit the main timeserie to a timespan mapping
-        return cls(BoundTimeSerie(timespan=block_size * 2),
+        return cls(BoundLimitedTimeSerie(timespan=block_size * 2,
+                                         timespan_set=block_size),
                    [AggregatedTimeSerie(
                        max_size=size, sampling=sampling,
                        block_size=block_size,
@@ -298,7 +334,7 @@ class TimeSerieArchive(object):
 
     @classmethod
     def from_dict(cls, d):
-        return cls(BoundTimeSerie.from_dict(d['timeserie']),
+        return cls(BoundLimitedTimeSerie.from_dict(d['timeserie']),
                    [AggregatedTimeSerie.from_dict(a) for a in d['archives']])
 
     @classmethod
