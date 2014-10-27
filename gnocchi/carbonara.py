@@ -92,31 +92,34 @@ class TimeSerie(object):
 
 
 class BoundTimeSerie(TimeSerie):
-
     def __init__(self, timestamps=None, values=None,
-                 timespan=None):
+                 block_size=None, back_window=1):
+        """A time serie that is limited in size.
+
+        The maximum size of this time serie is expressed in a number of block
+        size, called the back window.
+        When the timeserie is truncated, a whole block is removed.
+
+        You cannot set a value that is before this number of blocks.
+        """
         super(BoundTimeSerie, self).__init__(timestamps, values)
-        self.timespan = pandas.tseries.frequencies.to_offset(timespan)
+        self.block_size = pandas.tseries.frequencies.to_offset(block_size)
+        self.back_window = back_window
         self._truncate()
 
     def __eq__(self, other):
-        return (super(BoundTimeSerie, self).__eq__(other)
-                and self.timespan == other.timespan)
-
-    def __cmp__(self, other):
-        if self.timespan == other.timespan:
-            return 0
-        if self.timespan < other.timespan:
-            return -1
-        return 1
+        return (isinstance(other, BoundTimeSerie)
+                and super(BoundTimeSerie, self).__eq__(other)
+                and self.block_size == other.block_size
+                and self.back_window == other.back_window)
 
     def set_values(self, values, before_truncate_callback=None):
-        if self.timespan is not None and len(self.ts):
+        if self.back_window is not None and not self.ts.empty:
             # Check that the smallest timestamp does not go too much back in
             # time.
             # TODO(jd) convert keys to timestamp to be sure we can subtract?
             if (min(map(operator.itemgetter(0), values))
-               < (self.ts.index[-1] - self.timespan)):
+               < self._first_block_timestamp()):
                 raise NoDeloreanAvailable
         super(BoundTimeSerie, self).set_values(values)
         if before_truncate_callback:
@@ -134,39 +137,43 @@ class BoundTimeSerie(TimeSerie):
         """
         timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
         return cls(timestamps, values,
-                   timespan=d.get('timespan'))
+                   block_size=d.get('block_size'),
+                   back_window=d.get('back_window'))
 
     def to_dict(self):
         basic = super(BoundTimeSerie, self).to_dict()
         basic.update({
-            'timespan': self._serialize_time_period(self.timespan),
+            'block_size': self._serialize_time_period(self.block_size),
+            'back_window': self.back_window,
         })
         return basic
 
+    def _first_block_timestamp(self):
+        ts = self.ts.resample(self.block_size)
+        return (ts.index[-1] - (self.block_size * (self.back_window - 1)))
+
     def _truncate(self):
         """Truncate the timeserie."""
-        if self.timespan:
-            for timestamp, value in self.ts.iteritems():
-                if timestamp >= (self.ts.index[-1] - self.timespan):
-                    self.ts = self.ts[timestamp:]
-                    break
+        if self.block_size is not None and not self.ts.empty:
+            # Change that to remove the amount of block needed to have
+            # the size <= max_size. A block is a number of "seconds" (a
+            # timespan)
+            self.ts = self.ts[self._first_block_timestamp():]
 
 
 class AggregatedTimeSerie(TimeSerie):
 
     def __init__(self, timestamps=None, values=None,
-                 max_size=None, block_size=None,
+                 max_size=None,
                  sampling=None, aggregation_method='mean'):
         super(AggregatedTimeSerie, self).__init__(timestamps, values)
         self.aggregation_method = aggregation_method
         self.sampling = pandas.tseries.frequencies.to_offset(sampling)
         self.max_size = max_size
-        self.block_size = pandas.tseries.frequencies.to_offset(block_size)
 
     def __eq__(self, other):
         return (self.ts.all() == other.ts.all()
                 and self.max_size == other.max_size
-                and self.block_size == other.block_size
                 and self.sampling == other.sampling
                 and self.aggregation_method == other.aggregation_method)
 
@@ -189,7 +196,6 @@ class AggregatedTimeSerie(TimeSerie):
         return cls(timestamps, values,
                    max_size=d.get('max_size'),
                    sampling=d.get('sampling'),
-                   block_size=d.get('block_size'),
                    aggregation_method=d.get('aggregation_method', 'mean'))
 
     def to_dict(self):
@@ -197,7 +203,6 @@ class AggregatedTimeSerie(TimeSerie):
         d.update({
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
-            'block_size': self._serialize_time_period(self.block_size),
             'sampling': self._serialize_time_period(self.sampling),
         })
         return d
@@ -207,21 +212,7 @@ class AggregatedTimeSerie(TimeSerie):
         if self.max_size is not None:
             # Remove empty points if any that could be added by aggregation
             self.ts = self.ts[~self.ts.isnull()]
-            if self.block_size is not None:
-                # Change that to remove the amount of block needed to have
-                # the size <= max_size. A block is a number of "seconds" (a
-                # timespan)
-                while len(self.ts) > self.max_size:
-                    first_point = self.ts.index[0] + self.block_size
-                    for timestamp, value in self.ts.iteritems():
-                        if timestamp >= first_point:
-                            self.ts = self.ts[timestamp:]
-                            break
-                    else:
-                        # Clear it all!
-                        self.ts = self.ts[0:0]
-            else:
-                self.ts = self.ts[-self.max_size:]
+            self.ts = self.ts[-self.max_size:]
 
     def _resample(self, after):
         if self.sampling:
@@ -253,7 +244,8 @@ class TimeSerieArchive(object):
                                      key=operator.attrgetter("sampling"))
 
     @classmethod
-    def from_definitions(cls, definitions, aggregation_method='mean'):
+    def from_definitions(cls, definitions, aggregation_method='mean',
+                         back_window=1):
         """Create a new collection of archived time series.
 
         :param definition: A list of tuple (sampling, max_size)
@@ -264,10 +256,10 @@ class TimeSerieArchive(object):
         block_size = definitions[-1][0]
 
         # Limit the main timeserie to a timespan mapping
-        return cls(BoundTimeSerie(timespan=block_size * 2),
+        return cls(BoundTimeSerie(block_size=block_size,
+                                  back_window=back_window),
                    [AggregatedTimeSerie(
                        max_size=size, sampling=sampling,
-                       block_size=block_size,
                        aggregation_method=aggregation_method)
                     for sampling, size in definitions])
 
