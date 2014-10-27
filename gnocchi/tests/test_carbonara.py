@@ -55,13 +55,16 @@ class TestBoundTimeSerie(testtools.TestCase):
                        (datetime.datetime(2014, 1, 1, 12, 0, 10), 4)])
         self.assertEqual(len(ts), 3)
 
+
+class TestBoundLimitedTimeSerie(testtools.TestCase):
     def test_timespan_timelimit(self):
-        ts = carbonara.BoundTimeSerie(
+        ts = carbonara.BoundLimitedTimeSerie(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
             [3, 5, 6],
-            timespan='5s')
+            timespan='5s',
+            back_window='5s')
         self.assertEqual(len(ts), 2)
         ts.set_values([(datetime.datetime(2014, 1, 1, 12, 0, 10), 3),
                        (datetime.datetime(2014, 1, 1, 12, 0, 11), 4)])
@@ -351,3 +354,31 @@ class TestTimeSerieArchive(testtools.TestCase):
             # we expect all 10 of the *aggregated* (as opposed to raw)
             # datapoints not to be discarded
             self.assertEqual(i, len(d['archives'][0]['values']))
+
+    def test_back_window(self):
+        """Back window testing.
+
+        Test the the back window on an archive is not longer than the window we
+        aggregate on.
+        """
+        ts = carbonara.TimeSerieArchive.from_definitions(
+            [(pandas.tseries.offsets.Second(1), 60)])
+
+        ts.set_values([
+            (datetime.datetime(2014, 1, 1, 12, 0, 1, 2300), 1),
+            (datetime.datetime(2014, 1, 1, 12, 0, 1, 4600), 2),
+            (datetime.datetime(2014, 1, 1, 12, 0, 2, 4500), 3),
+            (datetime.datetime(2014, 1, 1, 12, 0, 2, 7800), 4),
+            (datetime.datetime(2014, 1, 1, 12, 0, 3, 9), 2.5),
+        ])
+
+        self.assertEqual(ts.fetch(),
+                         {datetime.datetime(2014, 1, 1, 12, 0, 1): 1.5,
+                          datetime.datetime(2014, 1, 1, 12, 0, 2): 3.5,
+                          datetime.datetime(2014, 1, 1, 12, 0, 3): 2.5})
+
+        self.assertRaises(carbonara.NoDeloreanAvailable,
+                          ts.set_values,
+                          [
+                              (datetime.datetime(2014, 1, 1, 12, 0, 1, 99), 9),
+                          ])
