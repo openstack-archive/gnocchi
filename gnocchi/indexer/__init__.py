@@ -181,3 +181,11 @@ class IndexerDriver(object):
     @staticmethod
     def delete_entity(id):
         raise exceptions.NotImplementedError
+
+    @staticmethod
+    def __enter__():
+        raise exceptions.NotImplementedError
+
+    @staticmethod
+    def __exit__():
+        raise exceptions.NotImplementedError
