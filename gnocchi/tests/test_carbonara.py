@@ -212,7 +212,7 @@ class TestTimeSerieArchive(testtools.TestCase):
         self.assertEqual(5.5, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(8, r[datetime.datetime(2014, 1, 1, 12, 2, 0)])
 
-        tsc.set_values([(datetime.datetime(2014, 1, 1, 12, 2, 10), 11)])
+        tsc.set_values([(datetime.datetime(2014, 1, 1, 12, 2, 13), 11)])
 
         r = tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0))
 
@@ -241,7 +241,7 @@ class TestTimeSerieArchive(testtools.TestCase):
         self.assertAlmostEqual(9.8994949366116654,
                                r[datetime.datetime(2014, 1, 1, 12, 2, 0)])
 
-        tsc.set_values([(datetime.datetime(2014, 1, 1, 12, 2, 10), 110)])
+        tsc.set_values([(datetime.datetime(2014, 1, 1, 12, 2, 13), 110)])
 
         r = tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0))
 
@@ -270,7 +270,7 @@ class TestTimeSerieArchive(testtools.TestCase):
         self.assertEqual(7, r[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(15, r[datetime.datetime(2014, 1, 1, 12, 2, 0)])
 
-        tsc.set_values([(datetime.datetime(2014, 1, 1, 12, 2, 10), 110)])
+        tsc.set_values([(datetime.datetime(2014, 1, 1, 12, 2, 13), 110)])
 
         r = tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0))
 

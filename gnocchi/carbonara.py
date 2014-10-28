@@ -155,7 +155,13 @@ class BoundLimitedTimeSerie(BoundTimeSerie):
         """
         super(BoundLimitedTimeSerie, self).__init__(timestamps,
                                                     values, timespan)
-        self.back_window = pandas.tseries.frequencies.to_offset(back_window)
+        if back_window is None:
+            self.back_window = pandas.tseries.offsets.Second(0)
+        else:
+            self.back_window = pandas.tseries.frequencies.to_offset(
+                back_window)
+        if self.back_window > self.timespan:
+            raise ValueError("Back window cannot be larger than timespan")
 
     def __eq__(self, other):
         return (super(BoundLimitedTimeSerie, self).__eq__(other)
@@ -288,7 +294,8 @@ class TimeSerieArchive(object):
                                      key=operator.attrgetter("sampling"))
 
     @classmethod
-    def from_definitions(cls, definitions, aggregation_method='mean'):
+    def from_definitions(cls, definitions, aggregation_method='mean',
+                         back_window=None):
         """Create a new collection of archived time series.
 
         :param definition: A list of tuple (sampling, max_size)
@@ -298,9 +305,14 @@ class TimeSerieArchive(object):
         # The block size is the coarse grained archive definition
         block_size = definitions[-1][0]
 
+        if back_window is None:
+            back_window = pandas.tseries.offsets.Second(0)
+        else:
+            back_window = pandas.tseries.frequencies.to_offset(back_window)
+
         # Limit the main timeserie to a timespan mapping
-        return cls(BoundLimitedTimeSerie(timespan=block_size * 2,
-                                         back_window=block_size),
+        return cls(BoundLimitedTimeSerie(timespan=block_size + back_window,
+                                         back_window=back_window),
                    [AggregatedTimeSerie(
                        max_size=size, sampling=sampling,
                        block_size=block_size,
