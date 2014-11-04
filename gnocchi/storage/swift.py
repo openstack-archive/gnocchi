@@ -15,8 +15,11 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import threading
+
 from oslo.config import cfg
 import pandas
+import six.moves.queue
 from swiftclient import client as swclient
 
 from gnocchi import carbonara
@@ -95,20 +98,17 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 raise storage.EntityDoesNotExist(entity)
             raise
 
-    def add_measures(self, entity, measures):
-        # We are going to iterate multiple time over measures, so if it's a
-        # generator we need to build a list out of it right now.
-        measures = list(measures)
-        for aggregation in self.aggregation_types:
-            # NOTE(jd) Use a lock to not update the same entity+aggregation
-            # carbonara at the same time. If we don't do that, someone might
-            # other work might run add_measures() at the same time and we
-            # might overwrite its measures when re-puting the file in Swift.
-            # This should be replaceable by using a mechanism where we store
-            # the ETag when getting the object from Swift, then put with
-            # If-Match, and then restart the whole get/update/put if the put
-            # returned 412 (If-Match failed). But for now Swift does not
-            # support If-Match with ETag. :(
+    def _add_measures(self, aggregation, entity, measures, exceptions):
+        # NOTE(jd) Use a lock to not update the same entity+aggregation
+        # carbonara at the same time. If we don't do that, someone might
+        # other work might run add_measures() at the same time and we
+        # might overwrite its measures when re-puting the file in Swift.
+        # This should be replaceable by using a mechanism where we store
+        # the ETag when getting the object from Swift, then put with
+        # If-Match, and then restart the whole get/update/put if the put
+        # returned 412 (If-Match failed). But for now Swift does not
+        # support If-Match with ETag. :(
+        try:
             with self.coord.get_lock(b"gnocchi-" + entity.encode('ascii')
                                      + b"-" + aggregation.encode('ascii')):
                 try:
@@ -121,6 +121,26 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 tsc = carbonara.TimeSerieArchive.unserialize(contents)
                 tsc.set_values([(m.timestamp, m.value) for m in measures])
                 self.swift.put_object(entity, aggregation, tsc.serialize())
+        except Exception as e:
+            exceptions.put(e)
+
+    def add_measures(self, entity, measures):
+        # We are going to iterate multiple time over measures, so if it's a
+        # generator we need to build a list out of it right now.
+        measures = list(measures)
+        threads = []
+        exceptions = six.moves.queue.Queue()
+        for aggregation in self.aggregation_types:
+            t = threading.Thread(target=self._add_measures,
+                                 args=(aggregation, entity,
+                                       measures, exceptions))
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+        if not exceptions.empty():
+            # Only raise the first one, not much choice
+            raise exceptions.get()
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
                      aggregation='mean'):
