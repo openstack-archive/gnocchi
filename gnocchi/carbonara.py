@@ -205,8 +205,6 @@ class AggregatedTimeSerie(TimeSerie):
     def _truncate(self):
         """Truncate the timeserie."""
         if self.max_size is not None:
-            # Remove empty points if any that could be added by aggregation
-            self.ts = self.ts[~self.ts.isnull()]
             if self.block_size is not None:
                 # Change that to remove the amount of block needed to have
                 # the size <= max_size. A block is a number of "seconds" (a
@@ -225,10 +223,12 @@ class AggregatedTimeSerie(TimeSerie):
 
     def _resample(self, after):
         if self.sampling:
-            self.ts = self.ts[after:].resample(
-                self.sampling,
-                how=self.aggregation_method).combine_first(
-                    self.ts[:after][:-1])
+            old = self.ts[:after][:-1]
+            resampled = self.ts[after:].resample(self.sampling,
+                                                 how=self.aggregation_method)
+            # Remove empty points if any that could be added by aggregation
+            resampled = resampled[~resampled.isnull()]
+            self.ts = resampled.combine_first(old)
 
     def update(self, ts):
         # NOTE(jd) Is there a more efficient way to do that with Pandas? The
