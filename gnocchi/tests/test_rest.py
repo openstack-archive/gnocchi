@@ -527,9 +527,9 @@ class EntityTest(RestTest):
         self.assertEqual(ret.status_code, 200)
         result = json.loads(ret.text)
         self.assertEqual(
-            {u'2013-01-01T00:00:00.000000': 1234.2,
-             u'2013-01-01T23:00:00.000000': 1234.2,
-             u'2013-01-01T23:20:00.000000': 1234.2},
+            [[u'2013-01-01T00:00:00.000000', 86400.0, 1234.2],
+             [u'2013-01-01T23:00:00.000000', 3600.0, 1234.2],
+             [u'2013-01-01T23:20:00.000000', 300.0, 1234.2]],
             result)
 
     def test_get_measure_start(self):
@@ -544,7 +544,7 @@ class EntityTest(RestTest):
             % entity['id'])
         self.assertEqual(ret.status_code, 200)
         result = json.loads(ret.text)
-        self.assertEqual({'2013-01-01T23:23:23.000000': 1234.2},
+        self.assertEqual([['2013-01-01T23:23:23.000000', 1.0, 1234.2]],
                          result)
 
     def test_get_measure_stop(self):
@@ -560,8 +560,11 @@ class EntityTest(RestTest):
                            "?stop=2013-01-01 12:00:00" % entity['id'])
         self.assertEqual(ret.status_code, 200)
         result = json.loads(ret.text)
-        self.assertEqual({'2013-01-01T12:00:00.000000': 1234.2},
-                         result)
+        self.assertEqual(
+            [[u'2013-01-01T12:00:00.000000', 3600.0, 845.1],
+             [u'2013-01-01T12:00:00.000000', 60.0, 845.1],
+             [u'2013-01-01T12:00:00.000000', 1.0, 1234.2]],
+            result)
 
     def test_get_measure_aggregation(self):
         result = self.app.post_json("/v1/entity",
@@ -578,8 +581,9 @@ class EntityTest(RestTest):
             "/v1/entity/%s/measures?aggregation=max" % entity['id'])
         self.assertEqual(ret.status_code, 200)
         result = json.loads(ret.text)
-        self.assertEqual({'2013-01-01T12:00:00.000000': 12345.2,
-                          '2013-01-01T00:00:00.000000': 12345.2},
+        self.assertEqual([[u'2013-01-01T00:00:00.000000', 86400.0, 12345.2],
+                          [u'2013-01-01T12:00:00.000000', 3600.0, 12345.2],
+                          [u'2013-01-01T12:00:00.000000', 60.0, 12345.2]],
                          result)
 
 
