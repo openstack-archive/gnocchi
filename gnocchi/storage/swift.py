@@ -131,4 +131,4 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 raise storage.EntityDoesNotExist(entity)
             raise
         tsc = carbonara.TimeSerieArchive.unserialize(contents)
-        return dict(tsc.fetch(from_timestamp, to_timestamp))
+        return tsc.fetch(from_timestamp, to_timestamp)
