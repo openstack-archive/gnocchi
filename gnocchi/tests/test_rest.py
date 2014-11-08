@@ -335,6 +335,19 @@ class EntityTest(RestTest):
                          result.headers['Location'])
         self.assertEqual(entity['archive_policy'], "medium")
 
+    def test_get_entity(self):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"},
+                                    status=201)
+        self.assertEqual("application/json", result.content_type)
+
+        result = self.app.get(result.headers['Location'], status=200)
+        entity = json.loads(result.text)
+        self.assertEqual(entity['archive_policy'], "medium")
+
+    def test_get_entity_with_wrong_entity_id(self):
+        self.app.get("/v1/entity/{0}".format(uuid.uuid4()), status=404)
+
     def test_post_entity_wrong_archive_policy(self):
         policy = str(uuid.uuid4())
         result = self.app.post_json("/v1/entity",
