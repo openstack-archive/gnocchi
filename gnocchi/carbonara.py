@@ -265,14 +265,26 @@ class TimeSerieArchive(object):
                        aggregation_method=aggregation_method)
                     for sampling, size in definitions])
 
-    def fetch(self, from_timestamp=None, to_timestamp=None):
+    def fetch(self, from_timestamp=None, to_timestamp=None,
+              full=False):
         """Fetch aggregated time value.
 
         Returns a sorted list of tuples (timestamp, offset, value).
+
+        :param from_timestamp: From timestamp.
+        :param to_timestamp: To timestamp.
+        :param full: Returns all points for the timespan specified,
+                     even non-aggregated one.
         """
-        result = []
+        if full:
+            # First grab the infinite precision points
+            points = self.timeserie[from_timestamp:to_timestamp]
+            result = [(timestamp, 0, value)
+                      for timestamp, value in six.iteritems(points)]
+        else:
+            result = []
         for ts in self.agg_timeseries:
-            if result:
+            if not full and result:
                 # Change to_timestamp not to override more precise points we
                 # already have
                 to_timestamp = result[0][0]
@@ -282,7 +294,7 @@ class TimeSerieArchive(object):
                       in six.iteritems(ts[from_timestamp:to_timestamp])]
             points.extend(result)
             result = points
-        return result
+        return sorted(result, key=operator.itemgetter(0))
 
     def __eq__(self, other):
         return (isinstance(other, TimeSerieArchive)
