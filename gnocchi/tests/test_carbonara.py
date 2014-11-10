@@ -216,6 +216,69 @@ class TestTimeSerieArchive(testtools.TestCase):
             (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 3.0),
         ], tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0)))
 
+    def test_fetch_full(self):
+        tsc = carbonara.TimeSerieArchive.from_definitions(
+            [(pandas.tseries.offsets.Minute(1), 10),
+             (pandas.tseries.offsets.Minute(5), 6)])
+
+        tsc.set_values([
+            (datetime.datetime(2014, 1, 1, 11, 46, 4), 4),
+            (datetime.datetime(2014, 1, 1, 11, 47, 34), 8),
+            (datetime.datetime(2014, 1, 1, 11, 50, 54), 50),
+            (datetime.datetime(2014, 1, 1, 11, 54, 45), 4),
+            (datetime.datetime(2014, 1, 1, 11, 56, 49), 4),
+            (datetime.datetime(2014, 1, 1, 11, 57, 22), 6),
+            (datetime.datetime(2014, 1, 1, 11, 58, 22), 5),
+            (datetime.datetime(2014, 1, 1, 12, 1, 4), 4),
+            (datetime.datetime(2014, 1, 1, 12, 1, 9), 7),
+            (datetime.datetime(2014, 1, 1, 12, 2, 1), 15),
+            (datetime.datetime(2014, 1, 1, 12, 2, 12), 1),
+            (datetime.datetime(2014, 1, 1, 12, 3, 0), 3),
+            (datetime.datetime(2014, 1, 1, 12, 4, 9), 7),
+            (datetime.datetime(2014, 1, 1, 12, 5, 1), 15),
+            (datetime.datetime(2014, 1, 1, 12, 5, 12), 1),
+            (datetime.datetime(2014, 1, 1, 12, 6, 0), 3),
+        ])
+
+        self.assertEqual([
+            (pandas.Timestamp('2014-01-01 11:45:00'), 300.0, 6.0),
+            (pandas.Timestamp('2014-01-01 11:50:00'), 300.0, 27.0),
+            (pandas.Timestamp('2014-01-01 11:54:00'), 60.0, 4.0),
+            (pandas.Timestamp('2014-01-01 11:55:00'), 300.0, 5.0),
+            (pandas.Timestamp('2014-01-01 11:56:00'), 60.0, 4.0),
+            (pandas.Timestamp('2014-01-01 11:57:00'), 60.0, 6.0),
+            (pandas.Timestamp('2014-01-01 11:58:00'), 60.0, 5.0),
+            (pandas.Timestamp('2014-01-01 12:00:00'),
+             300.0, 6.166666666666667),
+            (pandas.Timestamp('2014-01-01 12:01:00'), 60.0, 5.5),
+            (pandas.Timestamp('2014-01-01 12:02:00'), 60.0, 8.0),
+            (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 3.0),
+            (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 7.0),
+            (pandas.Timestamp('2014-01-01 12:05:00'),
+             300.0, 6.333333333333333),
+            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 8.0),
+            (pandas.Timestamp('2014-01-01 12:05:01'), 0, 15),
+            (pandas.Timestamp('2014-01-01 12:05:12'), 0, 1),
+            (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 3.0),
+            (pandas.Timestamp('2014-01-01 12:06:00'), 0, 3),
+        ], tsc.fetch(full=True))
+
+        self.assertEqual([
+            (pandas.Timestamp('2014-01-01 12:00:00'),
+             300.0, 6.166666666666667),
+            (pandas.Timestamp('2014-01-01 12:01:00'), 60.0, 5.5),
+            (pandas.Timestamp('2014-01-01 12:02:00'), 60.0, 8.0),
+            (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 3.0),
+            (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 7.0),
+            (pandas.Timestamp('2014-01-01 12:05:00'),
+             300.0, 6.333333333333333),
+            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 8.0),
+            (pandas.Timestamp('2014-01-01 12:05:01'), 0, 15),
+            (pandas.Timestamp('2014-01-01 12:05:12'), 0, 1),
+            (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 3.0),
+            (pandas.Timestamp('2014-01-01 12:06:00'), 0, 3),
+        ], tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0), full=True))
+
     def test_fetch_agg_std(self):
         tsc = carbonara.TimeSerieArchive.from_definitions(
             [(pandas.tseries.offsets.Minute(1), 60),
