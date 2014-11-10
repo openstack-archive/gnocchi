@@ -222,12 +222,30 @@ class EntityController(rest.RestController):
     }])
 
     @pecan.expose('json')
-    def get(self):
+    def get_all(self, **kwargs):
+        type, options = werkzeug.http.parse_options_header(
+            pecan.request.headers.get('Accept'))
+        try:
+            details = strutils.bool_from_string(kwargs.pop('details', 'false'),
+                                                strict=True)
+        except ValueError as e:
+            method = 'Accept' if 'details' in options else 'query'
+            pecan.abort(
+                400,
+                "Unable to parse details value in %s: %s" % (method, str(e)))
+
         entity = pecan.request.indexer.get_resource(
             'entity', self.entity_id)
-        if entity:
-            return entity
-        pecan.abort(404, storage.EntityDoesNotExist(self.entity_id))
+        if not entity:
+            pecan.abort(404, storage.EntityDoesNotExist(self.entity_id))
+
+        if details:
+            archive_policy = pecan.request.indexer.get_archive_policy(
+                entity['archive_policy'])
+            entity['archive_policy'] = (
+                ArchivePolicyItem.archive_policy_to_human_readable(
+                    archive_policy))
+        return entity
 
     @vexpose(Measures)
     def post_measures(self, body):
