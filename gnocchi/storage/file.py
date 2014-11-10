@@ -95,7 +95,7 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
                         aggregation_file.write(tsc.serialize())
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean', full=False):
         path = os.path.join(self.basepath, entity, aggregation)
 
         try:
@@ -106,4 +106,4 @@ class FileStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 raise storage.EntityDoesNotExist(entity)
             raise
         tsc = carbonara.TimeSerieArchive.unserialize(contents)
-        return tsc.fetch(from_timestamp, to_timestamp)
+        return tsc.fetch(from_timestamp, to_timestamp, full)

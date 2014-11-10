@@ -123,7 +123,7 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 self.swift.put_object(entity, aggregation, tsc.serialize())
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean', full=False):
         try:
             headers, contents = self.swift.get_object(entity, aggregation)
         except swclient.ClientException as e:
@@ -131,4 +131,4 @@ class SwiftStorage(storage.StorageDriver, storage.CoordinatorMixin):
                 raise storage.EntityDoesNotExist(entity)
             raise
         tsc = carbonara.TimeSerieArchive.unserialize(contents)
-        return tsc.fetch(from_timestamp, to_timestamp)
+        return tsc.fetch(from_timestamp, to_timestamp, full)
