@@ -54,10 +54,10 @@ class CarbonaraBasedStorage(storage.StorageDriver, storage.CoordinatorMixin):
         raise NotImplementedError
 
     def get_measures(self, entity, from_timestamp=None, to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean', full=False):
         contents = self._get_measures(entity, aggregation)
         archive = carbonara.TimeSerieArchive.unserialize(contents)
-        return archive.fetch(from_timestamp, to_timestamp)
+        return archive.fetch(from_timestamp, to_timestamp, full)
 
     def add_measures(self, entity, measures):
         # We are going to iterate multiple time over measures, so if it's a
