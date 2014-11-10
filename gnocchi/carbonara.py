@@ -276,9 +276,15 @@ class TimeSerieArchive(object):
         :param full: Returns all points for the timespan specified,
                      even non-aggregated one.
         """
+        end_timestamp = to_timestamp
         if full:
             # First grab the infinite precision points
             points = self.timeserie[from_timestamp:to_timestamp]
+            try:
+                # Do not include stop timestamp
+                del points[end_timestamp]
+            except KeyError:
+                pass
             result = [(timestamp, 0, value)
                       for timestamp, value in six.iteritems(points)]
         else:
@@ -289,9 +295,15 @@ class TimeSerieArchive(object):
                 # already have
                 to_timestamp = result[0][0]
             offset = ts.sampling.nanos / 1000000000.0
+            points = ts[from_timestamp:to_timestamp]
+            try:
+                # Do not include stop timestamp
+                del points[end_timestamp]
+            except KeyError:
+                pass
             points = [(timestamp, offset, value)
                       for timestamp, value
-                      in six.iteritems(ts[from_timestamp:to_timestamp])]
+                      in six.iteritems(points)]
             points.extend(result)
             result = points
         return sorted(result, key=operator.itemgetter(0))
