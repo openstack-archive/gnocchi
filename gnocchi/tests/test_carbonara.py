@@ -335,8 +335,11 @@ class TestTimeSerieArchive(testtools.TestCase):
 
         ts.set_values([
             (datetime.datetime(2014, 1, 1, 12, 0, 1, 2300), 1),
-            (datetime.datetime(2014, 1, 1, 12, 0, 1, 4600), 2),
-            (datetime.datetime(2014, 1, 1, 12, 0, 2, 4500), 3),
+            (datetime.datetime(2014, 1, 1, 12, 0, 2, 1), 3),
+        ])
+
+        ts.set_values([
+            (datetime.datetime(2014, 1, 1, 12, 0, 1, 9999), 2),
             (datetime.datetime(2014, 1, 1, 12, 0, 2, 7800), 4),
             (datetime.datetime(2014, 1, 1, 12, 0, 3, 8), 2.5),
         ])
