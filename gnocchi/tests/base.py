@@ -185,6 +185,7 @@ class TestCase(testtools.TestCase, testscenarios.TestWithScenarios):
             try:
                 self.archive_policies[name] = self.index.create_archive_policy(
                     name=name,
+                    back_window=0,
                     definition=definition)['definition']
             except indexer.ArchivePolicyAlreadyExists:
                 self.archive_policies[name] = self.index.get_archive_policy(

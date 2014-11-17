@@ -64,6 +64,7 @@ to this request:
 
     {
       "archive_policy": {
+        "back_window": 0,
         "definition": [
           {
             "points": 60,
@@ -215,14 +216,25 @@ aggregated. That means that Gnocchi does not store all sent measures, but
 aggregates them over a certain period of time. Gnocchi provides several
 aggregation method (mean, min, max, sum…) that are builtin.
 
-An archive policy is a list of item. Each item is composed of the timespan and
-the level of precision that must be kept when aggregating data. For example, an
-item might be defined of 12 points over an hour (one point every 5 minutes), or
-a points every 1 hours over 1 day (24 points). An archive policy is defined by a
-name and a definition composed of a list of at least one of the previously
-described item.
+An archive policy is a defined by a list of item in the `definition` field. Each
+item is composed of the timespan and the level of precision that must be kept
+when aggregating data. For example, an item might be defined of 12 points over
+an hour (one point every 5 minutes), or a points every 1 hours over 1 day (24
+points). An archive policy is defined by a name and a definition composed of a
+list of at least one of the previously described item.
 
-The REST API allows to create archive policies:
+By default, new measures can only be sent with timestamp in the future or part
+of the last aggregation period. This window size is based on the largest
+granularity defined in the archive window. The `back_window` field can be used
+to set the number of period to keep so it is possible to send measure that are
+older than the last timestamp sent.
+
+For example, if an archive policy is defined with a larger aggregation of 1
+hour, and the last point sent has a timestamp of 14:34, it's possible to send
+measures back to to 14:00 with a `back_window` of 0. If the `back_window` is set
+to 2, it will be possible to send measures with timestamp back to 12:00.
+
+The REST API allows to create archive policies this way:
 
 ::
 
@@ -231,6 +243,7 @@ The REST API allows to create archive policies:
 
     {
       "name": "low",
+      "back_window": 0,
       "definition": [
         {
           "granularity": "1s",
@@ -249,6 +262,7 @@ The REST API allows to create archive policies:
 
     {
       "name": "low",
+      "back_window": 0,
       "definition": [
         {
           "granularity": "0:00:01",
@@ -277,6 +291,7 @@ retrieve the details of the archive policy later:
 
     {
       "name": "low",
+      "back_window": 0,
       "definition": [
         {
           "granularity": "0:00:01",
@@ -303,6 +318,7 @@ It is also possible to list archive policies:
     [
       {
         "name": "low",
+        "back_window": 0,
         "definition": [
           {
             "granularity": "0:00:01",
