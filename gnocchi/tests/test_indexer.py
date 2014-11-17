@@ -533,3 +533,7 @@ class TestIndexerDriver(tests_base.TestCase):
             'generic',
             ended_before=datetime.datetime(1999, 1, 1, 23, 23, 23))
         self.assertEqual(len(resources), 0)
+
+    def test_get_entity(self):
+        uid = uuid.uuid4()
+        self.assertIsNone(self.index.get_entity(uid))
