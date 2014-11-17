@@ -308,11 +308,28 @@ class ArchivePolicyTest(RestTest):
             status=409)
         self.assertIn('Archive policy high already exists', result.text)
 
+    def test_create_archive_policy_with_back_window(self):
+        params = {"name": str(uuid.uuid4()),
+                  "back_window": 1,
+                  "definition": [{
+                      "granularity": "10s",
+                      "points": 20,
+                  }]}
+        result = self.app.post_json(
+            "/v1/archive_policy",
+            params=params,
+            status=201)
+        ap = json.loads(result.text)
+        params['definition'][0]['timespan'] = u'0:03:20'
+        params['definition'][0]['granularity'] = u'0:00:10'
+        self.assertEqual(params, ap)
+
     def test_get_archive_policy(self):
         result = self.app.get("/v1/archive_policy/medium")
         ap = json.loads(result.text)
         self.assertEqual(
             {"name": "medium",
+             "back_window": 0,
              "definition": [
                  rest.ArchivePolicyItem(**d).to_human_readable_dict()
                  for d in self.archive_policies['medium']
@@ -330,6 +347,7 @@ class ArchivePolicyTest(RestTest):
         for name, definition in six.iteritems(self.archive_policies):
             self.assertIn(
                 {"name": name,
+                 "back_window": 0,
                  "definition": [
                      rest.ArchivePolicyItem(**d).to_human_readable_dict()
                      for d in definition
@@ -368,6 +386,7 @@ class EntityTest(RestTest):
         entity = json.loads(result.text)
         self.assertEqual(
             {"name": "medium",
+             "back_window": 0,
              "definition": [
                  rest.ArchivePolicyItem(**d).to_human_readable_dict()
                  for d in self.archive_policies['medium']
@@ -388,6 +407,7 @@ class EntityTest(RestTest):
         entity = json.loads(result.text)
         self.assertEqual(
             {"name": "medium",
+             "back_window": 0,
              "definition": [
                  rest.ArchivePolicyItem(**d).to_human_readable_dict()
                  for d in self.archive_policies['medium']
