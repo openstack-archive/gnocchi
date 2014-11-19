@@ -33,8 +33,7 @@ class CustomAggFailure(Exception):
 @six.add_metaclass(abc.ABCMeta)
 class CustomAggregator(object):
 
-    @staticmethod
-    def compute(storage_obj, entity_id, start, stop, **param):
+    def compute(self, storage_obj, entity_id, start, stop, **param):
         """Returns custom aggregate in a dict of timestamp, value pairs.
 
        :param storage_obj: storage object for retrieving the data

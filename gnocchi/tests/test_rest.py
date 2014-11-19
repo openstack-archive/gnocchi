@@ -597,6 +597,31 @@ class EntityTest(RestTest):
                           [u'2013-01-01T12:00:00.000000', 60.0, 12345.2]],
                          result)
 
+    def _test_get_measure_aggregation_custom(self, agg_method, expected):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"})
+        entity = json.loads(result.text)
+        self.app.post_json("/v1/entity/%s/measures" % entity['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:00',
+                                    "value": 69},
+                                   {"timestamp": '2013-01-01 12:00:20',
+                                    "value": 42},
+                                   {"timestamp": '2013-01-01 12:00:40',
+                                    "value": 6},
+                                   {"timestamp": '2013-01-01 12:01:00',
+                                    "value": 44},
+                                   {"timestamp": '2013-01-01 12:01:20',
+                                    "value": 7}])
+
+        path = "/v1/entity/%s/measures?aggregation=%s&window=120s"
+        ret = self.app.get(path % (entity['id'], agg_method), status=200)
+        result = json.loads(ret.text)
+        self.assertEqual(expected, result)
+
+    def test_get_measure_moving_average(self):
+        r = [[u'2014-01-01T12:00:00.000000', 120.0, 32.25]]
+        self._test_get_measure_aggregation_custom('moving-average', r)
+
 
 class ResourceTest(RestTest):
 
