@@ -765,6 +765,34 @@ class MetricTest(RestTest):
                           [u'2013-01-01T12:00:00.000000', 60.0, 12345.2]],
                          result)
 
+    def _test_get_measure_aggregation_custom(self, agg_method, expected):
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy": "medium"})
+        metric = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:00',
+                                    "value": 69},
+                                   {"timestamp": '2013-01-01 12:00:20',
+                                    "value": 42},
+                                   {"timestamp": '2013-01-01 12:00:40',
+                                    "value": 6},
+                                   {"timestamp": '2013-01-01 12:01:00',
+                                    "value": 44},
+                                   {"timestamp": '2013-01-01 12:01:20',
+                                    "value": 7}])
+
+        path = "/v1/metric/%s/measures?aggregation=%s&window=%ds"
+        ret = self.app.get(path % (metric['id'], agg_method, 120),
+                           status=200)
+        result = json.loads(ret.text)
+        self.assertEqual(expected, result)
+        self.app.get(path % (metric['id'], agg_method, 90),
+                     status=400)
+
+    def test_get_measure_moving_average(self):
+        r = [[u'2013-01-01T12:00:00.000000', 120.0, 32.25]]
+        self._test_get_measure_aggregation_custom('moving-average', r)
+
 
 class ResourceTest(RestTest):
 
