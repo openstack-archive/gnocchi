@@ -385,6 +385,15 @@ class EntityTest(RestTest):
         entity = json.loads(result.text)
         self.assertEqual(entity['archive_policy'], "medium")
 
+    def test_get_entity_with_another_user(self):
+        result = self.app.post_json("/v1/entity",
+                                    params={"archive_policy": "medium"},
+                                    status=201)
+        self.assertEqual("application/json", result.content_type)
+
+        with self.app.use_another_user():
+            self.app.get(result.headers['Location'], status=403)
+
     def test_get_detailed_entity(self):
         result = self.app.post_json(
             "/v1/entity",
