@@ -3,6 +3,7 @@
     "concerned": "project_id:%(project_id)s",
 
     "get measures":  "rule:admin_or_owner or rule:concerned",
+    "get entity": "rule:admin_or_owner or rule:concerned",
     "delete entity": "rule:admin_or_owner",
     "post measures":  "rule:admin_or_owner"
 }
