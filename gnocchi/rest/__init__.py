@@ -338,6 +338,7 @@ class EntityController(rest.RestController):
 
     @pecan.expose()
     def delete(self):
+        self.enforce_entity("delete entity")
         try:
             pecan.request.storage.delete_entity(self.entity_id)
         except storage.EntityDoesNotExist as e:
