@@ -1,6 +1,7 @@
 {
     "admin_or_owner": "role:admin or project_id:%(project_id)s",
 
+    "create entity": "",
     "get entity": "rule:admin_or_owner",
     "delete entity": "rule:admin_or_owner",
     "get measures":  "rule:admin_or_owner",

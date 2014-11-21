@@ -362,6 +362,11 @@ class EntitiesController(rest.RestController):
 
     @staticmethod
     def create_entity(archive_policy, user_id, project_id):
+        enforce("create entity", {
+            "user_id": user_id,
+            "project_id": project_id,
+            "archive_policy": archive_policy,
+        })
         id = uuid.uuid4()
         policy = pecan.request.indexer.get_archive_policy(archive_policy)
         if policy is None:
@@ -378,8 +383,6 @@ class EntitiesController(rest.RestController):
 
     @vexpose(Entity, 'json')
     def post(self, body):
-        # TODO(jd) Use policy to limit what values the user can use as
-        # 'archive'?
         user, project = get_user_and_project()
         id = self.create_entity(body['archive_policy'], user, project)
         set_resp_location_hdr("/v1/entity/" + str(id))
