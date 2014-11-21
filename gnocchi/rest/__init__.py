@@ -281,6 +281,7 @@ class EntityController(rest.RestController):
 
     @pecan.expose('json')
     def get_all(self, **kwargs):
+        self.enforce_entity("get entity")
         details = get_details(kwargs)
         entity = pecan.request.indexer.get_entity(self.entity_id,
                                                   details=details)
