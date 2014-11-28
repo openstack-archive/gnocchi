@@ -112,7 +112,7 @@ def Timestamp(v):
     return datetime.datetime.utcfromtimestamp(v)
 
 
-def convert_entity_list(entities, user_id, project_id):
+def convert_entity_list(entities, created_by_user_id, created_by_project_id):
     # Replace an archive policy as value for an entity by a brand
     # a new entity
     new_entities = {}
@@ -121,7 +121,8 @@ def convert_entity_list(entities, user_id, project_id):
             new_entities[k] = v
         else:
             new_entities[k] = str(EntitiesController.create_entity(
-                v['archive_policy'], user_id, project_id))
+                created_by_user_id, created_by_project_id,
+                v['archive_policy']))
     return new_entities
 
 
@@ -355,7 +356,16 @@ class EntityController(rest.RestController):
         pecan.request.indexer.delete_entity(self.entity_id)
 
 
+def UUID(value):
+    try:
+        return uuid.UUID(value)
+    except Exception as e:
+        raise ValueError(e)
+
+
 EntitySchemaDefinition = {
+    "user_id": UUID,
+    "project_id": UUID,
     voluptuous.Required('archive_policy'): six.text_type,
 }
 
@@ -369,14 +379,18 @@ class EntitiesController(rest.RestController):
     Entity = voluptuous.Schema(EntitySchemaDefinition)
 
     @staticmethod
-    def create_entity(archive_policy, user_id, project_id):
+    def create_entity(created_by_user_id, created_by_project_id,
+                      archive_policy,
+                      user_id=None, project_id=None):
         id = uuid.uuid4()
         policy = pecan.request.indexer.get_archive_policy(archive_policy)
         if policy is None:
             pecan.abort(400, "Unknown archive policy %s" % archive_policy)
-        pecan.request.indexer.create_resource('entity', id,
-                                              user_id, project_id,
-                                              archive_policy=policy['name'])
+        pecan.request.indexer.create_resource(
+            'entity', id,
+            created_by_user_id, created_by_project_id,
+            user_id, project_id,
+            archive_policy=policy['name'])
         pecan.request.storage.create_entity(
             str(id),
             policy['back_window'],
@@ -390,18 +404,11 @@ class EntitiesController(rest.RestController):
         # TODO(jd) Use policy to limit what values the user can use as
         # 'archive'?
         user, project = get_user_and_project()
-        id = self.create_entity(body['archive_policy'], user, project)
+        id = self.create_entity(user, project, **body)
         set_resp_location_hdr("/v1/entity/" + str(id))
         pecan.response.status = 201
         return {"id": str(id),
                 "archive_policy": str(body['archive_policy'])}
-
-
-def UUID(value):
-    try:
-        return uuid.UUID(value)
-    except Exception as e:
-        raise ValueError(e)
 
 
 Entities = voluptuous.Schema({
