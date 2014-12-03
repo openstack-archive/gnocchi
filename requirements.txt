@@ -23,3 +23,5 @@ sysv_ipc>=0.6.8
 tooz>=0.4
 voluptuous
 werkzeug
+Jinja2
+PyYAML
