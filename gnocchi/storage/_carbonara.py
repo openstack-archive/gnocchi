@@ -27,10 +27,8 @@ from gnocchi import carbonara
 from gnocchi import storage
 
 
-class CarbonaraBasedStorage(storage.StorageDriver):
+class CarbonaraBasedStorageToozLock(object):
     def __init__(self, conf):
-        super(CarbonaraBasedStorage, self).__init__(conf)
-        self.aggregation_types = list(storage.AGGREGATION_TYPES)
         self.coord = coordination.get_coordinator(
             conf.coordination_url,
             str(uuid.uuid4()).encode('ascii'))
@@ -40,14 +38,27 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         # Gnocchi with multiple processses, let's randomize what we iter
         # over so there are less chances we fight for the same lock!
 
-        random.shuffle(self.aggregation_types)
-
     def __del__(self):
         self.coord.stop()
+
+    def __call__(self, metric, aggregation):
+        lock_name = (b"gnocchi-" + metric.encode('ascii')
+                     + b"-" + aggregation.encode('ascii'))
+        return self.coord.get_lock(lock_name)
+
+
+class CarbonaraBasedStorage(storage.StorageDriver):
+    def __init__(self, conf):
+        super(CarbonaraBasedStorage, self).__init__(conf)
+        self.aggregation_types = list(storage.AGGREGATION_TYPES)
+        random.shuffle(self.aggregation_types)
 
     @staticmethod
     def _create_metric_container(metric):
         pass
+
+    def _lock(self, metric, aggregation):
+        raise NotImplementedError
 
     def create_metric(self, metric, back_window, archive_policy):
         self._create_metric_container(metric)
@@ -81,10 +92,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def _add_measures(self, aggregation, metric, measures, exceptions):
         try:
-            lock_name = (b"gnocchi-" + metric.encode('ascii')
-                         + b"-" + aggregation.encode('ascii'))
-            lock = self.coord.get_lock(lock_name)
-            with lock:
+            with self._lock(metric, aggregation):
                 contents = self._get_measures(metric, aggregation)
                 archive = carbonara.TimeSerieArchive.unserialize(contents)
                 try:
