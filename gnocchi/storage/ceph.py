@@ -17,6 +17,9 @@
 # under the License.
 
 import contextlib
+import ctypes
+import errno
+import time
 
 from oslo.config import cfg
 from oslo.utils import importutils
@@ -55,6 +58,34 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         self.pool = conf.ceph_pool
 
     @contextlib.contextmanager
+    def _get_lock_ctx(self, metric, aggregation):
+        name = self._get_object_name(metric, aggregation)
+        with self._get_ioctx() as ctx:
+            while True:
+                ret = rados.run_in_thread(
+                    ctx.librados.rados_lock_exclusive,
+                    (ctx.io, ctypes.c_char_p(name),
+                     ctypes.c_char_p("lock"),
+                     ctypes.c_char_p("gnocchi"),
+                     ctypes.c_char_p(""), None, ctypes.c_int8(0)))
+                if ret in [errno.EBUSY, errno.EEXIST]:
+                    time.sleep(0.1)
+                elif ret < 0:
+                    rados.make_ex(ret, "Error while getting lock of %s" % name)
+                else:
+                    break
+            try:
+                yield
+            finally:
+                ret = rados.run_in_thread(ctx.librados.rados_unlock,
+                                          (ctx.io, ctypes.c_char_p(name),
+                                           ctypes.c_char_p("lock"),
+                                           ctypes.c_char_p("gnocchi")))
+                if ret < 0:
+                    rados.make_ex(ret,
+                                  "Error while releasing lock of %s" % name)
+
+    @contextlib.contextmanager
     def _get_ioctx(self):
         options = {}
         if self.conf.ceph_keyring:
@@ -82,11 +113,14 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         name = self._get_object_name(metric, aggregation)
         with self._get_ioctx() as ioctx:
             try:
-                ioctx.stat(name)
+                size, mtime = ioctx.stat(name)
+                # NOTE(sileht: the object have been created by
+                # the lock code
+                if size == 0:
+                    return
             except rados.ObjectNotFound:
-                pass
-            else:
-                raise storage.MetricAlreadyExists(metric)
+                return
+            raise storage.MetricAlreadyExists(metric)
 
     def _store_metric_measures(self, metric, aggregation, data):
         name = self._get_object_name(metric, aggregation)
@@ -114,6 +148,10 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                         break
                     content += data
                     offset += len(content)
+                if len(content) == 0:
+                    # NOTE(sileht: the object have been created by
+                    # the lock code
+                    raise storage.MetricDoesNotExist(metric)
                 return content
         except rados.ObjectNotFound:
             raise storage.MetricDoesNotExist(metric)

@@ -34,7 +34,8 @@ OPTS = [
 cfg.CONF.register_opts(OPTS, group="storage")
 
 
-class FileStorage(_carbonara.CarbonaraBasedStorage):
+class FileStorage(_carbonara.CarbonaraBasedStorage,
+                  _carbonara.CarbonaraBasedStorageToozLockMixin):
     def __init__(self, conf):
         super(FileStorage, self).__init__(conf)
         self.basepath = conf.file_basepath

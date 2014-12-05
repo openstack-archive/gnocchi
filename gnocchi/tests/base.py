@@ -61,6 +61,25 @@ class FakeRadosModule(object):
     class ioctx(object):
         def __init__(self, kvs):
             self.kvs = kvs
+            self.librados = self
+            self.io = self
+
+        def rados_lock_exclusive(self, ctx, name, lock, locker, desc, timeval,
+                                 flags):
+            # Locking a not existing object create an empty one
+            # so, do the same in test
+            key = name.value
+            if key not in self.kvs:
+                self.kvs[key] = ""
+            return 0
+
+        def rados_unlock(self, ctx, name, lock, locker):
+            # Locking a not existing object create an empty one
+            # so, do the same in test
+            key = name.value
+            if key not in self.kvs:
+                self.kvs[key] = ""
+            return 0
 
         def close(self):
             pass
@@ -103,6 +122,12 @@ class FakeRadosModule(object):
 
     def Rados(self, *args, **kwargs):
         return FakeRadosModule.FakeRados(self.kvs)
+
+    def run_in_thread(self, method, args):
+        return method(*args)
+
+    def make_ex(self, ret, reason):
+        raise Exception(reason)
 
 
 class FakeSwiftClient(object):

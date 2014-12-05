@@ -48,7 +48,8 @@ OPTS = [
 cfg.CONF.register_opts(OPTS, group="storage")
 
 
-class SwiftStorage(_carbonara.CarbonaraBasedStorage):
+class SwiftStorage(_carbonara.CarbonaraBasedStorage,
+                   _carbonara.CarbonaraBasedStorageToozLockMixin):
     def __init__(self, conf):
         super(SwiftStorage, self).__init__(conf)
         self.swift = swclient.Connection(

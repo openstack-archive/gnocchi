@@ -90,9 +90,8 @@ def get_driver(conf):
 
 
 class StorageDriver(object):
-    @staticmethod
-    def __init__(conf):
-        pass
+    def __init__(self, conf):
+        self.conf = conf
 
     @staticmethod
     def create_metric(metric, back_window, archive_policy):
