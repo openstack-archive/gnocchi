@@ -27,12 +27,10 @@ from gnocchi import carbonara
 from gnocchi import storage
 
 
-class CarbonaraBasedStorage(storage.StorageDriver):
-    def __init__(self, conf):
-        super(CarbonaraBasedStorage, self).__init__(conf)
-        self.aggregation_types = list(storage.AGGREGATION_TYPES)
+class CarbonaraBasedStorageToozLockMixin(object):
+    def _create_coordinator(self):
         self.coord = coordination.get_coordinator(
-            conf.coordination_url,
+            self.conf.coordination_url,
             str(uuid.uuid4()).encode('ascii'))
         self.coord.start()
         # NOTE(jd) So this is a (smart?) optimization: since we're going to
@@ -40,10 +38,23 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         # Gnocchi with multiple processses, let's randomize what we iter
         # over so there are less chances we fight for the same lock!
 
-        random.shuffle(self.aggregation_types)
-
     def __del__(self):
-        self.coord.stop()
+        if hasattr(self, 'coord'):
+            self.coord.stop()
+
+    def _get_lock_ctx(self, metric, aggregation):
+        if not hasattr(self, 'coord'):
+            self._create_coordinator()
+        lock_name = (b"gnocchi-" + metric.encode('ascii')
+                     + b"-" + aggregation.encode('ascii'))
+        return self.coord.get_lock(lock_name)
+
+
+class CarbonaraBasedStorage(storage.StorageDriver):
+    def __init__(self, conf):
+        super(CarbonaraBasedStorage, self).__init__(conf)
+        self.aggregation_types = list(storage.AGGREGATION_TYPES)
+        random.shuffle(self.aggregation_types)
 
     @staticmethod
     def _create_metric_container(metric):
@@ -81,10 +92,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def _add_measures(self, aggregation, metric, measures, exceptions):
         try:
-            lock_name = (b"gnocchi-" + metric.encode('ascii')
-                         + b"-" + aggregation.encode('ascii'))
-            lock = self.coord.get_lock(lock_name)
-            with lock:
+            with self._get_lock_ctx(metric, aggregation):
                 contents = self._get_measures(metric, aggregation)
                 archive = carbonara.TimeSerieArchive.unserialize(contents)
                 try:
@@ -96,6 +104,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 self._store_metric_measures(metric, aggregation,
                                             archive.serialize())
         except Exception as e:
+            raise
             exceptions.put(e)
             return
 
@@ -106,6 +115,9 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         threads = []
         exceptions = six.moves.queue.Queue()
         for aggregation in self.aggregation_types:
+            self._add_measures(aggregation, metric, measures, exceptions)
+        return
+        if True:
             t = threading.Thread(target=self._add_measures,
                                  args=(aggregation, metric,
                                        measures, exceptions))
