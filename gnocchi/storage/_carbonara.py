@@ -36,14 +36,26 @@ OPTS = [
 cfg.CONF.register_opts(OPTS, group="storage")
 
 
-class CarbonaraBasedStorage(storage.StorageDriver):
+class CarbonaraBasedStorageToozLock(object):
     def __init__(self, conf):
-        super(CarbonaraBasedStorage, self).__init__(conf)
-        self.aggregation_types = list(storage.AGGREGATION_TYPES)
         self.coord = coordination.get_coordinator(
             conf.coordination_url,
             str(uuid.uuid4()).encode('ascii'))
         self.coord.start()
+
+    def __del__(self):
+        self.coord.stop()
+
+    def __call__(self, metric, aggregation):
+        lock_name = (b"gnocchi-" + metric.encode('ascii')
+                     + b"-" + aggregation.encode('ascii'))
+        return self.coord.get_lock(lock_name)
+
+
+class CarbonaraBasedStorage(storage.StorageDriver):
+    def __init__(self, conf):
+        super(CarbonaraBasedStorage, self).__init__(conf)
+        self.aggregation_types = list(storage.AGGREGATION_TYPES)
         self.executor = futures.ThreadPoolExecutor(
             max_workers=(conf.aggregation_workers_number or
                          multiprocessing.cpu_count()))
@@ -51,15 +63,14 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         # lock for each of this aggregation type, if we are using running
         # Gnocchi with multiple processes, let's randomize what we iter
         # over so there are less chances we fight for the same lock!
-
         random.shuffle(self.aggregation_types)
-
-    def __del__(self):
-        self.coord.stop()
 
     @staticmethod
     def _create_metric_container(metric):
         pass
+
+    def _lock(self, metric, aggregation):
+        raise NotImplementedError
 
     def create_metric(self, metric, archive_policy):
         self._create_metric_container(metric)
@@ -95,10 +106,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         return carbonara.TimeSerieArchive.unserialize(contents)
 
     def _add_measures(self, aggregation, metric, measures):
-        lock_name = (b"gnocchi-" + metric.encode('ascii')
-                     + b"-" + aggregation.encode('ascii'))
-        lock = self.coord.get_lock(lock_name)
-        with lock:
+        with self._lock(metric, aggregation):
             contents = self._get_measures(metric, aggregation)
             archive = carbonara.TimeSerieArchive.unserialize(contents)
             try:
