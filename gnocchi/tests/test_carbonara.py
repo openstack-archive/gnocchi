@@ -560,35 +560,35 @@ class TestTimeSerieArchive(base.BaseTestCase):
             [(pandas.tseries.offsets.Minute(1), 10)])
 
         tsc1.set_values([
-            (datetime.datetime(2014, 1, 1, 12, 3, 0), 4),
-            (datetime.datetime(2014, 1, 1, 12, 4, 0), 2),
-            (datetime.datetime(2014, 1, 1, 12, 5, 0), 3),
-            (datetime.datetime(2014, 1, 1, 12, 6, 0), 4),
-            (datetime.datetime(2014, 1, 1, 12, 7, 0), 10),
-            (datetime.datetime(2014, 1, 1, 12, 8, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 3, 0), 9),
+            (datetime.datetime(2014, 1, 1, 12, 4, 0), 1),
+            (datetime.datetime(2014, 1, 1, 12, 5, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 6, 0), 7),
+            (datetime.datetime(2014, 1, 1, 12, 7, 0), 5),
+            (datetime.datetime(2014, 1, 1, 12, 8, 0), 3),
         ])
 
         tsc2.set_values([
-            (datetime.datetime(2014, 1, 1, 11, 0, 0), 4),
-            (datetime.datetime(2014, 1, 1, 12, 1, 0), 3),
-            (datetime.datetime(2014, 1, 1, 12, 2, 0), 2),
-            (datetime.datetime(2014, 1, 1, 12, 3, 0), 4),
-            (datetime.datetime(2014, 1, 1, 12, 4, 0), 2),
-            (datetime.datetime(2014, 1, 1, 12, 5, 0), 3),
-            (datetime.datetime(2014, 1, 1, 12, 6, 0), 4),
+            (datetime.datetime(2014, 1, 1, 11, 0, 0), 6),
+            (datetime.datetime(2014, 1, 1, 12, 1, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 2, 0), 13),
+            (datetime.datetime(2014, 1, 1, 12, 3, 0), 24),
+            (datetime.datetime(2014, 1, 1, 12, 4, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 5, 0), 16),
+            (datetime.datetime(2014, 1, 1, 12, 6, 0), 12),
         ])
 
         # By default we require 100% of point that overlap
         # but we allow that the last datapoint is missing
         # of the precisest granularity
         output = carbonara.TimeSerieArchive.aggregated([
-            tsc1, tsc2])
+            tsc1, tsc2], aggregation='sum')
 
         self.assertEqual([
-            (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 4.0),
-            (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 2.0),
-            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 3.0),
-            (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 4.0),
+            (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 33.0),
+            (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 5.0),
+            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 18.0),
+            (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 19.0),
         ], output)
 
     def test_aggregated_different_archive_overlap_edge_missing2(self):
