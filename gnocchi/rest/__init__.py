@@ -282,13 +282,19 @@ class AggregatedMetricController(rest.RestController):
     @pecan.expose('json')
     def get_measures(self, start=None, stop=None, aggregation='mean',
                      needed_overlap=100.0):
+        self.get_cross_metric_measures(self.metrics_id, start, stop,
+                                       aggregation, needed_overlap)
+
+    @staticmethod
+    def get_cross_metric_measures(metric_ids, start=None, stop=None,
+                                  aggregation='mean', needed_overlap=100.0):
         if aggregation not in storage.AGGREGATION_TYPES:
             pecan.abort(400, 'Invalid aggregation value %s, must be one of %s'
                         % (aggregation, str(storage.AGGREGATION_TYPES)))
 
         try:
             measures = pecan.request.storage.get_cross_metric_measures(
-                self.metric_ids, start, stop, aggregation, needed_overlap)
+                metric_ids, start, stop, aggregation, needed_overlap)
             # Replace timestamp keys by their string versions
             return [(timeutils.strtime(timestamp), offset, v)
                     for timestamp, offset, v in measures]
@@ -762,10 +768,23 @@ class ResourcesController(rest.RestController):
     swift_account = SwiftAccountsResourcesController()
 
 
-class V1Controller(object):
+class V1Controller(rest.RestController):
     archive_policy = ArchivePoliciesController()
     metric = MetricsController()
     resource = ResourcesController()
+
+    _custom_actions = {
+        'aggregated_metric_measures': ['POST'],
+    }
+
+    @pecan.expose('json')
+    def post_aggregated_metric_measures(self, metric=None, start=None,
+                                        stop=None, aggregation='mean',
+                                        needed_overlap=None):
+        AggregatedMetricController.get_cross_metric_measures(metric,
+                                                             start, stop,
+                                                             aggregation,
+                                                             needed_overlap)
 
 
 class RootController(object):
