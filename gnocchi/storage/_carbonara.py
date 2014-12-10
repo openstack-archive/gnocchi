@@ -111,7 +111,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def get_cross_metric_measures(self, metrics, from_timestamp=None,
                                   to_timestamp=None, aggregation='mean',
-                                  needed_overlap=None):
+                                  needed_overlap=100.0):
 
         tss = self._map_in_tread(self._get_measures_archive,
                                  [(metric, aggregation) for metric in metrics])

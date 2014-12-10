@@ -368,9 +368,7 @@ class TimeSerieArchive(object):
 
     @staticmethod
     def aggregated(timeseries, from_timestamp=None, to_timestamp=None,
-                   aggregation='mean', needed_percent_of_overlap=None):
-        if needed_percent_of_overlap is None:
-            needed_percent_of_overlap = 100.0
+                   aggregation='mean', needed_percent_of_overlap=100.0):
 
         index = ['timestamp', 'granularity']
         columns = ['timestamp', 'granularity', 'value']
