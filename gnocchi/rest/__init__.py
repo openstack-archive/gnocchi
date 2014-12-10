@@ -280,14 +280,15 @@ class AggregatedMetricController(rest.RestController):
         self.metric_ids = metric_ids
 
     @pecan.expose('json')
-    def get_measures(self, start=None, stop=None, aggregation='mean'):
+    def get_measures(self, start=None, stop=None, aggregation='mean',
+                     needed_overlap=100.0):
         if aggregation not in storage.AGGREGATION_TYPES:
             pecan.abort(400, 'Invalid aggregation value %s, must be one of %s'
                         % (aggregation, str(storage.AGGREGATION_TYPES)))
 
         try:
             measures = pecan.request.storage.get_cross_metric_measures(
-                self.metric_ids, start, stop, aggregation)
+                self.metric_ids, start, stop, aggregation, needed_overlap)
             # Replace timestamp keys by their string versions
             return [(timeutils.strtime(timestamp), offset, v)
                     for timestamp, offset, v in measures]
