@@ -468,6 +468,10 @@ class NamedMetricController(rest.RestController):
 
     @vexpose(Metrics)
     def post(self, body):
+        enforce("update resource", {
+            "resource_type": self.resource_type,
+            "resource_id": self.resource_id,
+        })
         user, project = get_user_and_project()
         metrics = convert_metric_list(body, user, project)
         try:
@@ -521,6 +525,10 @@ class GenericResourceController(rest.RestController):
 
     @pecan.expose('json')
     def get(self):
+        enforce("get resource", {
+            "resource_type": self._resource_type,
+            "resource_id": self.id,
+        })
         resource = pecan.request.indexer.get_resource(
             self._resource_type, self.id)
         if resource:
@@ -529,6 +537,10 @@ class GenericResourceController(rest.RestController):
 
     @pecan.expose()
     def patch(self):
+        enforce("update resource", {
+            "resource_type": self._resource_type,
+            "resource_id": self.id,
+        })
         if getattr(self, "read_only", False):
             pecan.abort(403, "Unable to patch resource")
         # NOTE(jd) Can't use vexpose because it does not take into account
@@ -556,6 +568,10 @@ class GenericResourceController(rest.RestController):
 
     @pecan.expose()
     def delete(self):
+        enforce("delete resource", {
+            "resource_type": self._resource_type,
+            "resource_id": self.id,
+        })
         try:
             pecan.request.indexer.delete_resource(self.id)
         except indexer.NoSuchResource as e:
@@ -596,6 +612,9 @@ class GenericResourcesController(rest.RestController):
 
     @pecan.expose('json')
     def post(self):
+        enforce("create resource", {
+            "resource_type": self._resource_type,
+        })
         if getattr(self, "read_only", False):
             pecan.abort(403, "Unable to create resource")
         # NOTE(jd) Can't use vexpose because it does not take into account
@@ -622,6 +641,9 @@ class GenericResourcesController(rest.RestController):
 
     @pecan.expose('json')
     def get_all(self, **kwargs):
+        enforce("list resource", {
+            "resource_type": self._resource_type,
+        })
         started_after = kwargs.pop('started_after', None)
         ended_before = kwargs.pop('ended_before', None)
         details = get_details(kwargs)
