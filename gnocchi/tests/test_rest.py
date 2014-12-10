@@ -1522,5 +1522,33 @@ class ResourceTest(RestTest):
         else:
             self.assertEqual(400, result.status_code)
 
+    def test_get_aggregated_measures_across_entities(self):
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy": "medium"})
+        metric1 = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric1['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 8},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 16}])
+
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy": "medium"})
+        metric2 = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric2['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:01',
+                                    "value": 0},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 4}])
+
+        result = self.app.get("/v1/aggregated_metric_measures"
+                              "?aggregation=mean&metric=%s&metric=%s" %
+                              (metric1['id'], metric2['id']))
+
+        measures = json.loads(result.text)
+        self.assertEqual([[u'2013-01-01T00:00:00.000000', 86400.0, 7.0],
+                          [u'2013-01-01T12:00:00.000000', 3600.0, 7.0],
+                          [u'2013-01-01T12:00:00.000000', 60.0, 7.0]],
+                         measures)
 
 ResourceTest.generate_scenarios()
