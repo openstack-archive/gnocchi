@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Code-Review+2: Eoghan Glynn <eglynn@redhat.com>
+Workflow+1: Eoghan Glynn <eglynn@redhat.com>
+Submitted-by: Jenkins
+Submitted-at: Fri, 12 Dec 2014 16:36:39 +0000
+Reviewed-on: https://review.openstack.org/139962
+Project: stackforge/gnocchi
+Branch: refs/heads/master
