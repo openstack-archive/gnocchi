@@ -272,6 +272,13 @@ class ArchivePoliciesController(rest.RestController):
         return list(map(ArchivePolicyItem.archive_policy_to_human_readable,
                         pecan.request.indexer.list_archive_policies()))
 
+    @pecan.expose()
+    def delete(self, name):
+        try:
+            pecan.request.indexer.delete_archive_policy(name)
+        except (indexer.NoSuchArchivePolicy, indexer.ArchivePolicyInUse) as e:
+            pecan.abort(400, e)
+
 
 class MetricController(rest.RestController):
     _custom_actions = {
