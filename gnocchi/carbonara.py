@@ -396,14 +396,43 @@ class TimeSerieArchive(object):
 
         points_count = pandas.concat(dataframes).groupby(
             level='timestamp').count()
-        maximum = len(points_count)
-        minimum = len(points_count[points_count < len(timeseries)].dropna())
-        percent_of_overlap = float(maximum - minimum) * 100.0 / float(maximum)
-        if percent_of_overlap < needed_percent_of_overlap:
-            raise UnAggregableTimeseries('Less than %f%% of datapoints '
-                                         'overlap in this timespan (%.2f%%)' %
-                                         (needed_percent_of_overlap,
-                                          percent_of_overlap))
+
+        # particular case if we have no ending date,
+        # remove all points before the first common timestamp
+        # after the last common timestamp
+        right_boundary = None
+        if to_timestamp is None:
+            while points_count['value'].iget(-1) % len(timeseries) != 0:
+                points_count = points_count[:-1]
+                if right_boundary is None:
+                    right_boundary = -1
+                else:
+                    right_boundary -= 1
+                if len(points_count) == 0:
+                    raise UnAggregableTimeseries('No overlap')
+
+        left_boundary = None
+        if from_timestamp is None:
+            forward_index = -1
+            while (points_count['value'].iget(forward_index) %
+                   len(timeseries) == 0):
+                forward_index -= 1
+            left_boundary = len(points_count) + forward_index + 1
+            points_count = points_count[left_boundary:]
+            if len(points_count) == 0:
+                raise UnAggregableTimeseries('No overlap left')
+
+        if to_timestamp is not None or from_timestamp is not None:
+            maximum = len(points_count)
+            minimum = len(points_count[points_count < len(timeseries)
+                                       ].dropna())
+            percent_of_overlap = (float(maximum - minimum) * 100.0 /
+                                  float(maximum))
+            if percent_of_overlap < needed_percent_of_overlap:
+                raise UnAggregableTimeseries(
+                    'Less than %f%% of datapoints overlap in this '
+                    'timespan (%.2f%%)' % (needed_percent_of_overlap,
+                                           percent_of_overlap))
 
         grouped = pandas.concat(dataframes).groupby(level=index)
         # NOTE(sileht): this call the aggregation method on already
@@ -417,4 +446,4 @@ class TimeSerieArchive(object):
                   .itertuples())
         points = [(timestamp, granularity, value)
                   for __, timestamp, granularity, value in points]
-        return points
+        return points[left_boundary:right_boundary]
