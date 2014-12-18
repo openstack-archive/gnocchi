@@ -563,3 +563,50 @@ class TestTimeSerieArchive(base.BaseTestCase):
             (pandas.Timestamp('2014-01-01 12:07:00'), 60.0, 10.0),
             (pandas.Timestamp('2014-01-01 12:09:00'), 60.0, 2.0),
         ], output)
+
+    def test_aggregated_different_archive_overlap_edge(self):
+        tsc1 = carbonara.TimeSerieArchive.from_definitions(
+            [(pandas.tseries.offsets.Minute(1), 10)])
+        tsc2 = carbonara.TimeSerieArchive.from_definitions(
+            [(pandas.tseries.offsets.Minute(1), 10)])
+
+        tsc1.set_values([
+            (datetime.datetime(2014, 1, 1, 11, 0, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 1, 0), 3),
+            (datetime.datetime(2014, 1, 1, 12, 2, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 3, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 4, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 5, 0), 3),
+            (datetime.datetime(2014, 1, 1, 12, 6, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 7, 0), 10),
+            (datetime.datetime(2014, 1, 1, 12, 8, 0), 2),
+        ])
+
+        tsc2.set_values([
+            (datetime.datetime(2014, 1, 1, 11, 0, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 1, 0), 3),
+            (datetime.datetime(2014, 1, 1, 12, 2, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 3, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 4, 0), 2),
+            (datetime.datetime(2014, 1, 1, 12, 5, 0), 3),
+            (datetime.datetime(2014, 1, 1, 12, 6, 0), 4),
+            (datetime.datetime(2014, 1, 1, 12, 7, 0), 10),
+        ])
+
+        dtfrom = datetime.datetime(2014, 1, 1, 12, 0, 0)
+
+        # By default we require 100% of point that overlap
+        # but we allow that the last datapoint is missing
+        # of the precisest granularity
+        output = carbonara.TimeSerieArchive.aggregated([
+            tsc1, tsc2], from_timestamp=dtfrom)
+
+        self.assertEqual([
+            (pandas.Timestamp('2014-01-01 12:01:00'), 60.0, 3.0),
+            (pandas.Timestamp('2014-01-01 12:02:00'), 60.0, 2.0),
+            (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 4.0),
+            (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 2.0),
+            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 3.0),
+            (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 4.0),
+            (pandas.Timestamp('2014-01-01 12:07:00'), 60.0, 10.0),
+        ], output)

@@ -395,6 +395,16 @@ class TimeSerieArchive(object):
 
         points_count = pandas.concat(dataframes).groupby(
             level='timestamp').count()
+
+        # particular case if we have no ending date and
+        remove_latest_point = False
+        if (to_timestamp is None and
+                points_count['value'].iget(-1) < len(timeseries)):
+            points_count = points_count[:-1]
+            remove_latest_point = True
+            if len(points_count) == 0:
+                raise UnAggregableTimeseries('No overlap')
+
         maximum = len(points_count)
         minimum = len(points_count[points_count < len(timeseries)].dropna())
         percent_of_overlap = float(maximum - minimum) * 100.0 / float(maximum)
@@ -416,4 +426,6 @@ class TimeSerieArchive(object):
                   .itertuples())
         points = [(timestamp, granularity, value)
                   for __, timestamp, granularity, value in points]
+        if remove_latest_point:
+            return points[:-1]
         return points
