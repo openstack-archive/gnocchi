@@ -178,13 +178,13 @@ class TestStorageDriver(tests_base.TestCase):
         self.storage.create_metric("bar", self.archive_policies['low'])
         self.storage.add_measures('foo', [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 5, 31), 8),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 42),
         ])
         self.storage.add_measures('bar', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 2), 9),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 2),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 6),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
