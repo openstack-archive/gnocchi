@@ -36,6 +36,10 @@ OPTS = [
     cfg.StrOpt('coordination_url',
                help='Coordination driver URL',
                default='ipc://'),
+    cfg.IntOpt('aggregation_workers_number',
+               default=5,
+               help='Number of workers to run during adding new measures for '
+                    'pre-aggregation needs.'),
 ]
 
 cfg.CONF.register_opts(OPTS, group="storage")
