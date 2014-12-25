@@ -592,7 +592,7 @@ def ResourceSchema(schema):
         voluptuous.Required("id"): UUID,
         'started_at': Timestamp,
         'ended_at': Timestamp,
-        'user_id': UUID,
+        'user_id': voluptuous.Any(None, UUID),
         'project_id': UUID,
         'metrics': Metrics,
     }
