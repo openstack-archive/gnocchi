@@ -895,7 +895,7 @@ class ResourceTest(RestTest):
         ('swift_account', dict(
             attributes={
                 "started_at": "2014-01-03 02:02:02",
-                "user_id": str(uuid.uuid4()),
+                "user_id": None,
                 "project_id": str(uuid.uuid4()),
             },
             patchable_attributes={
