@@ -892,10 +892,22 @@ class ResourceTest(RestTest):
                 "server_group": "new_as_group",
             },
             resource_type='instance')),
+        # swift notifications contain UUID user_id
         ('swift_account', dict(
             attributes={
                 "started_at": "2014-01-03 02:02:02",
                 "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
+            },
+            patchable_attributes={
+                "ended_at": "2014-01-03 02:02:02",
+            },
+            resource_type='swift_account')),
+        # swift pollsters contain None user_id
+        ('swift_account', dict(
+            attributes={
+                "started_at": "2014-01-03 02:02:02",
+                "user_id": None,
                 "project_id": str(uuid.uuid4()),
             },
             patchable_attributes={

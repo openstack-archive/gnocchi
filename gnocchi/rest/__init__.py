@@ -429,6 +429,12 @@ def UUID(value):
         raise ValueError(e)
 
 
+def UUID_or_None(value):
+    if value is not None:
+        return UUID(value)
+    return None
+
+
 MetricSchemaDefinition = {
     "user_id": UUID,
     "project_id": UUID,
@@ -605,7 +611,7 @@ def ResourceSchema(schema):
         voluptuous.Required("id"): UUID,
         'started_at': Timestamp,
         'ended_at': Timestamp,
-        'user_id': UUID,
+        'user_id': UUID_or_None,
         'project_id': UUID,
         'metrics': Metrics,
     }
