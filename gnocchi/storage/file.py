@@ -1,8 +1,10 @@
 # -*- encoding: utf-8 -*-
 #
 # Copyright © 2014 Objectif Libre
+# Copyright © 2014 eNovance
 #
 # Authors: Stéphane Albert
+#          Julien Danjou <julien@danjou.info>
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -20,6 +22,7 @@ import os
 import shutil
 
 from oslo.config import cfg
+import six
 
 from gnocchi import storage
 from gnocchi.storage import _carbonara
@@ -39,7 +42,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         super(FileStorage, self).__init__(conf)
         self.basepath = conf.file_basepath
 
-    def _create_metric_container(self, metric):
+    def _create_metric_container(self, metric, user_id, project_id):
         path = os.path.join(self.basepath, metric)
         try:
             os.mkdir(path, 0o750)
@@ -47,6 +50,11 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
             if e.errno == errno.EEXIST:
                 raise storage.MetricAlreadyExists(metric)
             raise
+        with open(os.path.join(path, "owners"), "w") as f:
+            f.write(six.text_type(user_id))
+            f.write("\n")
+            f.write(six.text_type(project_id))
+            f.write("\n")
 
     def _store_metric_measures(self, metric, aggregation, data):
         path = os.path.join(self.basepath, metric, aggregation)

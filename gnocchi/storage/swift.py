@@ -59,7 +59,7 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             key=conf.swift_key,
             tenant_name=conf.swift_tenant_name)
 
-    def _create_metric_container(self, metric):
+    def _create_metric_container(self, metric, user_id, project_id):
         # TODO(jd) A container per user in their account?
         resp = {}
         self.swift.put_container(metric, response_dict=resp)
@@ -67,6 +67,8 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         # means the metric was already created!
         if resp['status'] == 204:
             raise storage.MetricAlreadyExists(metric)
+        self.swift.put_object(metric, "owner",
+                              "%s\n%s" % (user_id, project_id))
 
     def _store_metric_measures(self, metric, aggregation, data):
         self.swift.put_object(metric, aggregation, data)

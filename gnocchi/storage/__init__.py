@@ -106,10 +106,12 @@ class StorageDriver(object):
         pass
 
     @staticmethod
-    def create_metric(metric, back_window, archive_policy):
-        """Create an metric.
+    def create_metric(metric, user_id, project_id, back_window, archive_policy):
+        """Create a metric.
 
-        :param metric: The metric key.
+        :param metric: The metric identifier.
+        :param user_id: The user creating the metric.
+        :param project_id: The project creating the metric.
         :param back_window: Number of blocks to allow as back window.
         :param archive_policy: The archive policy to use.
         """

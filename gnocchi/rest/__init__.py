@@ -487,6 +487,7 @@ class MetricsController(rest.RestController):
             archive_policy=policy['name'])
         pecan.request.storage.create_metric(
             str(id),
+            created_by_user_id, created_by_project_id,
             policy['back_window'],
             [ArchivePolicyItem(**d).to_dict()
              for d in policy['definition']],

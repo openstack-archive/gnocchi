@@ -58,11 +58,12 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         self.coord.stop()
 
     @staticmethod
-    def _create_metric_container(metric):
+    def _create_metric_container(metric, user_id, project_id):
         pass
 
-    def create_metric(self, metric, back_window, archive_policy):
-        self._create_metric_container(metric)
+    def create_metric(self, metric, user_id, project_id,
+                      back_window, archive_policy):
+        self._create_metric_container(metric, user_id, project_id)
         for aggregation in self.aggregation_types:
             # TODO(jd) Having the TimeSerieArchive.full_res_timeserie duped in
             # each archive isn't the most efficient way of doing things. We

@@ -16,6 +16,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+import uuid
 
 import testscenarios
 
@@ -33,27 +34,34 @@ class TestStorageDriver(tests_base.TestCase):
         self.assertIsInstance(driver, null.NullStorage)
 
     def test_create_metric(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
 
     def test_create_metric_already_exists(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.assertRaises(storage.MetricAlreadyExists,
                           self.storage.create_metric,
-                          "foo", 0, self.archive_policies['low'])
+                          "foo", 0,
+                          uuid.uuid4(), uuid.uuid4(),
+                          self.archive_policies['low'])
 
     def test_delete_empty_metric(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.storage.delete_metric("foo")
 
     def test_delete_nonempty_metric(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.storage.add_measures('foo', [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
         ])
         self.storage.delete_metric("foo")
 
     def test_add_and_get_measures(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.storage.add_measures('foo', [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
@@ -110,16 +118,20 @@ class TestStorageDriver(tests_base.TestCase):
                           ['foo', 'bar'])
 
     def test_add_and_get_cross_metric_measures_different_archives(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.storage.create_metric(
-            "bar", 0, self.archive_policies['no_granularity_match'])
+            "bar", uuid.uuid4(), uuid.uuid4(),
+            0, self.archive_policies['no_granularity_match'])
         self.assertRaises(storage.MetricUnaggregatable,
                           self.storage.get_cross_metric_measures,
                           ['foo', 'bar'])
 
     def test_add_and_get_cross_metric_measures(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
-        self.storage.create_metric("bar", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
+        self.storage.create_metric("bar", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.storage.add_measures('foo', [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
@@ -174,8 +186,10 @@ class TestStorageDriver(tests_base.TestCase):
         ], values)
 
     def test_add_and_get_cross_metric_measures_with_holes(self):
-        self.storage.create_metric("foo", 0, self.archive_policies['low'])
-        self.storage.create_metric("bar", 0, self.archive_policies['low'])
+        self.storage.create_metric("foo", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
+        self.storage.create_metric("bar", uuid.uuid4(), uuid.uuid4(),
+                                   0, self.archive_policies['low'])
         self.storage.add_measures('foo', [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
