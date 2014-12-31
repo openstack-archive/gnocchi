@@ -23,10 +23,11 @@ class NullStorage(storage.StorageDriver):
     def __init__(self, conf):
         self.metrics = {}
 
-    def create_metric(self, metric, back_window, archive_policy):
+    def create_metric(self, metric, user_id, project_id,
+                      back_window, archive_policy):
         if metric in self.metrics:
             raise storage.MetricAlreadyExists(metric)
-        self.metrics[metric] = True
+        self.metrics[metric] = (user_id, project_id)
 
     def delete_metric(self, metric):
         try:
