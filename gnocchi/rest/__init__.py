@@ -529,7 +529,7 @@ class NamedMetricController(rest.RestController):
         # dedicated driver method rather than get_resource, which might be
         # heavier.
         resource = pecan.request.indexer.get_resource(
-            'generic', self.resource_id)
+            'generic', self.resource_id, with_metrics=True)
         if name in resource['metrics']:
             return MetricController(resource['metrics'][name])
         pecan.abort(404)
@@ -638,7 +638,7 @@ class GenericResourceController(rest.RestController):
             "resource_id": self.id,
         })
         resource = pecan.request.indexer.get_resource(
-            self._resource_type, self.id)
+            self._resource_type, self.id, with_metrics=True)
         if resource:
             return resource
         pecan.abort(404)
