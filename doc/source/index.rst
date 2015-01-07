@@ -10,6 +10,7 @@ The Gnocchi project procdes a REST interface to catalog and measure resources.
    basic
    install
    rest
+   statsd
    resource_types
 
 Indices and tables
