@@ -26,4 +26,3 @@ voluptuous
 werkzeug
 Jinja2
 PyYAML
-trollius
