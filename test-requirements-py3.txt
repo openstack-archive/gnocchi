@@ -1,3 +1,4 @@
+hacking>=0.10,<0.11
 http://tarballs.openstack.org/ceilometer/ceilometer-master.tar.gz#egg=ceilometer
 fixtures
 keystonemiddleware
