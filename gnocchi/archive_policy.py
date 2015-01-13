@@ -70,6 +70,14 @@ class ArchivePolicy(object):
                    [ArchivePolicyItem(**definition)
                     for definition in d['definition']])
 
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "back_window": self.back_window,
+            "definition": [d.to_dict()
+                           for d in self.definition],
+        }
+
     def to_human_readable_dict(self):
         return {
             "name": self.name,
