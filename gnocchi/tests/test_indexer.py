@@ -610,25 +610,31 @@ class TestIndexerDriver(tests_base.TestCase):
                                  archive_policy_name="low")
 
         metric = self.index.get_metrics([e1], details=True)
-        self.assertEqual([{"id": str(e1),
-                           "archive_policy": {
-                               "back_window": 0,
-                               "definition": [
-                                   {'granularity': 300,
-                                    'points': 12,
-                                    'timespan': 3600},
-                                   {'granularity': 3600,
-                                    'points': 24,
-                                    'timespan': 86400},
-                                   {'granularity': 86400,
-                                    'points': 30,
-                                    'timespan': 2592000}],
-                               "name": "low"},
-                           "created_by_user_id": six.text_type(user),
-                           "created_by_project_id": six.text_type(project),
-                           "name": None,
-                           "resource_id": None}],
-                         metric)
+        # Order of the list is random, use a set then
+        metric['archive_policy']['aggregation_methods'] = set(
+            metric['archive_policy']['aggregation_methods'])
+        self.assertEqual([
+            {"id": str(e1),
+             "archive_policy": {
+                 'aggregation_methods':
+                 archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS,
+                 "back_window": 0,
+                 "definition": [
+                     {'granularity': 300,
+                      'points': 12,
+                      'timespan': 3600},
+                     {'granularity': 3600,
+                      'points': 24,
+                      'timespan': 86400},
+                     {'granularity': 86400,
+                      'points': 30,
+                      'timespan': 2592000}],
+                 "name": "low"},
+             "created_by_user_id": six.text_type(user),
+             "created_by_project_id": six.text_type(project),
+             "name": None,
+             "resource_id": None}
+        ], metric)
 
     def test_get_metric_with_bad_uuid(self):
         e1 = uuid.uuid4()
