@@ -348,11 +348,6 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     @staticmethod
     def _resource_to_dict(resource, with_metrics=False):
         r = dict(resource)
-        # FIXME(jd) Convert UUID to string; would be better if Pecan JSON
-        # serializer could be patched to handle that.
-        for k, v in six.iteritems(r):
-            if isinstance(v, uuid.UUID):
-                r[k] = six.text_type(v)
         if with_metrics and isinstance(resource, Resource):
             r['metrics'] = dict((m['name'], six.text_type(m['id']))
                                 for m in resource.metrics)
