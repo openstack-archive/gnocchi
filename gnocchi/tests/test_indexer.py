@@ -16,7 +16,6 @@
 import datetime
 import uuid
 
-import six
 import testscenarios
 
 from gnocchi import indexer
@@ -71,9 +70,9 @@ class TestIndexerDriver(tests_base.TestCase):
         user = uuid.uuid4()
         project = uuid.uuid4()
         m = self.index.create_metric(r1, user, project, "low")
-        self.assertEqual({"id": str(r1),
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+        self.assertEqual({"id": r1,
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "archive_policy_name": "low",
                           "name": None,
                           "resource_id": None}, m)
@@ -87,9 +86,9 @@ class TestIndexerDriver(tests_base.TestCase):
         rc = self.index.create_resource('generic', r1, user, project)
         self.assertIsNotNone(rc['started_at'])
         del rc['started_at']
-        self.assertEqual({"id": str(r1),
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+        self.assertEqual({"id": r1,
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "user_id": None,
                           "project_id": None,
                           "ended_at": None,
@@ -97,7 +96,7 @@ class TestIndexerDriver(tests_base.TestCase):
                           "metrics": {}},
                          rc)
         rg = self.index.get_resource('generic', r1, with_metrics=True)
-        self.assertEqual(str(rc['id']), rg['id'])
+        self.assertEqual(rc['id'], rg['id'])
         self.assertEqual(rc['metrics'], rg['metrics'])
 
     def test_create_non_existent_metric(self):
@@ -133,10 +132,10 @@ class TestIndexerDriver(tests_base.TestCase):
                                         display_name="lol", **kwargs)
         self.assertIsNotNone(rc['started_at'])
         del rc['started_at']
-        self.assertEqual({"id": str(r1),
+        self.assertEqual({"id": r1,
                           "type": "instance",
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "user_id": None,
                           "project_id": None,
                           "ended_at": None,
@@ -148,7 +147,7 @@ class TestIndexerDriver(tests_base.TestCase):
                           "metrics": {}},
                          rc)
         rg = self.index.get_resource('generic', r1, with_metrics=True)
-        self.assertEqual(str(rc['id']), rg['id'])
+        self.assertEqual(rc['id'], rg['id'])
         self.assertEqual(rc['metrics'], rg['metrics'])
 
     def test_create_instance(self):
@@ -177,9 +176,9 @@ class TestIndexerDriver(tests_base.TestCase):
             'generic',
             r1, user, project,
             started_at=ts)
-        self.assertEqual({"id": str(r1),
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+        self.assertEqual({"id": r1,
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "user_id": None,
                           "project_id": None,
                           "started_at": ts,
@@ -205,9 +204,9 @@ class TestIndexerDriver(tests_base.TestCase):
                                         metrics={'foo': e1, 'bar': e2})
         self.assertIsNotNone(rc['started_at'])
         del rc['started_at']
-        self.assertEqual({"id": str(r1),
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+        self.assertEqual({"id": r1,
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "user_id": None,
                           "project_id": None,
                           "ended_at": None,
@@ -216,9 +215,9 @@ class TestIndexerDriver(tests_base.TestCase):
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
-        self.assertEqual({"id": str(r1),
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+        self.assertEqual({"id": r1,
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "type": "generic",
                           "ended_at": None,
                           "user_id": None,
@@ -246,9 +245,9 @@ class TestIndexerDriver(tests_base.TestCase):
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
-        self.assertEqual({"id": str(r1),
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+        self.assertEqual({"id": r1,
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "ended_at": datetime.datetime(2043, 1, 1, 2, 3, 4),
                           "user_id": None,
                           "project_id": None,
@@ -261,10 +260,10 @@ class TestIndexerDriver(tests_base.TestCase):
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
-        self.assertEqual({"id": str(r1),
+        self.assertEqual({"id": r1,
                           "ended_at": None,
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "user_id": None,
                           "project_id": None,
                           "type": "generic",
@@ -394,10 +393,10 @@ class TestIndexerDriver(tests_base.TestCase):
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
-        self.assertEqual({"id": str(r1),
+        self.assertEqual({"id": r1,
                           "ended_at": None,
-                          "created_by_user_id": six.text_type(user),
-                          "created_by_project_id": six.text_type(project),
+                          "created_by_user_id": user,
+                          "created_by_project_id": project,
                           "user_id": None,
                           "project_id": None,
                           "type": "generic",
@@ -512,10 +511,10 @@ class TestIndexerDriver(tests_base.TestCase):
         g_found = False
         i_found = False
         for r in resources:
-            if r['id'] == str(r1):
+            if r['id'] == r1:
                 self.assertEqual(g, r)
                 g_found = True
-            elif r['id'] == str(r2):
+            elif r['id'] == r2:
                 i_found = True
             if i_found and g_found:
                 break
@@ -525,7 +524,7 @@ class TestIndexerDriver(tests_base.TestCase):
         resources = self.index.list_resources('instance')
         self.assertGreaterEqual(len(resources), 1)
         for r in resources:
-            if r['id'] == str(r2):
+            if r['id'] == r2:
                 self.assertEqual(i, r)
                 break
         else:
@@ -594,10 +593,10 @@ class TestIndexerDriver(tests_base.TestCase):
                                  archive_policy_name="low")
 
         metric = self.index.get_metrics([e1])
-        self.assertEqual([{"id": str(e1),
+        self.assertEqual([{"id": e1,
                            "archive_policy_name": "low",
-                           "created_by_user_id": six.text_type(user),
-                           "created_by_project_id": six.text_type(project),
+                           "created_by_user_id": user,
+                           "created_by_project_id": project,
                            "name": None,
                            "resource_id": None}],
                          metric)
@@ -611,7 +610,7 @@ class TestIndexerDriver(tests_base.TestCase):
                                  archive_policy_name="low")
 
         metric = self.index.get_metrics([e1], details=True)
-        self.assertEqual([{"id": str(e1),
+        self.assertEqual([{"id": e1,
                            "archive_policy": {
                                "back_window": 0,
                                "definition": [
@@ -619,8 +618,8 @@ class TestIndexerDriver(tests_base.TestCase):
                                    {u'granularity': 3600, u'points': 24},
                                    {u'granularity': 86400, u'points': 30}],
                                "name": "low"},
-                           "created_by_user_id": six.text_type(user),
-                           "created_by_project_id": six.text_type(project),
+                           "created_by_user_id": user,
+                           "created_by_project_id": project,
                            "name": None,
                            "resource_id": None}],
                          metric)
