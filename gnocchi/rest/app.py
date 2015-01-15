@@ -15,8 +15,8 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
 import socket
+import uuid
 from wsgiref import simple_server
 
 import netaddr
@@ -25,6 +25,7 @@ from oslo.utils import importutils
 from oslo_log import log
 from oslo_serialization import jsonutils
 import pecan
+import six
 
 from gnocchi import indexer
 from gnocchi import storage
@@ -76,8 +77,15 @@ class OsloJSONRenderer(object):
         pass
 
     @staticmethod
-    def render(template_path, namespace):
-        return jsonutils.dumps(namespace)
+    def to_primitive(value, *args, **kwargs):
+        # TODO(jd): Remove that once oslo.serialization is released with
+        # https://review.openstack.org/#/c/147198/
+        if isinstance(value, uuid.UUID):
+            return six.text_type(value)
+        return jsonutils.to_primitive(value, *args, **kwargs)
+
+    def render(self, template_path, namespace):
+        return jsonutils.dumps(namespace, default=self.to_primitive)
 
 
 PECAN_CONFIG = {
