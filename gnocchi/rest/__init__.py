@@ -727,7 +727,7 @@ class GenericResourcesController(rest.RestController):
             pecan.abort(409, e)
         set_resp_location_hdr("/v1/resource/"
                               + self._resource_type + "/"
-                              + resource['id'])
+                              + six.text_type(resource['id']))
         pecan.response.status = 201
         return resource
 
