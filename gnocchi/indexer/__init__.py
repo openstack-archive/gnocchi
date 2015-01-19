@@ -203,6 +203,10 @@ class IndexerDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
+    def rewrite_archive_policy_rules(self, name, rules):
+        raise exceptions.NotImplementedError
+
+    @staticmethod
     def create_resource(resource_type, id, user_id, project_id,
                         started_at=None, ended_at=None, metrics=None,
                         **kwargs):

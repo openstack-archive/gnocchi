@@ -1,0 +1,8 @@
+---
+archive_policies:
+#    - name: high
+#      rules:
+#          - metric_name: "cpu_util"
+    - name: low
+      rules:
+          - metric_name: "*"

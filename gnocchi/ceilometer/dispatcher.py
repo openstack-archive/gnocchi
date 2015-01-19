@@ -17,9 +17,12 @@
 # under the License.
 from __future__ import absolute_import
 
+import copy
+import fnmatch
 import itertools
 import json
 import operator
+import os
 
 from ceilometer import dispatcher
 from ceilometer.i18n import _
@@ -29,6 +32,7 @@ from oslo_log import log
 import requests
 import six
 import stevedore.dispatch
+import yaml
 
 LOG = log.getLogger(__name__)
 
@@ -44,10 +48,10 @@ dispatcher_opts = [
     cfg.StrOpt('url',
                default="http://localhost:8041",
                help='URL to Gnocchi.'),
-    cfg.StrOpt('archive_policy',
-               default="low",
-               help='The archive policy to use when the dispatcher '
-               'create a new metric.')
+    cfg.StrOpt('archive_policy_rules_file',
+               default="ap_rules.yaml",
+               help='Path to yaml file with archive policies rules '
+                    'definitions.')
 ]
 
 cfg.CONF.register_opts(dispatcher_opts, group="dispatcher_gnocchi")
@@ -108,13 +112,63 @@ class GnocchiDispatcher(dispatcher.Base):
                 raise
 
         self.gnocchi_url = conf.dispatcher_gnocchi.url
-        self.gnocchi_archive_policy = {
-            'archive_policy_name':
-            cfg.CONF.dispatcher_gnocchi.archive_policy
-        }
+        # NOTE(dbelova): later this might be managed via persistent config
+        # and pipeline storage we do have for Ceilometer being in development
+        self.gnocchi_archive_policy_rules = self._parse_ap_config()
         self.mgmr = stevedore.dispatch.DispatchExtensionManager(
             'gnocchi.ceilometer.resource', lambda x: True,
             invoke_on_load=True)
+
+    def _parse_ap_config(self):
+        """Parse yaml file with archive policies rules."""
+        cfg_file = cfg.CONF.dispatcher_gnocchi.archive_policy_rules_file
+        if not os.path.exists(cfg_file):
+            cfg_file = cfg.CONF.find_file(cfg_file)
+
+        LOG.debug(_("Archive policies rules file: %s"), cfg_file)
+
+        with open(cfg_file) as fap:
+            data = fap.read()
+
+        archive_rules = yaml.safe_load(data)
+        LOG.info(_("Archive rules: %s"), archive_rules)
+
+        for archive_policy in archive_rules:
+            r = requests.patch(
+                "%s/v1/archive_policy/%s/%s"
+                % (self.gnocchi_url, archive_policy['name'], 'rules'),
+                headers=self._get_headers(),
+                data=json.dumps(archive_policy['rules']))
+
+            if int(r.status_code / 100) != 2:
+                raise UnexpectedWorkflowError(
+                    _("Archive policy %(name)s update failed with "
+                      "status: %(status_code)d: %(msg)s") %
+                    {'name': archive_policy['name'],
+                     'status_code': r.status_code,
+                     'msg': r.text})
+
+        return archive_rules
+
+    def _get_metric_ap(self, metric_name, resource_attributes):
+        filters = copy.deepcopy(resource_attributes)
+        filters.pop('metrics')
+        filters['metric_name'] = metric_name
+
+        # NOTE(dbelova): I've decided to use order we've listed archive
+        # policies as the priority parameter. So default policy should be
+        # listed last, more concrete ones - first.
+        # I would say default section should look like as following:
+        #
+        #       - name: low
+        #         rules:
+        #           - metric_name: "*"
+
+        for ap in self.gnocchi_archive_policy_rules['archive_policies']:
+            policy_name = ap['name']
+            for rule, value in six.iteritems(ap['rules']):
+                if rule in filters and fnmatch.fnmatch(value, filters[rule]):
+                    return policy_name
 
     def _get_headers(self, content_type="application/json"):
         return {
@@ -184,8 +238,10 @@ class GnocchiDispatcher(dispatcher.Base):
                                       resource_attributes)
             except ResourceAlreadyExists:
                 try:
+                    archive_policy_name = self._get_metric_ap(
+                        metric_name, resource_attributes)
                     self._create_metric(resource_type, resource_id,
-                                        metric_name)
+                                        metric_name, archive_policy_name)
                 except MetricAlreadyExists:
                     # NOTE(sileht): Just ignore the metric have been created in
                     # the meantime.
@@ -217,8 +273,9 @@ class GnocchiDispatcher(dispatcher.Base):
             attributes["id"] = resource_id
             attributes["user_id"] = samples[-1]['user_id']
             attributes["project_id"] = samples[-1]['project_id']
+            archive_policy_name = self._get_metric_ap(metric_name, attributes)
             attributes["metrics"] = dict(
-                (metric_name, self.gnocchi_archive_policy)
+                (metric_name, archive_policy_name)
                 for metric_name in ext.obj.get_metrics_names()
             )
         return attributes
@@ -289,8 +346,9 @@ class GnocchiDispatcher(dispatcher.Base):
         else:
             LOG.debug("Resource %s updated", resource_id)
 
-    def _create_metric(self, resource_type, resource_id, metric_name):
-        params = {metric_name: self.gnocchi_archive_policy}
+    def _create_metric(self, resource_type, resource_id, metric_name,
+                       archive_policy_name):
+        params = {metric_name: {'archive_policy_name': archive_policy_name}}
         r = requests.post("%s/v1/resource/%s/%s/metric"
                           % (self.gnocchi_url, resource_type,
                              resource_id),

@@ -110,6 +110,7 @@ class ArchivePolicy(Base, GnocchiBase):
     name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True)
     back_window = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     definition = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=False)
+    rules = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=True)
 
 
 class Metric(Base, GnocchiBase):
@@ -284,6 +285,19 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         except exception.DBDuplicateEntry:
             raise indexer.ArchivePolicyAlreadyExists(archive_policy.name)
         return dict(ap)
+
+    def rewrite_archive_policy_rules(self, name, rules):
+        session = self.engine_facade.get_session()
+        with session.begin():
+            q = session.query(
+                ArchivePolicy).filter(
+                    ArchivePolicy.name == name)
+            ap = q.first()
+
+            if ap is None:
+                raise indexer.NoSuchResource(name)
+
+            ap.rules = rules
 
     def create_metric(self, id, created_by_user_id, created_by_project_id,
                       archive_policy_name,

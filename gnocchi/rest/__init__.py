@@ -184,6 +184,16 @@ def Timespan(value):
     return seconds
 
 
+def Rules(value):
+    try:
+        rules = dict(value)
+    except ValueError:
+        raise ValueError("Rules have to match dict format.")
+    if not rules:
+        raise ValueError("Rules have to be not empty.")
+    return rules
+
+
 def get_details(params):
     type, options = werkzeug.http.parse_options_header(
         pecan.request.headers.get('Accept'))
@@ -211,6 +221,10 @@ class ArchivePoliciesController(rest.RestController):
             }], voluptuous.Length(min=1)),
         })
 
+    ArchivePolicyPatch = voluptuous.Schema({
+        voluptuous.Required("rules"): Rules,
+        })
+
     @staticmethod
     @vexpose(ArchivePolicy, 'json')
     def post(body):
@@ -230,6 +244,17 @@ class ArchivePoliciesController(rest.RestController):
         pecan.response.status = 201
         return archive_policy.ArchivePolicy.from_dict(
             ap).to_human_readable_dict()
+
+    @vexpose(ArchivePolicy, 'json')
+    def patch(self, name):
+        ap = pecan.request.indexer.get_archive_policy(name)
+        if not ap:
+            pecan.abort(404)
+
+        enforce("update archive policy", ap)
+
+        rules = deserialize(self.ArchivePolicyPatch)
+        pecan.request.indexer.rewrite_archive_policy_rules(name, rules)
 
     @pecan.expose('json')
     def get_one(self, id):

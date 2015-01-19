@@ -27,11 +27,12 @@ class ArchivePolicy(object):
     VALID_AGGREGATION_METHODS = set(('mean', 'sum', 'last', 'max', 'min',
                                      'std', 'median', 'first', 'count'))
 
-    def __init__(self, name, back_window, definition,
+    def __init__(self, name, back_window, definition, rules,
                  aggregation_methods=set(("*",))):
         self.name = name
         self.back_window = back_window
         self.definition = definition
+        self.rules = rules
         self.aggregation_methods = aggregation_methods
 
     @property
@@ -66,7 +67,8 @@ class ArchivePolicy(object):
         return cls(d['name'],
                    d['back_window'],
                    [ArchivePolicyItem(**definition)
-                    for definition in d['definition']])
+                    for definition in d['definition']],
+                   d['rules'])
 
     def to_dict(self):
         return {
@@ -74,6 +76,7 @@ class ArchivePolicy(object):
             "back_window": self.back_window,
             "definition": [d.to_dict()
                            for d in self.definition],
+            "rules": self.rules,
         }
 
     def to_human_readable_dict(self):
@@ -82,6 +85,7 @@ class ArchivePolicy(object):
             "back_window": self.back_window,
             "definition": [d.to_human_readable_dict()
                            for d in self.definition],
+            "rules": self.rules,
         }
 
 
