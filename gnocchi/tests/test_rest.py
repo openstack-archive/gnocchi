@@ -809,6 +809,31 @@ class MetricTest(RestTest):
         self.assertEqual([['2013-01-01T23:23:23.000000', 1.0, 1234.2]],
                          result)
 
+    def test_get_measure_start_relative(self):
+        """Make sure the timestamps can be relative to now."""
+        # TODO(jd) Use a fixture as soon as there's one
+        timeutils.set_time_override()
+        self.addCleanup(timeutils.clear_time_override)
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy_name": "high"})
+        metric = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
+                           params=[{"timestamp": timeutils.isotime(),
+                                    "value": 1234.2}])
+        ret = self.app.get(
+            "/v1/metric/%s/measures?start=-10 minutes"
+            % metric['id'],
+            status=200)
+        result = json.loads(ret.text)
+        now = timeutils.utcnow()
+        self.assertEqual([
+            [timeutils.isotime(now
+                               - datetime.timedelta(
+                                   seconds=now.second,
+                                   microseconds=now.microsecond)),
+             60.0, 1234.2],
+            [timeutils.isotime(), 1.0, 1234.2]], result)
+
     def test_get_measure_stop(self):
         result = self.app.post_json("/v1/metric",
                                     params={"archive_policy_name": "high"})
