@@ -25,7 +25,8 @@ class ArchivePolicy(object):
     #               methods, where there is no longer just a single aggregate
     #               value to be stored per-period (e.g. ohlc)
     VALID_AGGREGATION_METHODS = set(('mean', 'sum', 'last', 'max', 'min',
-                                     'std', 'median', 'first', 'count'))
+                                     'std', 'median', 'first', 'count',
+                                     '75pct', '90pct', '95pct'))
 
     def __init__(self, name, back_window, definition,
                  aggregation_methods=set(("*",))):
