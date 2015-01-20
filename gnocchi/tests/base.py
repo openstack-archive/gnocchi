@@ -20,6 +20,7 @@ import os
 import uuid
 
 import fixtures
+from oslo.config import cfg
 from oslo.config import fixture as config_fixture
 from oslotest import base
 from oslotest import mockpatch
@@ -309,7 +310,10 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
 
         self.conf.set_override('driver', self.indexer_engine, 'indexer')
 
-        service.prepare_service([], self.conf)
+        try:
+            service.prepare_service([], self.conf)
+        except cfg.ArgsAlreadyParsedError:
+            pass
 
         self.index = indexer.get_driver(self.conf)
         pre_connect_func = getattr(self, "_pre_connect_" + self.indexer_engine,
