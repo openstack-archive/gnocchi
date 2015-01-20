@@ -74,7 +74,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def _lock(self, metric, aggregation):
         raise NotImplementedError
 
-    def create_metric(self, metric, archive_policy):
+    def create_metric(self, metric, archive_policy, name):
         self._create_metric_container(metric)
         for aggregation in archive_policy.aggregation_methods:
             # TODO(jd) Having the TimeSerieArchive.full_res_timeserie duped in

@@ -143,13 +143,15 @@ def convert_metric_list(metrics, created_by_user_id, created_by_project_id):
     # Replace an archive policy as value for an metric by a brand
     # a new metric
     new_metrics = {}
-    for k, v in six.iteritems(metrics):
-        if isinstance(v, uuid.UUID):
-            new_metrics[k] = v
+    for name, value in six.iteritems(metrics):
+        # if value is metric_id
+        if isinstance(value, uuid.UUID):
+            new_metrics[name] = value
+        # else there is None there -> no metric was created before -> let's do
+        # that
         else:
-            new_metrics[k] = str(MetricsController.create_metric(
-                created_by_user_id, created_by_project_id,
-                v['archive_policy_name']))
+            new_metrics[name] = str(MetricsController.create_metric(
+                created_by_user_id, created_by_project_id, metric_name=name))
     return new_metrics
 
 
@@ -209,6 +211,21 @@ class ArchivePoliciesController(rest.RestController):
             "points": PositiveNotNullInt,
             "timespan": Timespan,
             }], voluptuous.Length(min=1)),
+        # if no rules will be passed, default rule will be used
+        # default rule maps policy to all metric names
+        voluptuous.Optional("rules"):
+            voluptuous.All([{
+                "filter": six.text_type,
+                "value": six.text_type,
+                }], voluptuous.Length(min=1)),
+        })
+
+    ArchivePolicyPatch = voluptuous.Schema({
+        voluptuous.Required("rules"):
+            voluptuous.All([{
+                "filter": six.text_type,
+                "value": six.text_type,
+            }], voluptuous.Length(min=1)),
         })
 
     @staticmethod
@@ -217,6 +234,8 @@ class ArchivePoliciesController(rest.RestController):
         # Validate the data
         try:
             ap = archive_policy.ArchivePolicy.from_dict(body)
+            if not ap.rules:
+                ap.rules = [archive_policy.DEFAULT_POLICY_RULE]
         except ValueError as e:
             pecan.abort(400, e)
         enforce("create archive policy", ap.to_dict())
@@ -230,6 +249,20 @@ class ArchivePoliciesController(rest.RestController):
         pecan.response.status = 201
         return archive_policy.ArchivePolicy.from_dict(
             ap).to_human_readable_dict()
+
+    @vexpose(ArchivePolicy, 'json')
+    def patch(self, name):
+        ap = pecan.request.indexer.get_archive_policy(name)
+        if not ap:
+            pecan.abort(404)
+
+        enforce("update archive policy", ap)
+
+        rules = deserialize(self.ArchivePolicyPatch)
+        pecan.request.indexer.rewrite_archive_policy_rules(
+            name,
+            [archive_policy.ArchivePolicyRule(rule['filter'], rule['value'])
+             for rule in rules])
 
     @pecan.expose('json')
     def get_one(self, id):
@@ -442,35 +475,31 @@ class MetricsController(rest.RestController):
 
     @staticmethod
     def create_metric(created_by_user_id, created_by_project_id,
-                      archive_policy_name,
-                      user_id=None, project_id=None):
+                      name=None, user_id=None, project_id=None):
         enforce("create metric", {
             "created_by_user_id": created_by_user_id,
             "created_by_project_id": created_by_project_id,
             "user_id": user_id,
             "project_id": project_id,
-            "archive_policy_name": archive_policy_name,
         })
         id = uuid.uuid4()
+        metric = pecan.request.indexer.create_metric(
+            id, created_by_user_id, created_by_project_id, name)
+        archive_policy_name = metric.archive_policy_name
         policy = pecan.request.indexer.get_archive_policy(archive_policy_name)
         if policy is None:
             pecan.abort(400, "Unknown archive policy %s" % archive_policy_name)
         ap = archive_policy.ArchivePolicy.from_dict(policy)
-        pecan.request.indexer.create_metric(
-            id,
-            created_by_user_id, created_by_project_id,
-            archive_policy_name=policy['name'])
-        pecan.request.storage.create_metric(str(id), ap)
-        return id
+        pecan.request.storage.create_metric(str(id), ap, metric.name)
+        return (id, archive_policy_name)
 
     @vexpose(Metric, 'json')
     def post(self, body):
         user, project = get_user_and_project()
-        id = self.create_metric(user, project, **body)
+        id, policy_name = self.create_metric(user, project, **body)
         set_resp_location_hdr("/v1/metric/" + str(id))
         pecan.response.status = 201
-        return {"id": str(id),
-                "archive_policy_name": str(body['archive_policy_name'])}
+        return {"id": str(id), "archive_policy_name": policy_name}
 
     @pecan.expose('json')
     def get_all(self, **kwargs):
@@ -502,9 +531,11 @@ class NamedMetricController(rest.RestController):
     def __init__(self, resource_id, resource_type):
         self.resource_id = resource_id
         self.resource_type = resource_type
+        self.metric_name = 'generic'
 
     @pecan.expose()
     def _lookup(self, name, *remainder):
+        self.metric_name = name
         try:
             uuid.UUID(self.resource_id)
         except ValueError:

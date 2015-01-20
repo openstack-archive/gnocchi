@@ -27,11 +27,12 @@ class ArchivePolicy(object):
     VALID_AGGREGATION_METHODS = set(('mean', 'sum', 'last', 'max', 'min',
                                      'std', 'median', 'first', 'count'))
 
-    def __init__(self, name, back_window, definition,
+    def __init__(self, name, back_window, definition, rules=None,
                  aggregation_methods=set(("*",))):
         self.name = name
         self.back_window = back_window
         self.definition = definition
+        self.rules = rules or []
         self.aggregation_methods = aggregation_methods
 
     @property
@@ -66,7 +67,8 @@ class ArchivePolicy(object):
         return cls(d['name'],
                    d['back_window'],
                    [ArchivePolicyItem(**definition)
-                    for definition in d['definition']])
+                    for definition in d['definition']],
+                   [ArchivePolicyRule(**rule) for rule in d['rules']])
 
     def to_dict(self):
         return {
@@ -74,6 +76,7 @@ class ArchivePolicy(object):
             "back_window": self.back_window,
             "definition": [d.to_dict()
                            for d in self.definition],
+            "rules": [rule.to_dict() for rule in self.rules],
         }
 
     def to_human_readable_dict(self):
@@ -82,6 +85,7 @@ class ArchivePolicy(object):
             "back_window": self.back_window,
             "definition": [d.to_human_readable_dict()
                            for d in self.definition],
+            "rules": [rule.to_dict() for rule in self.rules],
         }
 
 
@@ -131,3 +135,18 @@ class ArchivePolicyItem(object):
                 datetime.timedelta(seconds=self.granularity)),
             'points': self.points,
         }
+
+
+class ArchivePolicyRule(object):
+    def __init__(self, filter, value, **kwargs):
+        self.filter = filter
+        self.value = value
+
+    def to_dict(self):
+        return {
+            'filter': self.filter,
+            'value': self.value,
+        }
+
+
+DEFAULT_POLICY_RULE = ArchivePolicyRule('metric_name', '*')

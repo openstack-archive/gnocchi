@@ -16,6 +16,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import
+import copy
+import fnmatch
 import itertools
 import operator
 import uuid
@@ -70,11 +72,13 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         session = self.engine_facade.get_session()
         return [dict(ap) for ap in session.query(models.ArchivePolicy).all()]
 
-    def get_archive_policy(self, name):
-        session = self.engine_facade.get_session()
+    def get_archive_policy(self, name, session=None):
+        session = session or self.engine_facade.get_session()
         ap = session.query(models.ArchivePolicy).get(name)
         if ap:
-            return dict(ap)
+            ap_dict = dict(ap)
+            ap_dict['rules'] = [dict(rule) for rule in ap.rules]
+            return ap_dict
 
     def delete_archive_policy(self, name):
         session = self.engine_facade.get_session()
@@ -111,16 +115,72 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             name=archive_policy.name, back_window=archive_policy.back_window,
             definition=[d.to_dict() for d in archive_policy.definition])
         session = self.engine_facade.get_session()
-        session.add(ap)
-        try:
+        with session.begin():
+            session.add(ap)
+            for rule in archive_policy.rules:
+                apr = models.ArchivePolicyRule(
+                    id=uuid.uuid4(), filter=rule.filter, value=rule.value,
+                    archive_policy_name=archive_policy.name)
+                session.add(apr)
+            try:
+                session.flush()
+            except exception.DBDuplicateEntry:
+                raise indexer.ArchivePolicyAlreadyExists(archive_policy.name)
+            ap = self.get_archive_policy(archive_policy.name, session)
+        return ap
+
+    def rewrite_archive_policy_rules(self, name, rules):
+        session = self.engine_facade.get_session()
+        with session.begin():
+            q = session.query(
+                models.ArchivePolicy).filter(
+                    models.ArchivePolicy.name == name)
+            ap = q.first()
+
+            if ap is None:
+                raise indexer.NoSuchResource(name)
+
+            session.query(models.Resource).filter(
+                models.ArchivePolicyRule.archive_policy == name).delete()
+
+            for rule in rules:
+                apr = models.ArchivePolicyRule(archive_policy_name=name,
+                                               id=uuid.uuid4(),
+                                               filter=rule.filter,
+                                               value=rule.value)
+                session.add(apr)
+
             session.flush()
-        except exception.DBDuplicateEntry:
-            raise indexer.ArchivePolicyAlreadyExists(archive_policy.name)
-        return dict(ap)
+
+    def _get_metric_ap(self, metric_name, resource_attributes):
+        filters = copy.deepcopy(resource_attributes)
+        filters.pop('metrics')
+        filters['metric_name'] = metric_name
+
+        policies = self.list_archive_policies()
+
+        # fixme(dbelova): make policies prioritized somehow, at least via order
+        # of their creation! Otherwise we might have rules for low AP
+        # "metric_name": "*" and "metric_name": "cpu_util" for, let's say, high
+        # AP -> we definitely want high AP to be applied to cpu_util
+        # measurements
+
+        for ap in policies:
+            policy_name = ap['name']
+            for rule, value in six.iteritems(ap['rules']):
+                if rule in filters and fnmatch.fnmatch(value, filters[rule]):
+                    return policy_name
 
     def create_metric(self, id, created_by_user_id, created_by_project_id,
-                      archive_policy_name,
-                      name=None, resource_id=None):
+                      name=None, resource_id=None, resource_type=None):
+
+        resource_attributes = {}
+        if resource_id is not None and resource_type is not None:
+            resource_attributes = self._resource_to_dict(
+                self.get_resource(resource_type, resource_id))
+
+        archive_policy_name = self._get_metric_ap(name, resource_attributes)
+
         m = models.Metric(id=id,
                           created_by_user_id=created_by_user_id,
                           created_by_project_id=created_by_project_id,

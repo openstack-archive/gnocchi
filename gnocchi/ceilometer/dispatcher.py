@@ -44,10 +44,6 @@ dispatcher_opts = [
     cfg.StrOpt('url',
                default="http://localhost:8041",
                help='URL to Gnocchi.'),
-    cfg.StrOpt('archive_policy',
-               default="low",
-               help='The archive policy to use when the dispatcher '
-               'create a new metric.')
 ]
 
 cfg.CONF.register_opts(dispatcher_opts, group="dispatcher_gnocchi")
@@ -108,10 +104,6 @@ class GnocchiDispatcher(dispatcher.Base):
                 raise
 
         self.gnocchi_url = conf.dispatcher_gnocchi.url
-        self.gnocchi_archive_policy = {
-            'archive_policy_name':
-            cfg.CONF.dispatcher_gnocchi.archive_policy
-        }
         self.mgmr = stevedore.dispatch.DispatchExtensionManager(
             'gnocchi.ceilometer.resource', lambda x: True,
             invoke_on_load=True)
@@ -217,10 +209,8 @@ class GnocchiDispatcher(dispatcher.Base):
             attributes["id"] = resource_id
             attributes["user_id"] = samples[-1]['user_id']
             attributes["project_id"] = samples[-1]['project_id']
-            attributes["metrics"] = dict(
-                (metric_name, self.gnocchi_archive_policy)
-                for metric_name in ext.obj.get_metrics_names()
-            )
+            attributes["metrics"] = [
+                metric_name for metric_name in ext.obj.get_metrics_names()]
         return attributes
 
     def _post_measure(self, resource_type, resource_id, metric_name,
@@ -290,7 +280,7 @@ class GnocchiDispatcher(dispatcher.Base):
             LOG.debug("Resource %s updated", resource_id)
 
     def _create_metric(self, resource_type, resource_id, metric_name):
-        params = {metric_name: self.gnocchi_archive_policy}
+        params = {'metric_name': metric_name}
         r = requests.post("%s/v1/resource/%s/%s/metric"
                           % (self.gnocchi_url, resource_type,
                              resource_id),
