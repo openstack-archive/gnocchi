@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
-# Copyright © 2014 eNovance
+# Copyright © 2014-2015 eNovance
 #
 # Authors: Julien Danjou <julien@danjou.info>
 #
@@ -16,9 +16,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 """Time series data manipulation, better with pancetta."""
+import functools
 import operator
 
 import msgpack
+import numpy
 import pandas
 import six
 
@@ -185,6 +187,12 @@ class BoundTimeSerie(TimeSerie):
             self.ts = self.ts[self._first_block_timestamp():]
 
 
+def _percentile(a, q):
+    if len(a) == 1:
+        return a[0]
+    return numpy.percentile(a, q)
+
+
 class AggregatedTimeSerie(TimeSerie):
 
     def __init__(self, timestamps=None, values=None,
@@ -245,11 +253,20 @@ class AggregatedTimeSerie(TimeSerie):
             self.ts = self.ts[~self.ts.isnull()]
             self.ts = self.ts[-self.max_size:]
 
+    EXTRA_AGGREGATION_METHODS = {
+        '75pct': functools.partial(_percentile, q=75),
+        '90pct': functools.partial(_percentile, q=90),
+        '95pct': functools.partial(_percentile, q=95),
+    }
+
     def _resample(self, after):
         if self.sampling:
+            agg_method = self.EXTRA_AGGREGATION_METHODS.get(
+                self.aggregation_method,
+                self.aggregation_method)
             self.ts = self.ts[after:].resample(
                 self.sampling,
-                how=self.aggregation_method).combine_first(
+                how=agg_method).combine_first(
                     self.ts[:after][:-1])
 
     def update(self, ts):
@@ -410,7 +427,8 @@ class TimeSerieArchive(object):
         # aggregated values, for some kind of aggregation this can
         # result can looks wierd, but this is the best we can do
         # because we don't have anymore the raw datapoints in those case.
-        # FIXME(sileht): so should we bailout is case of stddev and median ?
+        # FIXME(sileht): so should we bailout is case of stddev, percentile
+        # and median?
         agg_timeserie = getattr(grouped, aggregation)()
         points = (agg_timeserie.dropna().reset_index()
                   .sort(['granularity', 'timestamp'], ascending=[0, 1])
