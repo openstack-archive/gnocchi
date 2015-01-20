@@ -16,29 +16,22 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import
-import calendar
-import datetime
-import decimal
 import itertools
 import operator
 import uuid
 
 from oslo.db import exception
 from oslo.db import options
-from oslo.db.sqlalchemy import models
 from oslo.db.sqlalchemy import session
 from oslo.utils import timeutils
-from oslo.utils import units
 import six
 import sqlalchemy
-from sqlalchemy.ext import declarative
-from sqlalchemy import types
-import sqlalchemy_utils
 
 from gnocchi import indexer
+from gnocchi.indexer.sqlalchemy import models
 
 
-Base = declarative.declarative_base()
+Base = models.Base
 
 COMMON_TABLES_ARGS = {'mysql_charset': "utf8",
                       'mysql_engine': "InnoDB"}
@@ -46,172 +39,12 @@ COMMON_TABLES_ARGS = {'mysql_charset': "utf8",
 _marker = indexer._marker
 
 
-class PreciseTimestamp(types.TypeDecorator):
-    """Represents a timestamp precise to the microsecond."""
-
-    impl = sqlalchemy.DateTime
-
-    @staticmethod
-    def _decimal_to_dt(dec):
-        """Return a datetime from Decimal unixtime format."""
-        if dec is None:
-            return None
-
-        integer = int(dec)
-        micro = (dec - decimal.Decimal(integer)) * decimal.Decimal(units.M)
-        daittyme = datetime.datetime.utcfromtimestamp(integer)
-        return daittyme.replace(microsecond=int(round(micro)))
-
-    @staticmethod
-    def _dt_to_decimal(utc):
-        """Datetime to Decimal.
-
-        Some databases don't store microseconds in datetime
-        so we always store as Decimal unixtime.
-        """
-        if utc is None:
-            return None
-
-        decimal.getcontext().prec = 30
-        return (decimal.Decimal(str(calendar.timegm(utc.utctimetuple()))) +
-                (decimal.Decimal(str(utc.microsecond)) /
-                 decimal.Decimal("1000000.0")))
-
-    def load_dialect_impl(self, dialect):
-        if dialect.name == 'mysql':
-            return dialect.type_descriptor(
-                types.DECIMAL(precision=20,
-                              scale=6,
-                              asdecimal=True))
-        return self.impl
-
-    def process_bind_param(self, value, dialect):
-        if dialect.name == 'mysql':
-            return self._dt_to_decimal(value)
-        return value
-
-    def process_result_value(self, value, dialect):
-        if dialect.name == 'mysql':
-            return self._decimal_to_dt(value)
-        return value
-
-
-class GnocchiBase(models.ModelBase):
-    pass
-
-
-class ArchivePolicy(Base, GnocchiBase):
-    __tablename__ = 'archive_policy'
-    __table_args__ = (
-        sqlalchemy.Index('ix_archive_policy_name', 'name'),
-        COMMON_TABLES_ARGS,
-    )
-
-    name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True)
-    back_window = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    definition = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=False)
-
-
-class Metric(Base, GnocchiBase):
-    __tablename__ = 'metric'
-    __table_args__ = (
-        sqlalchemy.Index('ix_metric_id', 'id'),
-        sqlalchemy.UniqueConstraint("resource_id", "name",
-                                    name="uniq_metric0resource_id0name"),
-        COMMON_TABLES_ARGS,
-    )
-
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           primary_key=True)
-    archive_policy_name = sqlalchemy.Column(
-        sqlalchemy.String(255),
-        sqlalchemy.ForeignKey('archive_policy.name',
-                              ondelete="RESTRICT"),
-        nullable=False)
-    archive_policy = sqlalchemy.orm.relationship(ArchivePolicy)
-    created_by_user_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False),
-        nullable=False)
-    created_by_project_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False),
-        nullable=False)
-    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                                    sqlalchemy.ForeignKey('resource.id',
-                                                          ondelete="SET NULL"))
-    name = sqlalchemy.Column(sqlalchemy.String(255))
-
-
-class Resource(Base, GnocchiBase):
-    __tablename__ = 'resource'
-    __table_args__ = (
-        sqlalchemy.Index('ix_resource_id', 'id'),
-        COMMON_TABLES_ARGS,
-    )
-
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           primary_key=True)
-    type = sqlalchemy.Column(sqlalchemy.Enum('metric', 'generic', 'instance',
-                                             'swift_account',
-                                             name="resource_type_enum"),
-                             nullable=False, default='generic')
-    created_by_user_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False),
-        nullable=False)
-    created_by_project_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False),
-        nullable=False)
-    metrics = sqlalchemy.orm.relationship(Metric)
-    started_at = sqlalchemy.Column(PreciseTimestamp, nullable=False,
-                                   # NOTE(jd): We would like to use
-                                   # sqlalchemy.func.now, but we can't
-                                   # because the type of PreciseTimestamp in
-                                   # MySQL is not a Timestamp, so it would
-                                   # not store a timestamp but a date as an
-                                   # integer…
-                                   default=datetime.datetime.utcnow)
-    ended_at = sqlalchemy.Column(PreciseTimestamp)
-    user_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
-    project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
-
-
-class Instance(Resource):
-    __tablename__ = 'instance'
-    __table_args__ = (
-        sqlalchemy.Index('ix_instance_id', 'id'),
-        COMMON_TABLES_ARGS,
-    )
-
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           sqlalchemy.ForeignKey('resource.id',
-                                                 ondelete="CASCADE"),
-                           primary_key=True)
-
-    flavor_id = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
-    image_ref = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    host = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    server_group = sqlalchemy.Column(sqlalchemy.String(255))
-
-
-class SwiftAccount(Resource):
-    __tablename__ = 'swift_account'
-    __table_args__ = (
-        sqlalchemy.Index('ix_swift_account_id', 'id'),
-        COMMON_TABLES_ARGS,
-    )
-
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           sqlalchemy.ForeignKey('resource.id',
-                                                 ondelete="CASCADE"),
-                           primary_key=True)
-
-
 class SQLAlchemyIndexer(indexer.IndexerDriver):
     # TODO(jd) Use stevedore instead to allow extending?
     _RESOURCE_CLASS_MAPPER = {
-        'generic': Resource,
-        'instance': Instance,
-        'swift_account': SwiftAccount,
+        'generic': models.Resource,
+        'instance': models.Instance,
+        'swift_account': models.SwiftAccount,
     }
 
     def __init__(self, conf):
@@ -235,19 +68,19 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def list_archive_policies(self):
         session = self.engine_facade.get_session()
-        return [dict(ap) for ap in session.query(ArchivePolicy).all()]
+        return [dict(ap) for ap in session.query(models.ArchivePolicy).all()]
 
     def get_archive_policy(self, name):
         session = self.engine_facade.get_session()
-        ap = session.query(ArchivePolicy).get(name)
+        ap = session.query(models.ArchivePolicy).get(name)
         if ap:
             return dict(ap)
 
     def delete_archive_policy(self, name):
         session = self.engine_facade.get_session()
         try:
-            if session.query(ArchivePolicy).filter(
-                    ArchivePolicy.name == name).delete() == 0:
+            if session.query(models.ArchivePolicy).filter(
+                    models.ArchivePolicy.name == name).delete() == 0:
                 raise indexer.NoSuchArchivePolicy(name)
         except exception.DBError as e:
             # TODO(jd) Add an exception in oslo.db to match foreign key
@@ -257,10 +90,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def get_metrics(self, uuids, details=False):
         session = self.engine_facade.get_session()
-        query = session.query(Metric).filter(Metric.id.in_(uuids))
+        query = session.query(models.Metric).filter(
+            models.Metric.id.in_(uuids))
         if details:
             query = query.options(sqlalchemy.orm.joinedload(
-                Metric.archive_policy))
+                models.Metric.archive_policy))
             metrics = []
             for m in query:
                 metric = self._resource_to_dict(m)
@@ -273,10 +107,9 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         return list(map(self._resource_to_dict, query.all()))
 
     def create_archive_policy(self, archive_policy):
-        ap = ArchivePolicy(name=archive_policy.name,
-                           back_window=archive_policy.back_window,
-                           definition=[d.to_dict()
-                                       for d in archive_policy.definition])
+        ap = models.ArchivePolicy(
+            name=archive_policy.name, back_window=archive_policy.back_window,
+            definition=[d.to_dict() for d in archive_policy.definition])
         session = self.engine_facade.get_session()
         session.add(ap)
         try:
@@ -288,12 +121,12 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def create_metric(self, id, created_by_user_id, created_by_project_id,
                       archive_policy_name,
                       name=None, resource_id=None):
-        m = Metric(id=id,
-                   created_by_user_id=created_by_user_id,
-                   created_by_project_id=created_by_project_id,
-                   archive_policy_name=archive_policy_name,
-                   name=name,
-                   resource_id=resource_id)
+        m = models.Metric(id=id,
+                          created_by_user_id=created_by_user_id,
+                          created_by_project_id=created_by_project_id,
+                          archive_policy_name=archive_policy_name,
+                          name=name,
+                          resource_id=resource_id)
         session = self.engine_facade.get_session()
         session.add(m)
         session.flush()
@@ -301,11 +134,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def list_metrics(self, user_id=None, project_id=None):
         session = self.engine_facade.get_session()
-        q = session.query(Metric)
+        q = session.query(models.Metric)
         if user_id is not None:
-            q = q.filter(Metric.created_by_user_id == user_id)
+            q = q.filter(models.Metric.created_by_user_id == user_id)
         if project_id is not None:
-            q = q.filter(Metric.created_by_project_id == project_id)
+            q = q.filter(models.Metric.created_by_project_id == project_id)
         return [self._resource_to_dict(m) for m in q.all()]
 
     def create_resource(self, resource_type, id,
@@ -355,7 +188,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         for k, v in six.iteritems(r):
             if isinstance(v, uuid.UUID):
                 r[k] = six.text_type(v)
-        if with_metrics and isinstance(resource, Resource):
+        if with_metrics and isinstance(resource, models.Resource):
             r['metrics'] = dict((m['name'], six.text_type(m['id']))
                                 for m in resource.metrics)
         return r
@@ -395,8 +228,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
             if metrics is not _marker:
                 if not append_metrics:
-                    session.query(Metric).filter(
-                        Metric.resource_id == uuid).update(
+                    session.query(models.Metric).filter(
+                        models.Metric.resource_id == uuid).update(
                             {"resource_id": None})
                 self._set_metrics_for_resource(session, uuid,
                                                r.created_by_user_id,
@@ -409,10 +242,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                                   user_id, project_id, metrics):
         for name, metric_id in six.iteritems(metrics):
             try:
-                update = session.query(Metric).filter(
-                    Metric.id == metric_id,
-                    Metric.created_by_user_id == user_id,
-                    Metric.created_by_project_id == project_id).update(
+                update = session.query(models.Metric).filter(
+                    models.Metric.id == metric_id,
+                    models.Metric.created_by_user_id == user_id,
+                    models.Metric.created_by_project_id == project_id).update(
                         {"resource_id": resource_id, "name": name})
             except exception.DBDuplicateEntry:
                 raise indexer.NamedMetricAlreadyExists(name)
@@ -421,7 +254,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def delete_resource(self, id):
         session = self.engine_facade.get_session()
-        if session.query(Resource).filter(Resource.id == id).delete() == 0:
+        if session.query(models.Resource).filter(
+                models.Resource.id == id).delete() == 0:
             raise indexer.NoSuchResource(id)
 
     def get_resource(self, resource_type, uuid, with_metrics=False):
@@ -481,5 +315,5 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def delete_metric(self, id):
         session = self.engine_facade.get_session()
-        session.query(Metric).filter(Metric.id == id).delete()
+        session.query(models.Metric).filter(models.Metric.id == id).delete()
         session.flush()

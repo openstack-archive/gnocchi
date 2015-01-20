@@ -15,14 +15,14 @@
 
 from oslo.config import cfg
 
-from gnocchi.indexer import sqlalchemy as sql_db
+from gnocchi.indexer.sqlalchemy import sql_indexer
 from gnocchi.rest import app
 from gnocchi import service
 
 
 def storage_dbsync():
     service.prepare_service()
-    indexer = sql_db.SQLAlchemyIndexer(cfg.CONF)
+    indexer = sql_indexer.SQLAlchemyIndexer(cfg.CONF)
     indexer.connect()
     indexer.upgrade()
 
