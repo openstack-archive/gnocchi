@@ -18,6 +18,7 @@ import os
 import uuid
 
 import fixtures
+from oslo.config import cfg
 from oslo.config import fixture as config_fixture
 from oslotest import base
 from oslotest import mockpatch
@@ -286,7 +287,10 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
         return root
 
     def prepare_service(self):
-        service.prepare_service([], self.conf)
+        try:
+            service.prepare_service([], self.conf)
+        except cfg.ArgsAlreadyParsedError:
+            pass
 
     def setUp(self):
         super(TestCase, self).setUp()
