@@ -78,6 +78,29 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
             [3, 5, 6])
 
+    def test_75_percentile(self):
+        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
+                                           aggregation_method='75pct')
+        ts.set_values(
+            [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
+             (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
+             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)])
+
+        self.assertEqual(1, len(ts))
+        self.assertEqual(5.5, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+
+    def test_95_percentile(self):
+        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
+                                           aggregation_method='95pct')
+        ts.set_values(
+            [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
+             (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
+             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)])
+
+        self.assertEqual(1, len(ts))
+        self.assertEqual(5.9000000000000004,
+                         ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
+
     def test_different_length_in_timestamps_and_data(self):
         self.assertRaises(ValueError,
                           carbonara.AggregatedTimeSerie,
