@@ -102,6 +102,26 @@ class ArchivePolicy(Base, GnocchiBase):
     name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True)
     back_window = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     definition = sqlalchemy.Column(sqlalchemy_utils.JSONType, nullable=False)
+    rules = metrics = sqlalchemy.orm.relationship(ArchivePolicyRule)
+
+
+class ArchivePolicyRule(Base, GnocchiBase):
+    __tablename__ = 'archive_policy_rule'
+    __table_args__ = (
+        sqlalchemy.Index('ix_archive_policy_rule_filter', 'filter'),
+        COMMON_TABLES_ARGS,
+    )
+
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                           primary_key=True)
+    filter = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True)
+    value = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True)
+    archive_policy_name = sqlalchemy.Column(
+        sqlalchemy.String(255),
+        sqlalchemy.ForeignKey('archive_policy.name',
+                              ondelete="RESTRICT"),
+        nullable=False)
+    archive_policy = sqlalchemy.orm.relationship(ArchivePolicy)
 
 
 class Metric(Base, GnocchiBase):

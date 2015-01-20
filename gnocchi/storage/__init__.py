@@ -100,7 +100,7 @@ class StorageDriver(object):
         pass
 
     @staticmethod
-    def create_metric(metric, archive_policy):
+    def create_metric(metric, archive_policy, name):
         """Create an metric.
 
         :param metric: The metric key.

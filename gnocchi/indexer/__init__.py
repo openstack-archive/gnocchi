@@ -191,7 +191,7 @@ class IndexerDriver(object):
 
     @staticmethod
     def create_metric(id, created_by_user_id, created_by_project_id,
-                      archive_policy_name, name=None, resource_id=None):
+                      name=None, resource_id=None):
         raise exceptions.NotImplementedError
 
     @staticmethod
@@ -200,6 +200,10 @@ class IndexerDriver(object):
 
     @staticmethod
     def create_archive_policy(archive_policy):
+        raise exceptions.NotImplementedError
+
+    @staticmethod
+    def rewrite_archive_policy_rules(self, name, rules):
         raise exceptions.NotImplementedError
 
     @staticmethod
