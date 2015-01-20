@@ -1,0 +1,154 @@
+# Tests for testing archive policy handling.
+
+fixtures:
+    - ConfigFixture
+
+tests:
+- name: json archive post or 415
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: text/bad
+  data: foo
+  status: 415
+
+- name: json archive post right content wrong data
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+  data: foo
+  status: 400
+  response_headers:
+      content-type: /text\/plain/
+  response_strings:
+      - "Unable to decode body:"
+
+- name: archive post fail no auth
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+  data:
+      name: test1
+      definition:
+          - granularity: 1 minute
+            points: 20
+  status: 403
+
+- name: archive post success
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+      x-roles: admin
+  data:
+      name: test1
+      definition:
+          - granularity: 1 minute
+            points: 20
+  status: 201
+  response_headers:
+      content-type: /application\/json/
+      location: $SCHEME://$NETLOC/v1/archive_policy/test1
+  response_json_paths:
+      $.name: test1
+      $.definition.[0].granularity: 0:01:00
+      $.definition.[0].points: 20
+      $.definition.[0].timespan: 0:20:00
+
+- name: archive infinite points
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+      x-roles: admin
+  data:
+      name: test2
+      definition:
+          - granularity: 2 minutes
+  status: 201
+  response_headers:
+      content-type: /application\/json/
+      location: $SCHEME://$NETLOC/v1/archive_policy/test2
+  response_json_paths:
+      $.name: test2
+      $.definition.[0].granularity: 0:02:00
+      $.definition.[0].points: null
+      $.definition.[0].timespan: null
+
+- name: archive invalid multiple 400
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+      x-roles: admin
+  data:
+      name: test3
+      definition:
+          - granularity: 1 minute
+            points: 20
+            timespan: 3 hours
+  status: 400
+  response_headers:
+      content-type: /text\/plain/
+  response_strings:
+      - timespan ≠ granularity × points
+
+- name: archive post unicode name
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+      x-roles: admin
+  data:
+      name: test☃
+      definition:
+          - granularity: 1 minute
+            points: 20
+  status: 201
+  response_headers:
+      content-type: /application\/json/
+      location: $SCHEME://$NETLOC/v1/archive_policy/test%E2%98%83
+  response_json_paths:
+      $.name: test☃
+
+- name: archive post invalid unit 400
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+      x-roles: admin
+  data:
+      name: testinvalidunit
+      definition:
+          - granularity: 10s
+            timespace: 1 shenanigan
+  status: 400
+
+- name: post archive policy to metric
+  url: /v1/metric
+  request_headers:
+      content-type: application/json
+      x-roles: admin
+      x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+      x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+  method: POST
+  data:
+      archive_policy_name: test1
+  status: 201
+  response_headers:
+      content-type: /application\/json/
+  response_strings:
+      - '"archive_policy_name": "test1"'
+
+- name: retrieve metric info
+  url: $LOCATION
+  status: 200
+  request_headers:
+      content_type: /application\/json/
+      x-roles: admin
+  response_json_paths:
+      $.archive_policy_name: test1
+      $.created_by_user_id: 93180da9-7c15-40d3-a050-a374551e52ee
+      $.created_by_project_id: 99d13f22-3618-4288-82b8-6512ded77e4f
