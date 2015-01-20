@@ -1,0 +1,157 @@
+#
+# Confirm we got some metrics going
+#
+
+fixtures:
+    - ConfigFixture
+
+tests:
+    - name: list metrics
+      desc: can we list metrics
+      url: /v1/metric
+      status: 200
+      response_headers:
+          content-type: application/json; charset=UTF-8
+      response_strings:
+          - "[]"
+
+    - name: post metric no archive
+      url: /v1/metric
+      method: POST
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: medium
+      status: 400
+      response_strings:
+          - Unknown archive policy
+
+    - name: post an archive
+      url: /v1/archive_policy
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: medium
+          definition:
+              - granularity: 1 second
+                points: 20
+      status: 201
+
+    - name: post metric no auth
+      xfail: true
+      desc: post one metric
+      url: /v1/metric
+      method: POST
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: medium
+      status: 403
+
+    - name: post metric auth
+      desc: post one metric
+      url: /v1/metric
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      data:
+          archive_policy_name: medium
+      status: 201
+      response_headers:
+          content-type: application/json; charset=UTF-8
+          location: /$SCHEME://$NETLOC/v1/metric//
+      response_json_paths:
+          $.archive_policy_name: medium
+
+    - name: get one metric no auth
+      desc: try get the metric we just posted
+      url: $LOCATION
+      response_headers:
+          content-type: /text/plain/
+      status: 403
+
+    - name: post another metric
+      desc: so we can retrived it again
+      url: /v1/metric
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      data:
+          archive_policy_name: medium
+      status: 201
+
+    - name: get one metric auth
+      desc: try get the metric we just posted
+      url: $LOCATION
+      request_headers: 
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      response_headers:
+          content-type: application/json; charset=UTF-8
+      response_json_paths:
+          $.archive_policy_name: medium
+          $.id: $RESPONSE['$.id']
+
+    - name: get one metric details
+      desc: get the details of that one metic
+      url: /v1/metric/$RESPONSE['$.id']
+      request_headers: 
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      response_json_paths:
+          $.created_by_user_id: 93180da9-7c15-40d3-a050-a374551e52ee
+
+    - name: post a single measure
+      desc: post one measure
+      url: /v1/metric/$RESPONSE['$.id']/measures
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      data:
+          - timestamp: "2013-01-01 23:23:20"
+            value: 1234.2
+      status: 204
+
+    - name: post non-existent metric measures
+      xfail: true
+      desc: post multiple measures
+      url: /v1/metric/cow/measures
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      data:
+          - timestamp: "2013-01-01 23:23:20"
+            value: 1234.2
+      status: 404
+
+    - name: list the one metric
+      url: /v1/metric
+      status: 200
+      response_json_paths:
+          $[0].archive_policy_name: medium
+      response_strings:
+          moo
+
+# This will fail sometimes because data is not ready yet.
+    - name: get aggregate
+      xfail: true
+      url: /v1/metric/$RESPONSE['$[0].id']/measures?aggregation=max
+      request_headers:
+          content-type: application/json
+          x-user-id: 93180da9-7c15-40d3-a050-a374551e52ee
+          x-project-id: 99d13f22-3618-4288-82b8-6512ded77e4f
+      response_json_paths:
+          $.[0]:
+              - '2013-01-01T23:23:20.000000Z'
+              - 1.0
+              - 1234.2
