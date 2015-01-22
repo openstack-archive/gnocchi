@@ -687,6 +687,10 @@ class InstanceResourceController(GenericResourceController):
     })
 
 
+class VolumeResourceController(GenericResourceController):
+    _resource_type = 'volume'
+
+
 class GenericResourcesController(rest.RestController):
     _resource_type = 'generic'
     _resource_rest_class = GenericResourceController
@@ -786,10 +790,16 @@ class InstancesResourcesController(GenericResourcesController):
     })
 
 
+class VolumesResourcesController(GenericResourcesController):
+    _resource_type = 'volume'
+    _resource_rest_class = VolumeResourceController
+
+
 class ResourcesController(rest.RestController):
     generic = GenericResourcesController()
     instance = InstancesResourcesController()
     swift_account = SwiftAccountsResourcesController()
+    volume = VolumesResourcesController()
 
 
 class V1Controller(object):
