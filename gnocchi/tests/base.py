@@ -279,6 +279,7 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
         if self.conf.database.connection is None:
             raise testcase.TestSkipped("No database connection configured")
         sqlalchemy_utils.create_database(db_url)
+        self.addCleanup(sqlalchemy_utils.drop_database, db_url)
 
     @staticmethod
     def path_get(project_file=None):
