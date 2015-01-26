@@ -460,7 +460,7 @@ class MetricsController(rest.RestController):
             id,
             created_by_user_id, created_by_project_id,
             archive_policy_name=policy['name'])
-        pecan.request.storage.create_metric(str(id), ap)
+        pecan.request.storage.create_metric(str(id), ap.back_window, ap)
         return id
 
     @vexpose(Metric, 'json')
