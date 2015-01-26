@@ -24,8 +24,6 @@ from oslo.config import fixture as config_fixture
 from oslotest import base
 from oslotest import mockpatch
 import six
-import sqlalchemy.engine.url as sqlalchemy_url
-import sqlalchemy_utils
 from stevedore import extension
 from swiftclient import exceptions as swexc
 import testscenarios
@@ -269,16 +267,12 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
                                                  indexer_backends)
 
     def _pre_connect_sqlalchemy(self):
-        db_url = getattr(self, 'db_url', 'sqlite://')
-        if db_url:
-            url = sqlalchemy_url.make_url(db_url)
-            url.database = url.database + str(uuid.uuid4()).replace('-', '')
-            db_url = str(url)
-        self.conf.set_override('connection', db_url, 'database')
+        self.conf.set_override('connection',
+                               getattr(self, "db_url", "sqlite:///"),
+                               'database')
         # No env var exported, no integration tests
         if self.conf.database.connection is None:
             raise testcase.TestSkipped("No database connection configured")
-        sqlalchemy_utils.create_database(db_url)
 
     @staticmethod
     def path_get(project_file=None):
