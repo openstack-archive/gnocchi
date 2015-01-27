@@ -264,7 +264,7 @@ class AggregatedTimeSerie(TimeSerie):
 
         self.ts = ts.ts.combine_first(self.ts)
 
-        self._resample(min(ts.ts.index))
+        self._resample(index[0])
         self._truncate()
 
 
