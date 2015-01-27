@@ -257,13 +257,10 @@ class AggregatedTimeSerie(TimeSerie):
                     self.ts[:after][:-1])
 
     def update(self, ts):
-        # NOTE(jd) Is there a more efficient way to do that with Pandas? The
-        # goal is to delete all the values that `ts' is providing again, so
-        # that means deleting the aggregate we did for it too.
         index = sorted(ts.ts.index)
-        for timestamp, value in sorted(self.ts.iteritems()):
-            if timestamp >= index[0] and timestamp <= index[-1]:
-                del self.ts[timestamp]
+        self.ts = self.ts[:index[0]].combine_first(self.ts[index[-1]:])
+        if index[0-1] in self.ts:
+            del self.ts[index[1]]
 
         self.ts = ts.ts.combine_first(self.ts)
 
