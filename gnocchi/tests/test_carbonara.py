@@ -195,6 +195,10 @@ class TestTimeSerieArchive(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 6, 0), 3),
         ])
 
+        tsc.set_values([
+            (datetime.datetime(2014, 1, 1, 12, 5, 13), 5),
+        ])
+
         self.assertEqual([
             (pandas.Timestamp('2014-01-01 11:45:00'), 300.0, 6.0),
             (pandas.Timestamp('2014-01-01 11:50:00'), 300.0, 27.0),
@@ -206,7 +210,7 @@ class TestTimeSerieArchive(base.BaseTestCase):
             (pandas.Timestamp('2014-01-01 12:02:00'), 60.0, 8.0),
             (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 3.0),
             (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 7.0),
-            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 8.0),
+            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 7),
             (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 3.0),
         ], tsc.fetch())
 
@@ -217,7 +221,7 @@ class TestTimeSerieArchive(base.BaseTestCase):
             (pandas.Timestamp('2014-01-01 12:02:00'), 60.0, 8.0),
             (pandas.Timestamp('2014-01-01 12:03:00'), 60.0, 3.0),
             (pandas.Timestamp('2014-01-01 12:04:00'), 60.0, 7.0),
-            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 8.0),
+            (pandas.Timestamp('2014-01-01 12:05:00'), 60.0, 7),
             (pandas.Timestamp('2014-01-01 12:06:00'), 60.0, 3.0),
         ], tsc.fetch(datetime.datetime(2014, 1, 1, 12, 0, 0)))
 
@@ -324,13 +328,16 @@ class TestTimeSerieArchive(base.BaseTestCase):
                          measure[0][0])
         self.assertAlmostEquals(measure[0][2], 3.0276503540974917)
 
-    def test_truncation(self):
+    def test_no_truncation(self):
         ts = carbonara.TimeSerieArchive.from_definitions(
             [(60, None)])
 
         for i in six.moves.range(1, 11):
             ts.set_values([
                 (datetime.datetime(2014, 1, 1, 12, i, i), float(i))
+            ])
+            ts.set_values([
+                (datetime.datetime(2014, 1, 1, 12, i, i + 1), float(i + 1))
             ])
             self.assertEqual(i, len(ts.fetch()))
 
