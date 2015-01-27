@@ -798,10 +798,23 @@ class ResourcesController(rest.RestController):
     swift_account = SwiftAccountsResourcesController()
 
 
-class V1Controller(object):
+class V1Controller(rest.RestController):
     archive_policy = ArchivePoliciesController()
     metric = MetricsController()
     resource = ResourcesController()
+
+    _custom_actions = {
+        'capabilities': ['GET']
+    }
+
+    @pecan.expose('json')
+    def get_capabilities(self):
+        aggregations = set(
+            archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS)
+        aggregations.update(
+            ext.name for ext in extension.ExtensionManager(
+                namespace='gnocchi.aggregates'))
+        return dict(aggregations=aggregations)
 
 
 class RootController(object):
