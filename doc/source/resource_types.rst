@@ -53,3 +53,12 @@ swift_account
 =============
 
 No specific attributes.
+
+volume
+======
+
++--------------+---------+-----------+
+| Attribute    | Type    | Immutable |
++==============+=========+===========+
+| display_name | String  | No        |
++--------------+---------+-----------+
