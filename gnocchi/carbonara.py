@@ -48,17 +48,13 @@ class UnAggregableTimeseries(Exception):
 class TimeSerie(object):
 
     def __init__(self, timestamps=None, values=None):
-        self.ts = pandas.Series(values, timestamps)
-        self.ts = self.ts.sort_index()
+        self.ts = pandas.Series(values, timestamps).sort_index()
 
     def __eq__(self, other):
         return (isinstance(other, TimeSerie)
                 and self.ts.all() == other.ts.all())
 
     def __getitem__(self, key):
-        return self.ts[key]
-
-    def get(self, key):
         return self.ts[key]
 
     def set_values(self, values):
@@ -96,13 +92,6 @@ class TimeSerie(object):
                            for timestamp, v
                            in six.iteritems(self.ts[~self.ts.isnull()])),
         }
-
-    def serialize(self):
-        return msgpack.dumps(self.to_dict())
-
-    @classmethod
-    def unserialize(cls, data):
-        return cls.from_dict(msgpack.loads(data, encoding='utf-8'))
 
     @staticmethod
     def _serialize_time_period(value):
@@ -215,7 +204,7 @@ class AggregatedTimeSerie(TimeSerie):
     def set_values(self, values):
         super(AggregatedTimeSerie, self).set_values(values)
         # See comments in update()
-        self._resample(min(list(values), key=operator.itemgetter(0))[0])
+        self._resample(min(values, key=operator.itemgetter(0))[0])
         self._truncate()
 
     @classmethod
