@@ -986,11 +986,23 @@ class ResourceTest(RestTest):
                 "project_id": str(uuid.uuid4()),
             },
             patchable_attributes={
+
                 "ended_at": "2014-01-03T02:02:02.000000",
             },
             resource_type='swift_account')),
         # TODO(dbelova): add tests with None project ID when we'll add kwapi,
         # ipmi, hardware, etc. resources that are passed without project ID
+        ('volume', dict(
+            attributes={
+                "started_at": "2014-01-03T02:02:02.000000",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
+            },
+            patchable_attributes={
+                "ended_at": "2014-01-03T02:02:02.000000",
+                "display_name": "myvolume",
+            },
+            resource_type='volume')),
     ]
 
     @classmethod
