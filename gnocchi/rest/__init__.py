@@ -693,6 +693,16 @@ class InstanceResourceController(GenericResourceController):
     })
 
 
+class ImageResourceController(GenericResourceController):
+    _resource_type = 'image'
+
+    ResourcePatch = ResourcePatchSchema({
+        "name": six.text_type,
+        "container_format": six.text_type,
+        "disk_format": six.text_type,
+    })
+
+
 class GenericResourcesController(rest.RestController):
     _resource_type = 'generic'
     _resource_rest_class = GenericResourceController
@@ -792,10 +802,22 @@ class InstancesResourcesController(GenericResourcesController):
     })
 
 
+class ImageResourcesController(GenericResourcesController):
+    _resource_type = 'image'
+    _resource_rest_class = ImageResourceController
+
+    Resource = ResourceSchema({
+        voluptuous.Required("name"): six.text_type,
+        voluptuous.Required("container_format"): six.text_type,
+        voluptuous.Required("disk_format"): six.text_type,
+    })
+
+
 class ResourcesController(rest.RestController):
     generic = GenericResourcesController()
     instance = InstancesResourcesController()
     swift_account = SwiftAccountsResourcesController()
+    image = ImageResourcesController()
 
 
 class V1Controller(object):
