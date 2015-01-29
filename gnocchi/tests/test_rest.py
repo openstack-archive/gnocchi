@@ -986,6 +986,32 @@ class ResourceTest(RestTest):
                 "ended_at": "2014-01-03T02:02:02.000000",
             },
             resource_type='swift_account')),
+        # image pollsters contain UUID user_id
+        ('image', dict(
+            attributes={
+                "started_at": "2014-01-03T02:02:02.000000",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
+                "size": 123456789,
+            },
+            patchable_attributes={
+                "ended_at": "2014-01-03T02:02:02.000000",
+                "size": 12121212,
+            },
+            resource_type='image')),
+        # image pollsters contain None user_id
+        ('image_none_user', dict(
+            attributes={
+                "started_at": "2014-01-03T02:02:02.000000",
+                "user_id": None,
+                "project_id": str(uuid.uuid4()),
+                "size": 123456789,
+            },
+            patchable_attributes={
+                "ended_at": "2014-01-03T02:02:02.000000",
+                "size": 12121212,
+            },
+            resource_type='image')),
         # TODO(dbelova): add tests with None project ID when we'll add kwapi,
         # ipmi, hardware, etc. resources that are passed without project ID
     ]
