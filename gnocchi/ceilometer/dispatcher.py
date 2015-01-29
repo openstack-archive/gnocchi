@@ -262,6 +262,18 @@ class GnocchiDispatcher(dispatcher.Base):
             raise ResourceAlreadyExists
 
         elif int(r.status_code / 100) != 2:
+            LOG.debug("resource_type: %(resource_type)s, "
+                      "resource_id: %(resource_id)s, "
+                      "resource_attributes: %(resource_attributes)s, "
+                      "gnocchi_url: %(gnocchi_url)s, headers: %(headers)s, "
+                      "data: %(data)s." %
+                      {"resource_type": resource_type,
+                       "resource_id": resource_id,
+                       "resource_attributes": resource_attributes,
+                       "gnocchi_url": self.gnocchi_url,
+                       "headers": self._get_headers(),
+                       "data": json.dumps(resource_attributes)})
+
             raise UnexpectedWorkflowError(
                 _("Resource %(resource_id)s creation failed with "
                   "status: %(status_code)d: %(msg)s") %

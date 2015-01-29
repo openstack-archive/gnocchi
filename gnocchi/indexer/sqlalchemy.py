@@ -150,7 +150,7 @@ class Resource(Base, GnocchiBase):
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            primary_key=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('metric', 'generic', 'instance',
-                                             'swift_account',
+                                             'swift_account', 'image',
                                              name="resource_type_enum"),
                              nullable=False, default='generic')
     created_by_user_id = sqlalchemy.Column(
@@ -169,8 +169,12 @@ class Resource(Base, GnocchiBase):
                                    # integer…
                                    default=datetime.datetime.utcnow)
     ended_at = sqlalchemy.Column(PreciseTimestamp)
-    user_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
-    project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
+    user_id = sqlalchemy.Column(
+        sqlalchemy_utils.UUIDType(binary=False),
+        nullable=True)
+    project_id = sqlalchemy.Column(
+        sqlalchemy_utils.UUIDType(binary=False),
+        nullable=True)
 
 
 class Instance(Resource):
@@ -205,12 +209,27 @@ class SwiftAccount(Resource):
                            primary_key=True)
 
 
+class Image(Resource):
+    __tablename__ = 'image'
+    __table_args__ = (
+        sqlalchemy.Index('ix_image_id', 'id'),
+        COMMON_TABLES_ARGS,
+    )
+
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                           sqlalchemy.ForeignKey('resource.id',
+                                                 ondelete="CASCADE"),
+                           primary_key=True)
+    size = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+
+
 class SQLAlchemyIndexer(indexer.IndexerDriver):
     # TODO(jd) Use stevedore instead to allow extending?
     _RESOURCE_CLASS_MAPPER = {
         'generic': Resource,
         'instance': Instance,
         'swift_account': SwiftAccount,
+        'image': Image
     }
 
     def __init__(self, conf):
