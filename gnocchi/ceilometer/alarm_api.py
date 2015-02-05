@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 #
 # Copyright 2015 eNovance
 #
@@ -15,9 +16,11 @@
 
 import cachetools
 from ceilometer.api.controllers.v2 import base
+from ceilometer.api.controllers.v2 import utils as v2_utils
 from oslo_config import cfg
 from oslo_serialization import jsonutils
 import requests
+import uuid
 import wsme
 from wsme import types as wtypes
 
@@ -95,6 +98,40 @@ class AlarmGnocchiMetricOfResourcesThresholdRule(AlarmGnocchiThresholdRule):
                                        'resource_constraint',
                                        'resource_type'])
         return rule
+
+    @classmethod
+    def validate_alarm(cls, alarm):
+        super(AlarmGnocchiMetricOfResourcesThresholdRule,
+              cls).validate_alarm(alarm)
+
+        try:
+            uuid.UUID(alarm.resource_constraint)
+        except Exception:
+            auth_project = v2_utils.get_auth_project(alarm.project_id)
+            if auth_project:
+                # NOTE(sileht): when we have more complex query allowed
+                # this should be enhanced to ensure the constraint are still
+                # scoped to auth_project
+                alarm.resource_constraint += "∧project_id=%s" % auth_project
+        else:
+            ks_client = utils.get_keystone_client()
+            gnocchi_url = cfg.CONF.alarm_gnocchi.url
+            headers = {'Content-Type': "application/json",
+                       'X-Auth-Token': ks_client.auth_token}
+            try:
+                r = requests.get("%s/resource/%s/%s" % (
+                    gnocchi_url, alarm.resource_type,
+                    alarm.resource_constraint),
+                    headers=headers)
+            except requests.ConnectionError as e:
+                raise GnocchiUnavailable(e)
+            if r.status_code == 404:
+                raise base.EntityNotFound('gnocchi resource',
+                                          alarm.resource_constraint)
+            elif r.status_code / 200 != 1:
+                raise base.ClientSideError(r.text, status_code=r.status_code)
+
+            return jsonutils.loads(r.text).get('aggregation_method', [])
 
 
 class AlarmGnocchiMetricsThresholdRule(AlarmGnocchiThresholdRule):
