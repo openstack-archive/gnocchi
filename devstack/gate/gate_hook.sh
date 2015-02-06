@@ -14,17 +14,41 @@
 
 # This script is executed inside gate_hook function in devstack gate.
 
+STORAGE_DRIVER="$1"
+SQL_DRIVER="$2"
 
-ENABLED_SERVICES="key,gnocchi-api,s-proxy,s-account,s-container,s-object,"
+ENABLED_SERVICES="key,gnocchi-api,"
 ENABLED_SERVICES+="ceilometer-acentral,ceilometer-collector,ceilometer-api,"
-ENABLED_SERVICES+="ceilometer-alarm-notifier,ceilometer-alarm-evaluator,ceilometer-anotification"
+ENABLED_SERVICES+="ceilometer-alarm-notifier,ceilometer-alarm-evaluator,ceilometer-anotification,"
+DEVSTACK_LOCAL_CONFIG=$'enable_plugin gnocchi https://github.com/stackforge/gnocchi master\n'
 
-export ENABLED_SERVICES
-export DEVSTACK_LOCAL_CONFIG='enable_plugin gnocchi https://github.com/stackforge/gnocchi master'
 export DEVSTACK_GATE_INSTALL_TESTONLY=1
 export DEVSTACK_GATE_NO_SERVICES=1
 export DEVSTACK_GATE_TEMPEST=0
 export DEVSTACK_GATE_EXERCISES=0
 export KEEP_LOCALRC=1
 
+case $STORAGE_DRIVER in
+    file)
+        DEVSTACK_LOCAL_CONFIG+=$'export GNOCCHI_STORAGE_BACKEND=file\n'
+        ;;
+    swift)
+        ENABLED_SERVICES+="s-proxy,s-account,s-container,s-object,"
+        DEVSTACK_LOCAL_CONFIG+=$'export GNOCCHI_STORAGE_BACKEND=swift\n'
+        ;;
+    ceph)
+        ENABLED_SERVICES+="ceph"
+        DEVSTACK_LOCAL_CONFIG+=$'export GNOCCHI_STORAGE_BACKEND=ceph\n'
+        ;;
+esac
 
+
+# default to mysql
+case $SQL_DRIVER in
+    postgresql)
+        export DEVSTACK_GATE_POSTGRES=1
+        ;;
+esac
+
+export ENABLED_SERVICES
+export DEVSTACK_LOCAL_CONFIG
