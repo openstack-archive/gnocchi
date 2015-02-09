@@ -43,23 +43,31 @@ class TestStorageDriver(tests_base.TestCase):
 
     def test_delete_empty_metric(self):
         self.storage.create_metric("foo", self.archive_policies['low'])
-        self.storage.delete_metric("foo")
+        self.storage.delete_metric(self.archive_policies['low'], "foo")
 
     def test_delete_nonempty_metric(self):
         self.storage.create_metric("foo", self.archive_policies['low'])
-        self.storage.add_measures('foo', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
-        ])
-        self.storage.delete_metric("foo")
+        self.storage.add_measures(
+            self.archive_policies['low'],
+            'foo',
+            [
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+            ],
+        )
+        self.storage.delete_metric(self.archive_policies['low'], "foo")
 
     def test_add_and_get_measures(self):
         self.storage.create_metric("foo", self.archive_policies['low'])
-        self.storage.add_measures('foo', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 44),
-        ])
+        self.storage.add_measures(
+            self.archive_policies['low'],
+            'foo',
+            [
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 44),
+            ],
+        )
 
         self.assertEqual([
             (datetime.datetime(2014, 1, 1), 86400.0, 39.75),
@@ -120,18 +128,26 @@ class TestStorageDriver(tests_base.TestCase):
     def test_add_and_get_cross_metric_measures(self):
         self.storage.create_metric("foo", self.archive_policies['low'])
         self.storage.create_metric("bar", self.archive_policies['low'])
-        self.storage.add_measures('foo', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 44),
-        ])
-        self.storage.add_measures('bar', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 41), 2),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 10, 31), 4),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 4),
-        ])
+        self.storage.add_measures(
+            self.archive_policies['low'],
+            'foo',
+            [
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 44),
+            ],
+        )
+        self.storage.add_measures(
+            self.archive_policies['low'],
+            'bar',
+            [
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 41), 2),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 10, 31), 4),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 4),
+            ],
+        )
 
         values = self.storage.get_cross_metric_measures(['foo', 'bar'])
         self.assertEqual([
@@ -176,19 +192,27 @@ class TestStorageDriver(tests_base.TestCase):
     def test_add_and_get_cross_metric_measures_with_holes(self):
         self.storage.create_metric("foo", self.archive_policies['low'])
         self.storage.create_metric("bar", self.archive_policies['low'])
-        self.storage.add_measures('foo', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 5, 31), 8),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 42),
-        ])
-        self.storage.add_measures('bar', [
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 2),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 6),
-            storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
-        ])
+        self.storage.add_measures(
+            self.archive_policies['low'],
+            'foo',
+            [
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 5, 31), 8),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 42),
+            ],
+        )
+        self.storage.add_measures(
+            self.archive_policies['low'],
+            'bar',
+            [
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 2),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 6),
+                storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
+            ],
+        )
 
         values = self.storage.get_cross_metric_measures(['foo', 'bar'])
         self.assertEqual([

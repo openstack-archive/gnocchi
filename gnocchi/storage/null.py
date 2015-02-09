@@ -28,7 +28,7 @@ class NullStorage(storage.StorageDriver):
             raise storage.MetricAlreadyExists(metric)
         self.metrics[metric] = True
 
-    def delete_metric(self, metric):
+    def delete_metric(self, archive_policy, metric):
         try:
             del self.metrics[metric]
         except KeyError:

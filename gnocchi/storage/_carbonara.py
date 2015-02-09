@@ -23,7 +23,6 @@ from concurrent import futures
 from oslo.config import cfg
 from tooz import coordination
 
-from gnocchi import archive_policy
 from gnocchi import carbonara
 from gnocchi import storage
 
@@ -59,19 +58,12 @@ class CarbonaraBasedStorageToozLock(object):
 class CarbonaraBasedStorage(storage.StorageDriver):
     def __init__(self, conf):
         super(CarbonaraBasedStorage, self).__init__(conf)
-        self.aggregation_types = list(
-            archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS)
         self.executor = futures.ThreadPoolExecutor(
             max_workers=(conf.aggregation_workers_number or
                          multiprocessing.cpu_count()))
-        # NOTE(jd) So this is a (smart?) optimization: since we're going to
-        # lock for each of this aggregation type, if we are using running
-        # Gnocchi with multiple processes, let's randomize what we iter
-        # over so there are less chances we fight for the same lock!
-        random.shuffle(self.aggregation_types)
 
     @staticmethod
-    def _create_metric_container(metric):
+    def _create_metric_container(metric, archive_policy):
         pass
 
     @staticmethod
@@ -79,7 +71,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         raise NotImplementedError
 
     def create_metric(self, metric, archive_policy):
-        self._create_metric_container(metric)
+        self._create_metric_container(metric, archive_policy)
         for aggregation in archive_policy.aggregation_methods:
             # TODO(jd) Having the TimeSerieArchive.full_res_timeserie duped in
             # each archive isn't the most efficient way of doing things. We
@@ -122,14 +114,20 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             self._store_metric_measures(metric, aggregation,
                                         archive.serialize())
 
-    def add_measures(self, metric, measures):
+    def add_measures(self, archive_policy, metric, measures):
         # We are going to iterate multiple time over measures, so if it's a
         # generator we need to build a list out of it right now.
         measures = list(measures)
+        # NOTE(jd) So this is a (smart?) optimization: since we're going to
+        # lock for each of this aggregation type, if we are using running
+        # Gnocchi with multiple processes, let's randomize what we iter
+        # over so there are less chances we fight for the same lock!
+        agg_methods = list(archive_policy.aggregation_methods)
+        random.shuffle(agg_methods)
         self._map_in_thread(self._add_measures,
                             list((aggregation, metric, measures)
                                  for aggregation
-                                 in self.aggregation_types))
+                                 in agg_methods))
 
     def get_cross_metric_measures(self, metrics, from_timestamp=None,
                                   to_timestamp=None, aggregation='mean',

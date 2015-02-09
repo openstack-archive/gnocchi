@@ -349,22 +349,18 @@ class MetricController(rest.RestController):
         voluptuous.Required("value"): voluptuous.Any(float, int),
     }])
 
-    def enforce_metric(self, rule):
-        metrics = pecan.request.indexer.get_metrics((self.metric_id,))
-        if not metrics:
-            pecan.abort(404, storage.MetricDoesNotExist(self.metric_id))
-        enforce(rule, metrics[0])
-
-    @pecan.expose('json')
-    def get_all(self, **kwargs):
-        details = get_details(kwargs)
+    def enforce_metric(self, rule, details=False):
         metrics = pecan.request.indexer.get_metrics((self.metric_id,),
                                                     details=details)
         if not metrics:
             pecan.abort(404, storage.MetricDoesNotExist(self.metric_id))
+        enforce(rule, metrics[0])
+        return metrics
 
-        metric = metrics[0]
-        enforce("get metric", metric)
+    @pecan.expose('json')
+    def get_all(self, **kwargs):
+        details = get_details(kwargs)
+        metric = self.enforce_metric("get metric", details)[0]
 
         if details:
             metric['archive_policy'] = (
@@ -375,9 +371,11 @@ class MetricController(rest.RestController):
 
     @vexpose(Measures)
     def post_measures(self, body):
-        self.enforce_metric("post measures")
+        metric = self.enforce_metric("post measures", details=True)[0]
         try:
             pecan.request.storage.add_measures(
+                archive_policy.ArchivePolicy.from_dict(
+                    metric['archive_policy']),
                 self.metric_id,
                 (storage.Measure(
                     m['timestamp'],
@@ -436,9 +434,12 @@ class MetricController(rest.RestController):
 
     @pecan.expose()
     def delete(self):
-        self.enforce_metric("delete metric")
+        metric = self.enforce_metric("delete metric", details=True)[0]
         try:
-            pecan.request.storage.delete_metric(self.metric_id)
+            pecan.request.storage.delete_metric(
+                archive_policy.ArchivePolicy.from_dict(
+                    metric['archive_policy']),
+                self.metric_id)
         except storage.MetricDoesNotExist as e:
             pecan.abort(404, str(e))
         pecan.request.indexer.delete_metric(self.metric_id)
@@ -694,7 +695,10 @@ class GenericResourceController(rest.RestController):
             enforce("delete metric", metric)
         for metric in metrics:
             try:
-                pecan.request.storage.delete_metric(str(metric['id']))
+                pecan.request.storage.delete_metric(
+                    archive_policy.ArchivePolicy.from_dict(
+                        metric['archive_policy']),
+                    str(metric['id']))
             except Exception:
                 LOG.error(
                     "Unable to delete metric `%s' from storage, "

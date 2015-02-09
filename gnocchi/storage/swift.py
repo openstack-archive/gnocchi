@@ -60,7 +60,7 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             tenant_name=conf.swift_tenant_name)
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
 
-    def _create_metric_container(self, metric):
+    def _create_metric_container(self, metric, archive_policy):
         # TODO(jd) A container per user in their account?
         resp = {}
         self.swift.put_container(metric, response_dict=resp)
@@ -72,9 +72,9 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     def _store_metric_measures(self, metric, aggregation, data):
         self.swift.put_object(metric, aggregation, data)
 
-    def delete_metric(self, metric):
+    def delete_metric(self, archive_policy, metric):
         try:
-            for aggregation in self.aggregation_types:
+            for aggregation in archive_policy.aggregation_methods:
                 try:
                     self.swift.delete_object(metric, aggregation)
                 except swclient.ClientException as e:

@@ -106,9 +106,10 @@ class StorageDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
-    def add_measures(metric, measures):
+    def add_measures(archive_policy, metric, measures):
         """Add a measure to an metric.
 
+        :param archive_policy: The archive policy used by this metric.
         :param metric: The metric measured.
         :param measures: The actual measures.
         """
@@ -127,7 +128,7 @@ class StorageDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
-    def delete_metric(metric):
+    def delete_metric(archive_policy, metric):
         raise exceptions.NotImplementedError
 
     @staticmethod

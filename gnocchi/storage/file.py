@@ -40,7 +40,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         self.basepath = conf.file_basepath
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
 
-    def _create_metric_container(self, metric):
+    def _create_metric_container(self, metric, archive_policy):
         path = os.path.join(self.basepath, metric)
         try:
             os.mkdir(path, 0o750)
@@ -54,7 +54,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         with open(path, 'wb') as aggregation_file:
             aggregation_file.write(data)
 
-    def delete_metric(self, metric):
+    def delete_metric(self, archive_policy, metric):
         path = os.path.join(self.basepath, metric)
         try:
             shutil.rmtree(path)
