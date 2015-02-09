@@ -16,13 +16,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import multiprocessing
 import os
-import socket
 import uuid
-from wsgiref import simple_server
 
 from flask import json as flask_json
-import netaddr
 from oslo.config import cfg
 from oslo.utils import importutils
 from oslo_log import log
@@ -30,6 +28,7 @@ from oslo_serialization import jsonutils
 import pecan
 from pecan import templating
 import six
+from werkzeug import serving
 from werkzeug import wsgi
 
 from gnocchi import indexer
@@ -56,12 +55,23 @@ OPTS = [
     cfg.MultiStrOpt('middlewares',
                     default=['keystonemiddleware.auth_token.AuthProtocol'],
                     help='Middlewares to use',),
+    cfg.IntOpt('workers',
+               help='Number of workers for Gnocchi API server. '
+               'By default the available number of CPU is used.'),
 ]
 
 opt_group = cfg.OptGroup(name='api',
                          title='Options for the gnocchi-api service')
 cfg.CONF.register_group(opt_group)
 cfg.CONF.register_opts(OPTS, opt_group)
+
+
+try:
+    default_workers = multiprocessing.cpu_count() or 1
+except NotImplementedError:
+    default_workers = 1
+
+cfg.set_defaults(OPTS, workers=default_workers)
 
 
 class DBHook(pecan.hooks.PecanHook):
@@ -150,23 +160,7 @@ def setup_app(pecan_config=PECAN_CONFIG):
     return app
 
 
-def get_server_cls(host):
-    """Return an appropriate WSGI server class base on provided host
-
-    :param host: The listen host for the ceilometer API server.
-    """
-    server_cls = simple_server.WSGIServer
-    if netaddr.valid_ipv6(host):
-        # NOTE(dzyu) make sure use IPv6 sockets if host is in IPv6 pattern
-        if getattr(server_cls, 'address_family') == socket.AF_INET:
-            class server_cls(server_cls):
-                address_family = socket.AF_INET6
-    return server_cls
-
-
 def build_server():
-    srv = simple_server.make_server(cfg.CONF.api.host,
-                                    cfg.CONF.api.port,
-                                    setup_app(),
-                                    get_server_cls(cfg.CONF.api.host))
-    srv.serve_forever()
+    serving.run_simple(cfg.CONF.api.host, cfg.CONF.api.port,
+                       setup_app(),
+                       processes=cfg.CONF.api.workers)
