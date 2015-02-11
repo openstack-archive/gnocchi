@@ -42,6 +42,15 @@ class TestStorageDriver(tests_base.TestCase):
                           self.storage.create_metric,
                           metric_name, self.archive_policies['low'])
 
+    def test_create_metric_already_exists_new_aggregation_methods_change(self):
+        metric_name = str(uuid.uuid4())
+        self.archive_policies['low'].aggregation_methods = ['mean']
+        self.storage.create_metric(metric_name, self.archive_policies['low'])
+        self.archive_policies['low'].aggregation_methods = ['sum']
+        self.assertRaises(storage.MetricAlreadyExists,
+                          self.storage.create_metric,
+                          metric_name, self.archive_policies['low'])
+
     def test_delete_empty_metric(self):
         metric_name = str(uuid.uuid4())
         self.storage.create_metric(metric_name, self.archive_policies['low'])
