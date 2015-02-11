@@ -15,6 +15,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import copy
 import functools
 import os
 import uuid
@@ -336,10 +337,10 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
         with self.coord.get_lock(b"gnocchi-tests-db-lock"):
             self.index.upgrade()
 
-        self.archive_policies = self.ARCHIVE_POLICIES
+        self.archive_policies = copy.copy(self.ARCHIVE_POLICIES)
         # Used in gnocchi.gendoc
         if not getattr(self, "skip_archive_policies_creation", False):
-            for name, ap in six.iteritems(self.ARCHIVE_POLICIES):
+            for name, ap in six.iteritems(self.archive_policies):
                 # Create basic archive policies
                 try:
                     self.index.create_archive_policy(ap)
