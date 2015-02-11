@@ -13,6 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import copy
 import datetime
 import uuid
 
@@ -41,6 +42,16 @@ class TestStorageDriver(tests_base.TestCase):
         self.assertRaises(storage.MetricAlreadyExists,
                           self.storage.create_metric,
                           metric_name, self.archive_policies['low'])
+
+    def test_create_metric_already_exists_new_aggregation_methods_change(self):
+        archive_policy = copy.deepcopy(self.archive_policies['low'])
+        metric_name = str(uuid.uuid4())
+        archive_policy.aggregation_methods = ['mean']
+        self.storage.create_metric(metric_name, archive_policy)
+        archive_policy.aggregation_methods = ['sum']
+        self.assertRaises(storage.MetricAlreadyExists,
+                          self.storage.create_metric,
+                          metric_name, archive_policy)
 
     def test_delete_empty_metric(self):
         metric_name = str(uuid.uuid4())
