@@ -35,16 +35,12 @@ LOG = log.getLogger(__name__)
 
 OPTS = [
     cfg.StrOpt('resource_id',
-               required=True,
                help='Resource UUID to use to identify statsd in Gnocchi'),
     cfg.StrOpt('user_id',
-               required=True,
                help='User UUID to use to identify statsd in Gnocchi'),
     cfg.StrOpt('project_id',
-               required=True,
                help='Project UUID to use to identify statsd in Gnocchi'),
     cfg.StrOpt('archive_policy_name',
-               required=True,
                help='Archive policy name to use when creating metrics'),
 ]
 
