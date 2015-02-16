@@ -208,3 +208,29 @@ class TestStorageDriver(tests_base.TestCase):
             (datetime.datetime(2014, 1, 1, 12, 5, 0), 300.0, 11.0),
             (datetime.datetime(2014, 1, 1, 12, 10, 0), 300.0, 22.0)
         ], values)
+
+    def test_search_value(self):
+        m1 = str(uuid.uuid4())
+        m2 = str(uuid.uuid4())
+        self.storage.create_metric(m1, self.archive_policies['low'])
+        self.storage.create_metric(m2, self.archive_policies['low'])
+        self.storage.add_measures(m1, [
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 5, 31), 8),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 42),
+        ])
+        self.storage.add_measures(m2, [
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 9),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 2),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 6),
+            storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
+        ])
+
+        self.assertEqual(
+            {m2: [],
+             m1: [(datetime.datetime(2014, 1, 1, 12), 300, 69)]},
+            self.storage.search_value(
+                [m1, m2],
+                lambda v: v > 50))
