@@ -1,0 +1,6 @@
+
+# This file is used to map a metric name to corresponding archive policy
+# Format is: <metric_name>: <policy>
+
+#cpu_utils: "high"
+#disk.*: "low"

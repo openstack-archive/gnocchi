@@ -26,7 +26,7 @@ import requests
 import testscenarios
 
 from gnocchi.ceilometer import dispatcher
-
+from gnocchi import service
 
 load_tests = testscenarios.load_tests_apply_scenarios
 
@@ -43,9 +43,11 @@ class json_matcher(object):
 
 
 class DispatcherTest(base.BaseTestCase):
+
     def setUp(self):
         super(DispatcherTest, self).setUp()
         self.conf = self.useFixture(config_fixture.Config())
+        service.prepare_service([])
         self.resource_id = str(uuid.uuid4())
         self.samples = [{
             'counter_name': 'disk.root.size',
@@ -196,13 +198,13 @@ class DispatcherWorkflowTest(base.BaseTestCase,
     def setUp(self):
         super(DispatcherWorkflowTest, self).setUp()
         self.conf = self.useFixture(config_fixture.Config())
-
         ks_client = mock.Mock(auth_token='fake_token')
         ks_client.users.find.return_value = 'gnocchi'
         self.useFixture(mockpatch.Patch(
             'gnocchi.ceilometer.utils.ksclient.Client',
             return_value=ks_client))
 
+        service.prepare_service([])
         self.dispatcher = dispatcher.GnocchiDispatcher(self.conf.conf)
         self.sample['resource_id'] = str(uuid.uuid4())
 
