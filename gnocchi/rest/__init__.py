@@ -760,6 +760,11 @@ class VolumeResourceController(GenericResourceController):
     })
 
 
+def _SearchSchema(v):
+    """Helper method to indirect the recursivity of the search schema"""
+    return GenericResourcesController.SearchSchema(v)
+
+
 class GenericResourcesController(rest.RestController):
     _resource_type = 'generic'
     _resource_rest_class = GenericResourceController
@@ -801,7 +806,7 @@ class GenericResourcesController(rest.RestController):
 
     @pecan.expose('json')
     def get_all(self, **kwargs):
-        attr_filter = {}
+        details = get_details(kwargs)
 
         try:
             enforce("list all resource", {
@@ -813,32 +818,51 @@ class GenericResourcesController(rest.RestController):
             })
             user, project = get_user_and_project()
             attr_filter = {"and": [{"=": {"created_by_user_id": user}},
+                                   {"=": {"created_by_project_id": project}}]}
+        else:
+            attr_filter = {}
+
+        try:
+            return pecan.request.indexer.list_resources(
+                self._resource_type,
+                attribute_filter=attr_filter,
+                details=details)
+        except indexer.ResourceAttributeError as e:
+            pecan.abort(400, e)
+
+    SearchSchema = voluptuous.Schema(
+        voluptuous.All(
+            voluptuous.Length(min=1, max=1),
+            {
+                voluptuous.Any("=", "<=", ">=", "!=", "in", "like"):
+                voluptuous.All(voluptuous.Length(min=1, max=1), dict),
+                voluptuous.Any("and", "or", "not"): [_SearchSchema],
+            }
+        )
+    )
+
+    @pecan.expose('json')
+    def search(self, **kwargs):
+        if pecan.request.body:
+            attr_filter = deserialize(self.SearchSchema)
+        else:
+            attr_filter = {}
+
+        details = get_details(kwargs)
+
+        try:
+            enforce("search all resource", {
+                "resource_type": self._resource_type,
+            })
+        except webob.exc.HTTPForbidden:
+            enforce("search resource", {
+                "resource_type": self._resource_type,
+            })
+            user, project = get_user_and_project()
+            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
                                    {"=": {"created_by_project_id": project}},
                                    attr_filter]}
 
-        started_after = kwargs.pop('started_after', None)
-        ended_before = kwargs.pop('ended_before', None)
-        details = get_details(kwargs)
-
-        if started_after is not None:
-            try:
-                started_after = Timestamp(started_after)
-            except Exception:
-                pecan.abort(400, "Unable to parse started_after timestamp")
-            attr_filter = {"and": [{">=": {"started_at": started_after}},
-                                   attr_filter]}
-        if ended_before is not None:
-            try:
-                ended_before = Timestamp(ended_before)
-            except Exception:
-                pecan.abort(400, "Unable to parse ended_before timestamp")
-            attr_filter = {"and": [{"<": {"started_at": ended_before}},
-                                   attr_filter]}
-        for k, v in six.iteritems(kwargs):
-            # Transform empty string to None (NULL)
-            if v == '':
-                v = None
-            attr_filter = {"and": [{"=": {k: v}}, attr_filter]}
         try:
             return pecan.request.indexer.list_resources(
                 self._resource_type,

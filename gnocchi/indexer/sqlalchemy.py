@@ -515,16 +515,16 @@ class QueryAttributeError(AttributeError):
 
 
 class QueryTransformer(object):
-    operators = {"=": operator.eq,
-                 "<": operator.lt,
-                 ">": operator.gt,
-                 "<=": operator.le,
-                 "=<": operator.le,
-                 ">=": operator.ge,
-                 "=>": operator.ge,
-                 "!=": operator.ne,
-                 "in": lambda field_name, values: field_name.in_(values),
-                 "=~": lambda field, value: field.op("regexp")(value)}
+    operators = {
+        "=": operator.eq,
+        "<": operator.lt,
+        ">": operator.gt,
+        "<=": operator.le,
+        ">=": operator.ge,
+        "!=": operator.ne,
+        "in": lambda field_name, values: field_name.in_(values),
+        "like": lambda field, value: field.like(value),
+    }
 
     complex_operators = {"or": sqlalchemy.or_,
                          "and": sqlalchemy.and_,
