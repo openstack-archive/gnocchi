@@ -28,6 +28,7 @@ from six.moves.urllib import parse as urllib_parse
 from stevedore import extension
 import testscenarios
 import webtest
+from webtest import utils
 
 from gnocchi import archive_policy
 from gnocchi import rest
@@ -133,6 +134,19 @@ class TestingApp(webtest.TestApp):
     def do_request(self, req, *args, **kwargs):
         req.headers['X-Auth-Token'] = self.token
         return super(TestingApp, self).do_request(req, *args, **kwargs)
+
+    def search(self, url, params=u'', headers=None, extra_environ=None,
+               status=None, upload_files=None, expect_errors=False,
+               content_type=None, xhr=False):
+        if xhr:
+            headers = self._add_xhr_header(headers)
+        return self._gen_request("SEARCH", url, params=params, headers=headers,
+                                 extra_environ=extra_environ, status=status,
+                                 upload_files=upload_files,
+                                 expect_errors=expect_errors,
+                                 content_type=content_type)
+
+    search_json = utils.json_method("SEARCH")
 
 
 class RestTest(tests_base.TestCase):
@@ -1526,109 +1540,34 @@ class ResourceTest(RestTest):
         result = self.app.get("/v1/metric/" + str(metric_id) + "/measures",
                               status=200)
 
-    def test_list_resources_with_null_field(self):
-        self.app.post_json("/v1/resource/" + self.resource_type,
-                           params=self.attributes,
-                           status=201)
-        result = self.app.get("/v1/resource/"
-                              + self.resource_type
-                              + "?ended_at=",
-                              status=200)
-        self.assertGreaterEqual(len(json.loads(result.text)), 1)
-
-    def test_list_resources_by_unknown_field(self):
-        result = self.app.get("/v1/resource/" + self.resource_type,
-                              params={"foo": "bar"},
-                              expect_errors=True,
-                              status=400)
-        self.assertEqual("text/plain", result.content_type)
-        self.assertIn("Resource " + self.resource_type
-                      + " has no foo attribute",
-                      result.text)
-
-    def test_list_resources_by_user(self):
+    def test_search_resources_by_user(self):
         u1 = str(uuid.uuid4())
         self.attributes['user_id'] = u1
         result = self.app.post_json(
             "/v1/resource/" + self.resource_type,
             params=self.attributes)
         created_resource = json.loads(result.text)
-        result = self.app.get("/v1/resource/generic",
-                              params={"user_id": u1},
-                              status=200)
+        result = self.app.search_json("/v1/resource/generic",
+                                      params={"=": {"user_id": u1}},
+                                      status=200)
         resources = json.loads(result.text)
         self.assertGreaterEqual(len(resources), 1)
-        result = self.app.get("/v1/resource/" + self.resource_type,
-                              params={"user_id": u1},
-                              status=200)
-        resources = json.loads(result.text)
-        self.assertGreaterEqual(len(resources), 1)
-        self.assertEqual(created_resource, resources[0])
-
-    def test_list_resources_by_project(self):
-        p1 = str(uuid.uuid4())
-        self.attributes['project_id'] = p1
-        result = self.app.post_json(
-            "/v1/resource/" + self.resource_type,
-            params=self.attributes)
-        created_resource = json.loads(result.text)
-        result = self.app.get("/v1/resource/generic",
-                              params={"project_id": p1},
-                              status=200)
-        resources = json.loads(result.text)
-        self.assertGreaterEqual(len(resources), 1)
-        result = self.app.get("/v1/resource/" + self.resource_type,
-                              params={"project_id": p1},
-                              status=200)
+        result = self.app.search_json("/v1/resource/" + self.resource_type,
+                                      params={"=": {"user_id": u1}},
+                                      status=200)
         resources = json.loads(result.text)
         self.assertGreaterEqual(len(resources), 1)
         self.assertEqual(created_resource, resources[0])
 
-    def test_list_resources(self):
-        # NOTE(jd) So this test is a bit fuzzy right now as we uses the same
-        # database for all tests and the tests are running concurrently, but
-        # for now it'll be better than nothing.
-        result = self.app.post_json(
-            "/v1/resource/generic",
-            params={
-                "id": str(uuid.uuid4()),
-                "started_at": "2014-01-01 02:02:02",
-                "user_id": str(uuid.uuid4()),
-                "project_id": str(uuid.uuid4()),
-            })
-        g = json.loads(result.text)
-        result = self.app.post_json(
-            "/v1/resource/" + self.resource_type,
-            params=self.attributes)
-        i = json.loads(result.text)
-        result = self.app.get("/v1/resource/generic", status=200)
-        resources = json.loads(result.text)
-        self.assertGreaterEqual(len(resources), 2)
+    def test_search_resources_by_unknown_field(self):
+        result = self.app.search_json("/v1/resource/" + self.resource_type,
+                                      params={"=": {"foobar": "baz"}},
+                                      status=400)
+        self.assertIn("Resource " + self.resource_type
+                      + " has no foobar attribute",
+                      result.text)
 
-        i_found = False
-        g_found = False
-        for r in resources:
-            if r['id'] == str(g['id']):
-                self.assertEqual(g, r)
-                g_found = True
-            elif r['id'] == str(i['id']):
-                i_found = True
-            if i_found and g_found:
-                break
-        else:
-            self.fail("Some resources were not found")
-
-        result = self.app.get("/v1/resource/" + self.resource_type)
-        resources = json.loads(result.text)
-        self.assertGreaterEqual(len(resources), 1)
-        for r in resources:
-            if r['id'] == str(i['id']):
-                self.assertEqual(i, r)
-                break
-        else:
-            self.fail("Some resources were not found")
-
-    def test_list_resources_started_after(self):
+    def test_search_resources_started_after(self):
         # NOTE(jd) So this test is a bit fuzzy right now as we uses the same
         # database for all tests and the tests are running concurrently, but
         # for now it'll be better than nothing.
@@ -1645,9 +1584,9 @@ class ResourceTest(RestTest):
             "/v1/resource/" + self.resource_type,
             params=self.attributes)
         i = json.loads(result.text)
-        result = self.app.get(
+        result = self.app.search_json(
             "/v1/resource/generic/",
-            params={"started_after": "2014-01-01"},
+            params={">=": {"started_at": "2014-01-01"}},
             status=200)
         resources = json.loads(result.text)
         self.assertGreaterEqual(len(resources), 2)
@@ -1665,9 +1604,10 @@ class ResourceTest(RestTest):
         else:
             self.fail("Some resources were not found")
 
-        result = self.app.get("/v1/resource/"
-                              + self.resource_type
-                              + "?started_after=2014-01-03")
+        result = self.app.search_json(
+            "/v1/resource/"
+            + self.resource_type,
+            params={">=": {"started_at": "2014-01-03"}})
         resources = json.loads(result.text)
         self.assertGreaterEqual(len(resources), 1)
         for r in resources:
@@ -1752,6 +1692,16 @@ class ResourceTest(RestTest):
     def test_list_resources_with_details_via_accept(self):
         self._do_test_list_resources_with_detail(
             lambda: self.app.get(
+                "/v1/resource/generic",
+                headers={"Accept": "application/json; details=true"}))
+
+    def test_search_resources_with_details(self):
+        self._do_test_list_resources_with_detail(
+            lambda: self.app.search("/v1/resource/generic?details=true"))
+
+    def test_search_resources_with_details_via_accept(self):
+        self._do_test_list_resources_with_detail(
+            lambda: self.app.search(
                 "/v1/resource/generic",
                 headers={"Accept": "application/json; details=true"}))
 
@@ -1994,6 +1944,45 @@ class GenericResourceTest(RestTest):
             for resource in resources:
                 if resource['id'] == resource_id:
                     self.fail("Resource found")
+
+    def test_search_resources_invalid_query(self):
+        result = self.app.search_json(
+            "/v1/resource/generic",
+            params={"wrongoperator": {"user_id": "bar"}},
+            status=400)
+        self.assertIn(
+            "Invalid input: extra keys not allowed @ data["
+            + repr(u'wrongoperator') + "]",
+            result.text)
+
+    def test_search_resources_with_like(self):
+        attributes = {
+            "id": str(uuid.uuid4()),
+            "started_at": "2014-01-03T02:02:02.000000",
+            "host": "computenode42",
+            "image_ref": "imageref!",
+            "flavor_id": 123,
+            "display_name": "myinstance",
+        }
+        result = self.app.post_json(
+            "/v1/resource/instance",
+            params=attributes)
+        created_resource = json.loads(result.text)
+
+        result = self.app.search_json(
+            "/v1/resource/instance",
+            params={"like": {"host": "computenode%"}},
+            status=200)
+
+        resources = json.loads(result.text)
+        self.assertIn(created_resource, resources)
+
+        result = self.app.search_json(
+            "/v1/resource/instance",
+            params={"like": {"host": str(uuid.uuid4())}},
+            status=200)
+        resources = json.loads(result.text)
+        self.assertEqual([], resources)
 
 
 ResourceTest.generate_scenarios()
