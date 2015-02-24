@@ -1,0 +1,55 @@
+{% extends "basic.j2" %}
+
+{% block head %}
+<link href="/static/css/c3.min.css" rel="stylesheet" type="text/css">
+{% endblock head %}
+
+{% block body %}
+<div class="container-fluid">
+  <div class="page-header">
+    <h1>Resource {{ display_name }}</h1>
+  </div>
+
+  <div class="page-body">
+    <dl>
+      <dt>id</dt>
+      <dd>{{ id }}</dd>
+
+      <dt>started_at</dt>
+      <dd>{{ started_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+
+      {%- if ended_at -%}
+      <dt>ended_at</dt>
+      <dd>{{ ended_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+
+      {% endif %}
+      <dt>type</dt>
+      <dd>{{ type }}</dd>
+
+      <dt>metrics</dt>
+      <dd>
+        <ul>
+          {% for key, value in metrics.iteritems() %}
+            <li>
+              <a href="/v1/metric/{{ value | e }}/measures">{{ key | e }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </dd>
+
+      <dt>user_id</dt>
+      <dd>{{ user_id }}</dd>
+
+      <dt>project_id</dt>
+      <dd>{{ project_id }}</dd>
+
+      <dt>created_by_project_id</dt>
+      <dd>{{ created_by_project_id }}</dd>
+
+      <dt>created_by_user_id</dt>
+      <dd>{{ created_by_user_id }}</dd>
+    </dl>
+    </div>
+  </div>
+
+{% endblock body %}
