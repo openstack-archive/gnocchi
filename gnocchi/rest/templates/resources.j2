@@ -5,6 +5,9 @@
 {% endblock head %}
 
 {% block body %}
+<script src="/static/js/d3.min.js" charset="utf-8"></script>
+<script src="/static/js/c3.min.js"></script>
+<script src="/static/js/gnocchi.js"></script>
 <div class="container-fluid">
   <div class="page-header">
     <h1>Resource {{ display_name }}</h1>
@@ -32,6 +35,7 @@
           {% for key, value in metrics.iteritems() %}
             <li>
               <a href="/v1/metric/{{ value | e }}/measures">{{ key | e }}</a>
+              <div id="{{ key|e }}-chart"></div>
             </li>
           {% endfor %}
         </ul>
@@ -52,4 +56,15 @@
     </div>
   </div>
 
+<script>
+$(function () {
+    var metrics = {{ metrics|tojson }}
+    $.each(metrics, function(name, id) {
+        url = '/v1/metric/' + id + '/measures'
+        $.get(url, function(measures) {
+            drawGraph('#' + name + '-chart', measures)
+        });
+    });
+});
+</script>
 {% endblock body %}
