@@ -28,6 +28,21 @@ import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
 
 from gnocchi import indexer
+from gnocchi.rest import app
+from gnocchi.tests import base as tests_base
+
+
+class GnocchiAppWithKeystone(object):
+    def __init__(self):
+        self._app = app.setup_app()
+
+    def __call__(self, environ, start_response):
+        environ['fake.cache'] = tests_base.FakeMemcache()
+        return self._app(environ, start_response)
+
+
+def interceptor():
+    return GnocchiAppWithKeystone()
 
 
 class ConfigFixture(fixture.GabbiFixture):
@@ -50,6 +65,27 @@ class ConfigFixture(fixture.GabbiFixture):
 
     def start_fixture(self):
         """Create necessary temp files and do the config dance."""
+
+        os.environ['GABBI_GNOCCHI_HOST'] = "localhost"
+        os.environ['GABBI_TOKEN_ADMIN'] = (
+            tests_base.FakeMemcache.VALID_TOKEN_ADMIN)
+        os.environ['GABBI_TOKEN_DEMO'] = (
+            tests_base.FakeMemcache.VALID_TOKEN)
+        os.environ['GABBI_TOKEN_DEMO2'] = (
+            tests_base.FakeMemcache.VALID_TOKEN_2)
+
+        os.environ['GABBI_PROJECT_ID_ADMIN'] = (
+            tests_base.FakeMemcache.PROJECT_ID_ADMIN)
+        os.environ['GABBI_USER_ID_ADMIN'] = (
+            tests_base.FakeMemcache.USER_ID_ADMIN)
+        os.environ['GABBI_PROJECT_ID_DEMO'] = (
+            tests_base.FakeMemcache.PROJECT_ID)
+        os.environ['GABBI_USER_ID_DEMO'] = (
+            tests_base.FakeMemcache.USER_ID)
+        os.environ['GABBI_PROJECT_ID_DEMO2'] = (
+            str(uuid.UUID(tests_base.FakeMemcache.PROJECT_ID_2)))
+        os.environ['GABBI_USER_ID_DEMO2'] = (
+            str(uuid.UUID(tests_base.FakeMemcache.USER_ID_2)))
 
         data_tmp_dir = tempfile.mkdtemp(prefix='gnocchi')
         coordination_dir = os.path.join(data_tmp_dir, 'tooz')
@@ -75,8 +111,10 @@ class ConfigFixture(fixture.GabbiFixture):
         conf.set_override('driver', 'sqlalchemy', 'indexer')
         conf.set_override('pecan_debug', False, 'api')
 
-        # Turn off any middleware.
-        conf.set_override('middlewares', [], 'api')
+        conf.import_opt("cache", "keystonemiddleware.auth_token",
+                        group="keystone_authtoken")
+        conf.set_override("cache", "fake.cache",
+                          group='keystone_authtoken')
 
         self.db_url = self._setup_database(conf)
         self.tmp_dir = data_tmp_dir

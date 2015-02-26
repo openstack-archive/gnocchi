@@ -88,6 +88,7 @@ def enforce(rule, target):
     }
 
     if not _ENFORCER.enforce(rule, target, creds):
+        raise Exception("%s, %s, %s" % (rule, target, creds))
         pecan.abort(403)
 
 

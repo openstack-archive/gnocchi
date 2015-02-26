@@ -13,13 +13,16 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import datetime
 import functools
+import json
 import os
 import uuid
 
 import fixtures
 from oslo.config import cfg
 from oslo.config import fixture as config_fixture
+from oslo.utils import timeutils
 from oslotest import base
 from oslotest import mockpatch
 import six
@@ -189,6 +192,70 @@ class FakeSwiftClient(object):
                                         http_status=404)
 
 
+class FakeMemcache(object):
+    VALID_TOKEN_ADMIN = '4562138218392830'
+    USER_ID_ADMIN = str(uuid.uuid4())
+    PROJECT_ID_ADMIN = str(uuid.uuid4())
+
+    VALID_TOKEN = '4562138218392831'
+    USER_ID = str(uuid.uuid4())
+    PROJECT_ID = str(uuid.uuid4())
+
+    VALID_TOKEN_2 = '4562138218392832'
+    # We replace "-" to simulate a middleware that would send UUID in a non
+    # normalized format.
+    USER_ID_2 = str(uuid.uuid4()).replace("-", "")
+    PROJECT_ID_2 = str(uuid.uuid4()).replace("-", "")
+
+    def get(self, key):
+        dt = datetime.datetime(
+            year=datetime.MAXYEAR, month=12, day=31,
+            hour=23, minute=59, second=59)
+        if key == "tokens/%s" % self.VALID_TOKEN_ADMIN:
+            return json.dumps(({'access': {
+                'token': {'id': self.VALID_TOKEN_ADMIN,
+                          'expires': timeutils.isotime(dt)},
+                'user': {
+                    'id': self.USER_ID_ADMIN,
+                    'name': 'adminusername',
+                    'tenantId': self.PROJECT_ID_ADMIN,
+                    'tenantName': 'myadmintenant',
+                    'roles': [
+                        {'name': 'admin'},
+                    ]},
+            }}, timeutils.isotime(dt)))
+        elif key == "tokens/%s" % self.VALID_TOKEN:
+            return json.dumps(({'access': {
+                'token': {'id': self.VALID_TOKEN,
+                          'expires': timeutils.isotime(dt)},
+                'user': {
+                    'id': self.USER_ID,
+                    'name': 'myusername',
+                    'tenantId': self.PROJECT_ID,
+                    'tenantName': 'mytenant',
+                    'roles': [
+                        {'name': 'member'},
+                    ]},
+            }}, timeutils.isotime(dt)))
+        elif key == "tokens/%s" % self.VALID_TOKEN_2:
+            return json.dumps(({'access': {
+                'token': {'id': self.VALID_TOKEN_2,
+                          'expires': timeutils.isotime(dt)},
+                'user': {
+                    'id': self.USER_ID_2,
+                    'name': 'myusername2',
+                    'tenantId': self.PROJECT_ID_2,
+                    'tenantName': 'mytenant2',
+                    'roles': [
+                        {'name': 'member'},
+                    ]},
+            }}, timeutils.isotime(dt)))
+
+    @staticmethod
+    def set(key, value, **kwargs):
+        pass
+
+
 @six.add_metaclass(SkipNotImplementedMeta)
 class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
 
@@ -298,8 +365,10 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
 
     def setUp(self):
         super(TestCase, self).setUp()
+
         self.config_fixture = config_fixture.Config()
         self.conf = self.useFixture(self.config_fixture).conf
+
         self.conf.import_opt('policy_file', 'gnocchi.openstack.common.policy')
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'))
@@ -367,5 +436,6 @@ class TestCase(base.BaseTestCase, testscenarios.TestWithScenarios):
         self.custom_agg = dict((x.name, x.obj) for x in self.mgr)
 
     def tearDown(self):
-        self.index.disconnect()
+        if not self.live:
+            self.index.disconnect()
         super(TestCase, self).tearDown()

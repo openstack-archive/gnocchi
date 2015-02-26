@@ -40,70 +40,6 @@ from gnocchi.tests import base as tests_base
 load_tests = testscenarios.load_tests_apply_scenarios
 
 
-class FakeMemcache(object):
-    VALID_TOKEN_ADMIN = '4562138218392830'
-    USER_ID_ADMIN = str(uuid.uuid4())
-    PROJECT_ID_ADMIN = str(uuid.uuid4())
-
-    VALID_TOKEN = '4562138218392831'
-    USER_ID = str(uuid.uuid4())
-    PROJECT_ID = str(uuid.uuid4())
-
-    VALID_TOKEN_2 = '4562138218392832'
-    # We replace "-" to simulate a middleware that would send UUID in a non
-    # normalized format.
-    USER_ID_2 = str(uuid.uuid4()).replace("-", "")
-    PROJECT_ID_2 = str(uuid.uuid4()).replace("-", "")
-
-    def get(self, key):
-        dt = datetime.datetime(
-            year=datetime.MAXYEAR, month=12, day=31,
-            hour=23, minute=59, second=59)
-        if key == "tokens/%s" % self.VALID_TOKEN_ADMIN:
-            return json.dumps(({'access': {
-                'token': {'id': self.VALID_TOKEN_ADMIN,
-                          'expires': timeutils.isotime(dt)},
-                'user': {
-                    'id': self.USER_ID_ADMIN,
-                    'name': 'adminusername',
-                    'tenantId': self.PROJECT_ID_ADMIN,
-                    'tenantName': 'myadmintenant',
-                    'roles': [
-                        {'name': 'admin'},
-                    ]},
-            }}, timeutils.isotime(dt)))
-        elif key == "tokens/%s" % self.VALID_TOKEN:
-            return json.dumps(({'access': {
-                'token': {'id': self.VALID_TOKEN,
-                          'expires': timeutils.isotime(dt)},
-                'user': {
-                    'id': self.USER_ID,
-                    'name': 'myusername',
-                    'tenantId': self.PROJECT_ID,
-                    'tenantName': 'mytenant',
-                    'roles': [
-                        {'name': 'member'},
-                    ]},
-            }}, timeutils.isotime(dt)))
-        elif key == "tokens/%s" % self.VALID_TOKEN_2:
-            return json.dumps(({'access': {
-                'token': {'id': self.VALID_TOKEN_2,
-                          'expires': timeutils.isotime(dt)},
-                'user': {
-                    'id': self.USER_ID_2,
-                    'name': 'myusername2',
-                    'tenantId': self.PROJECT_ID_2,
-                    'tenantName': 'mytenant2',
-                    'roles': [
-                        {'name': 'member'},
-                    ]},
-            }}, timeutils.isotime(dt)))
-
-    @staticmethod
-    def set(key, value, **kwargs):
-        pass
-
-
 class TestingApp(webtest.TestApp):
     CACHE_NAME = 'fake.cache'
 
@@ -111,15 +47,15 @@ class TestingApp(webtest.TestApp):
         self.auth = kwargs.pop('auth')
         super(TestingApp, self).__init__(*args, **kwargs)
         # Setup Keystone auth_token fake cache
-        self.extra_environ.update({self.CACHE_NAME: FakeMemcache()})
-        self.token = FakeMemcache.VALID_TOKEN
+        self.extra_environ.update({self.CACHE_NAME: tests_base.FakeMemcache()})
+        self.token = tests_base.FakeMemcache.VALID_TOKEN
 
     @contextlib.contextmanager
     def use_admin_user(self):
         if not self.auth:
             raise testcase.TestSkipped("No auth enabled")
         old_token = self.token
-        self.token = FakeMemcache.VALID_TOKEN_ADMIN
+        self.token = tests_base.FakeMemcache.VALID_TOKEN_ADMIN
         try:
             yield
         finally:
@@ -130,7 +66,7 @@ class TestingApp(webtest.TestApp):
         if not self.auth:
             raise testcase.TestSkipped("No auth enabled")
         old_token = self.token
-        self.token = FakeMemcache.VALID_TOKEN_2
+        self.token = tests_base.FakeMemcache.VALID_TOKEN_2
         try:
             yield
         finally:
@@ -691,7 +627,8 @@ class MetricTest(RestTest):
                       [r['id'] for r in json.loads(result.text)])
         # Only test that if we have auth enabled
         if self.middlewares:
-            result = self.app.get("/v1/metric?user_id=" + FakeMemcache.USER_ID)
+            result = self.app.get("/v1/metric?user_id=" +
+                                  tests_base.FakeMemcache.USER_ID)
             self.assertIn(metric['id'],
                           [r['id'] for r in json.loads(result.text)])
 
@@ -701,12 +638,14 @@ class MetricTest(RestTest):
             params={"archive_policy_name": "medium"})
         metric = json.loads(result.text)
         with self.app.use_admin_user():
-            result = self.app.get("/v1/metric?user_id=" + FakeMemcache.USER_ID)
+            result = self.app.get("/v1/metric?user_id=" +
+                                  tests_base.FakeMemcache.USER_ID)
         self.assertIn(metric['id'],
                       [r['id'] for r in json.loads(result.text)])
 
     def test_list_metric_invalid_user(self):
-        result = self.app.get("/v1/metric?user_id=" + FakeMemcache.USER_ID_2,
+        result = self.app.get("/v1/metric?user_id=" +
+                              tests_base.FakeMemcache.USER_ID_2,
                               status=403)
         self.assertIn("Insufficient privileges to filter by user/project",
                       result.text)
@@ -1107,8 +1046,10 @@ class ResourceTest(RestTest):
         self.attributes['id'] = str(uuid.uuid4())
         self.resource = self.attributes.copy()
         if self.middlewares:
-            self.resource['created_by_user_id'] = FakeMemcache.USER_ID
-            self.resource['created_by_project_id'] = FakeMemcache.PROJECT_ID
+            self.resource['created_by_user_id'] = (
+                tests_base.FakeMemcache.USER_ID)
+            self.resource['created_by_project_id'] = (
+                tests_base.FakeMemcache.PROJECT_ID)
         else:
             self.resource['created_by_user_id'] = None
             self.resource['created_by_project_id'] = None

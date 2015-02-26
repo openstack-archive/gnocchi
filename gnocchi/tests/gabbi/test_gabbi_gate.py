@@ -13,14 +13,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""A test module to exercise the Gnocchi API with gabbi."""
+"""A test module to exercise the Gnocchi API with gabbi on Gate."""
 
 import os
 
 from gabbi import driver
-
-from gnocchi.tests.gabbi import fixtures
-
 
 TESTS_DIR = 'gabbits'
 
@@ -28,6 +25,6 @@ TESTS_DIR = 'gabbits'
 def load_tests(loader, tests, pattern):
     """Provide a TestSuite to the discovery process."""
     test_dir = os.path.join(os.path.dirname(__file__), TESTS_DIR)
-    return driver.build_tests(test_dir, loader, host=None,
-                              intercept=fixtures.interceptor,
-                              fixture_module=fixtures)
+    host = os.getenv('GABBI_GNOCCHI_HOST')
+    port = os.getenv('GABBI_GNOCCHI_PORT', 8041)
+    return driver.build_tests(test_dir, loader, host=host, port=port)

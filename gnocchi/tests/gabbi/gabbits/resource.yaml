@@ -2,6 +2,10 @@
 # Test the resource API to achieve coverage of just the
 # ResourcesController and ResourceController class code.
 #
+defaults:
+  request_headers:
+    content-type: application/json
+    x-auth-token: $ENVIRON['GABBI_TOKEN_ADMIN']
 
 fixtures:
     - ConfigFixture
@@ -16,11 +20,8 @@ tests:
       desc: for later use
       url: /v1/archive_policy
       method: POST
-      request_headers:
-          content-type: application/json
-          x-roles: admin
       data:
-          name: medium
+          name: custom_medium
           definition:
               - granularity: 1 second
       status: 201
@@ -64,6 +65,7 @@ tests:
       desc: Expect 406 on bad accept type
       request_headers:
           accept: text/plain
+          x-auth-token: $ENVIRON['GABBI_TOKEN_ADMIN']
       url: /v1/resource/instance
       status: 406
       response_strings:
@@ -73,6 +75,7 @@ tests:
       desc: failover accept media type appropriately
       request_headers:
           accept: text/plain, application/json; q=0.8
+          x-auth-token: $ENVIRON['GABBI_TOKEN_ADMIN']
       url: /v1/resource/instance
       response_strings:
           - "[]"
@@ -85,69 +88,61 @@ tests:
       response_strings:
           - "[]"
 
-    - name: post resource no user-id
-      desc: https://bugs.launchpad.net/gnocchi/+bug/1424005
-      url: /v1/resource/generic
-      method: post
-      request_headers:
-          # Only provide one of these auth headers
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          content-type: application/json
-      data:
-          id: f93454f2-d8a5-4d67-9985-02511241e7f3
-          started_at: "2014-01-03T02:02:02.000000"
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-      status: 201
+# NOTE(sileht): not really possible with keystone middleware
+#    - name: post resource no user-id
+#      desc: https://bugs.launchpad.net/gnocchi/+bug/1424005
+#      url: /v1/resource/generic
+#      method: post
+#      request_headers:
+#          # Only provide one of these auth headers
+#          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+#          content-type: application/json
+#      data:
+#          id: f93454f2-d8a5-4d67-9985-02511241e7f3
+#          started_at: "2014-01-03T02:02:02.000000"
+#          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+#          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
+#      status: 201
 
     - name: post generic resource
       url: /v1/resource/generic
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
-          id: f93450f2-d8a5-4d67-9985-02511241e7d1
+          id: 8aac5dd2-137f-47b2-b5dd-a8a8cec67b24
           started_at: "2014-01-03T02:02:02.000000"
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
       status: 201
       response_headers:
-          location: $SCHEME://$NETLOC/v1/resource/generic/f93450f2-d8a5-4d67-9985-02511241e7d1
+          location: $SCHEME://$NETLOC/v1/resource/generic/8aac5dd2-137f-47b2-b5dd-a8a8cec67b24
           content-type: application/json; charset=UTF-8
       response_json_paths:
-          $.created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          $.created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          $.user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          $.created_by_user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          $.created_by_project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
+          $.user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
 
     - name: post same resource refuse
       desc: We can only post one identified resource once
       url: /v1/resource/generic
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
-          id: f93450f2-d8a5-4d67-9985-02511241e7d1
+          id: 8aac5dd2-137f-47b2-b5dd-a8a8cec67b24
           started_at: "2014-01-03T02:02:02.000000"
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
       status: 409
 
     - name: post generic resource bad content type
       url: /v1/resource/generic
       method: post
       request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
           content-type: text/plain
+          x-auth-token: $ENVIRON['GABBI_TOKEN_ADMIN']
       data:
-          id: f93450f2-d8a5-4d67-9985-02511241e7d1
+          id: 6fa587f9-f993-489b-b7ee-57a8241efd19
           started_at: "2014-01-03T02:02:02.000000"
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
       status: 415
 
 # Create a new instance resource, demonstrate that including no data
@@ -156,23 +151,15 @@ tests:
     - name: post instance resource no data
       url: /v1/resource/instance
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       status: 400
 
     - name: post instance resource
       url: /v1/resource/instance
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           id: 75C44741-CC60-4033-804E-2D3098C7D2E9
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
           flavor_id: 2
           image_ref: http://image
           host: compute1
@@ -187,10 +174,6 @@ tests:
     - name: patch instance resource
       url: $LOCATION
       method: patch
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           host: compute2
       status: 204
@@ -198,23 +181,15 @@ tests:
     - name: patch instance with metrics
       url: /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
       method: patch
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           metrics:
               disk.iops:
-                  archive_policy_name: medium
+                  archive_policy_name: custom_medium
       status: 204
 
     - name: patch instance bad metric association
       url: /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
       method: patch
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           metrics:
               disk.iops: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
@@ -225,10 +200,6 @@ tests:
     - name: patch instance with bad archive policy
       url: /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
       method: patch
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           metrics:
               disk.iops:
@@ -240,9 +211,6 @@ tests:
     - name: get patched resource
       desc: confirm the patched resource is properly patched
       url: /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       data:
           host: compute2
 
@@ -250,10 +218,6 @@ tests:
       desc: an empty dict in patch is an existence check
       url:  /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
       method: PATCH
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data: "{}"
       status: 204
 
@@ -263,10 +227,6 @@ tests:
       desc: providing no data is an error
       url:  /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
       method: PATCH
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       status: 400
       response_strings:
           - "Unable to decode body:"
@@ -275,10 +235,6 @@ tests:
       desc: providing data that is not a dict is an error
       url:  /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
       method: PATCH
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       status: 400
       data:
           - Beer and pickles
@@ -289,10 +245,6 @@ tests:
       desc: "patching something that doesn't exist is a 404"
       url: /v1/resource/instance/77777777-CC60-4033-804E-2D3098C7D2E9
       method: patch
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       status: 404
 
 # GET single resource failure modes
@@ -300,9 +252,6 @@ tests:
     - name: get noexist resource
       desc: if a resource does not exist 404
       url:  /v1/resource/instance/77777777-CC60-4033-804E-2D3098C7D2E9
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       status: 404
       response_strings:
           - The resource could not be found.
@@ -311,9 +260,6 @@ tests:
       desc: https://bugs.launchpad.net/gnocchi/+bug/1425588
       xfail: true
       url:  /v1/resource/instance/noexist
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       status: 404
       response_strings:
           - The resource could not be found.
@@ -322,39 +268,64 @@ tests:
 
     - name: list instance resources no auth
       url: /v1/resource/instance
-      response_strings:
-          - "[]"
+      request_headers:
+        content-type: application/json
+      status: 401
 
     - name: list instance resources
       url: /v1/resource/instance
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       response_json_paths:
           $[0].host: compute2
           $[-1].host: compute2
 
     - name: list all resources
       url: /v1/resource/generic
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       response_strings:
           - '"type": "generic"'
 
-# Metric handling when POSTing resources.
+    - name: list all resources filtered
+      url: /v1/resource/generic?type=instance&details=true
+      response_json_paths:
+          $[0].host: compute2
+          $[-1].host: compute2
+
+    - name: list all resources bad filter param
+      url: /v1/resource/generic?cow=instance&details=true
+      status: 400
+      response_strings:
+          - Resource generic has no cow attribute
+
+    - name: list all resource bad start time
+      url: /v1/resource/generic?started_after=my%20house%20caught%20fire
+      status: 400
+      response_strings:
+          - Unable to parse started_after timestamp
+
+    - name: list all resource bad end time
+      url: /v1/resource/generic?ended_before=my%20house%20caught%20fire
+      status: 400
+      response_strings:
+          - Unable to parse ended_before timestamp
+
+    - name: list all resources time bound
+      desc: legal time in past before test
+      url: /v1/resource/generic?started_after=1224880000&ended_before=1224890000
+      response_strings:
+          - '[]'
+
+    - name: list all resources null param
+      desc: legal time in past before test
+      url: /v1/resource/generic?type=&details=true
+      response_strings:
+          - '[]'
 
     - name: post new instance with non-existent metrics
       url: /v1/resource/instance
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           id: 85C44741-CC60-4033-804E-2D3098C7D2E9
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
           flavor_id: 2
           image_ref: http://image
           host: compute3
@@ -366,14 +337,10 @@ tests:
     - name: post new instance with metrics bad policy
       url: /v1/resource/instance
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           id: 85C44741-CC60-4033-804E-2D3098C7D2E9
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
           flavor_id: 2
           image_ref: http://image
           host: compute3
@@ -386,33 +353,28 @@ tests:
     - name: post new instance with metrics
       url: /v1/resource/instance
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           id: d13982cb-4cce-4f84-a96e-7581be1e599c
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
           flavor_id: 2
           image_ref: http://image
           host: compute3
           display_name: myvm2
           metrics:
               cpu.util:
-                  archive_policy_name: medium
+                  archive_policy_name: custom_medium
       status: 201
       response_json_paths:
-          created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          created_by_user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          created_by_project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
 
     - name: post new instance with metrics and un-normalized user/project id from keystone middleware
       url: /v1/resource/instance
       method: post
       request_headers:
-          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
-          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
           content-type: application/json
+          x-auth-token: $ENVIRON['GABBI_TOKEN_DEMO2']
       data:
           id: 85C44741-CC60-4033-804E-2D3098C7D2E9
           flavor_id: 2
@@ -421,19 +383,15 @@ tests:
           display_name: myvm2
           metrics:
               cpu.util:
-                  archive_policy_name: medium
+                  archive_policy_name: custom_medium
       status: 201
       response_json_paths:
-          created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          created_by_user_id: $ENVIRON['GABBI_USER_ID_DEMO2']
+          created_by_project_id: $ENVIRON['GABBI_PROJECT_ID_DEMO2']
 
 
     - name: get metrics for this resource
       url: /v1/resource/instance/$RESPONSE['$.id']/metric/cpu.util/measures
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       response_strings:
           - "[]"
 
@@ -441,21 +399,17 @@ tests:
       desc: "metric doesn't exist yet"
       url: /v1/resource/instance
       method: post
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
-          content-type: application/json
       data:
           id: 95C44741-CC60-4033-804E-2D3098C7D2E9
-          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          user_id: $ENVIRON['GABBI_USER_ID_ADMIN']
+          project_id: $ENVIRON['GABBI_PROJECT_ID_ADMIN']
           flavor_id: 2
           image_ref: http://image
           host: compute3
           display_name: myvm2
           metrics:
               cpu.util:
-                  archive_policy_name: medium
+                  archive_policy_name: custom_medium
           ended_at: "2001-12-15T02:59:43"
           started_at: "2014-12-15T02:59:43"
       status: 400
@@ -466,16 +420,10 @@ tests:
 
     - name: delete instance
       url: /v1/resource/instance/75C44741-CC60-4033-804E-2D3098C7D2E9
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       method: DELETE
       status: 204
 
     - name: delete noexist instance
       url: /v1/resource/instance/77777777-CC60-4033-804E-2D3098C7D2E9
-      request_headers:
-          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       method: DELETE
       status: 404
