@@ -69,6 +69,9 @@ GNOCCHI_CEPH_POOL=${GNOCCHI_CEPH_POOL:-gnocchi}
 GNOCCHI_CEPH_POOL_PG=${GNOCCHI_CEPH_POOL_PG:-8}
 GNOCCHI_CEPH_POOL_PGP=${GNOCCHI_CEPH_POOL_PGP:-8}
 
+# Gnocchi with keystone
+GNOCCHI_USE_KEYSTONE=${GNOCCHI_USE_KEYSTONE:-True}
+
 # Functions
 # ---------
 
@@ -193,6 +196,10 @@ function configure_gnocchi {
 
     if [ "$GNOCCHI_STORAGE_BACKEND" ]; then
         iniset $GNOCCHI_CONF storage driver "$GNOCCHI_STORAGE_BACKEND"
+    fi
+
+    if [ "$GNOCCHI_USE_KEYSTONE" != "True" ]; then
+        iniset $GNOCCHI_CONF api middlewares ""
     fi
 
     # Configure the indexer database
