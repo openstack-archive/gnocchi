@@ -31,4 +31,7 @@ token=$(keystone token-get | grep ' id ' | get_field 2)
 die_if_not_set $LINENO token "Keystone fail to get token"
 
 # NOTE(sileht): Just list policies for now
-curl -X GET $gnocchi_endpoint/v1/archive_policy -H "Content-Type: application/json" -H "X-Auth-Token: $token"
+#curl -X GET $gnocchi_endpoint/v1/archive_policy -H "Content-Type: application/json" -H "X-Auth-Token: $token"
+
+export GABBI_GNOCCHI_HOST=localhost
+sudo -E tox -epy27-gabbi
