@@ -32,3 +32,14 @@ die_if_not_set $LINENO token "Keystone fail to get token"
 
 # NOTE(sileht): Just list policies for now
 curl -X GET $gnocchi_endpoint/v1/archive_policy -H "Content-Type: application/json" -H "X-Auth-Token: $token"
+
+add_dash(){
+    read uuid
+    echo ${uuid:0:8}-${uuid:8:4}-${uuid:12:4}-${uuid:16:4}-${uuid:20}
+}
+
+export GABBI_GNOCCHI_HOST=localhost
+export GABBI_ADMIN_TOKEN=$token
+export GABBI_ADMIN_USER_ID=$(keystone user-get admin | grep ' id ' | get_field 2 | add_dash)
+export GABBI_ADMIN_PROJECT_ID=$(keystone tenant-get admin | grep ' id ' | get_field 2 | add_dash)
+sudo -E tox -epy27-gabbi test_gabbi_gate.*
