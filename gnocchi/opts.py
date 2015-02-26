@@ -21,6 +21,7 @@ import gnocchi.rest.app
 import gnocchi.statsd
 import gnocchi.storage
 import gnocchi.storage.file
+import gnocchi.storage.kairosdb
 import gnocchi.storage.swift
 
 
@@ -32,6 +33,7 @@ def list_opts():
         ("api", gnocchi.rest.app.OPTS),
         ("storage", itertools.chain(gnocchi.storage.OPTS,
                                     gnocchi.storage.file.OPTS,
+                                    gnocchi.storage.kairosdb.OPTS,
                                     gnocchi.storage.swift.OPTS)),
         ("statsd", gnocchi.statsd.OPTS),
     ]
