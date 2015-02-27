@@ -15,9 +15,11 @@
 
 import cachetools
 from ceilometer.api.controllers.v2 import base
+from gnocchi import rest
 from oslo_config import cfg
 from oslo_serialization import jsonutils
 import requests
+import uuid
 import wsme
 from wsme import types as wtypes
 
@@ -33,6 +35,17 @@ class GnocchiUnavailable(Exception):
 
 
 class AlarmGnocchiThresholdRule(base.AlarmRule):
+
+    def setUp(self):
+        self.gnocchi_url = cfg.CONF.alarm_gnocchi.url
+        self._ks_client = utils.get_keystone_client()
+
+    def _get_headers(self, content_type="application/json"):
+        return {
+            'Content-Type': content_type,
+            'X-Auth-Token': self._ks_client.auth_token,
+        }
+
     comparison_operator = base.AdvEnum('comparison_operator', str,
                                        'lt', 'le', 'eq', 'ne', 'ge', 'gt',
                                        default='eq')
@@ -94,7 +107,47 @@ class AlarmGnocchiMetricOfResourcesThresholdRule(AlarmGnocchiThresholdRule):
                                        'metric',
                                        'resource_constraint',
                                        'resource_type'])
-        return rule
+        self.setUp()
+        try:
+            uuid.UUID(rule['resource_constraint'])
+            url = ("%s/v1/resource/%s/%s") % (self.gnocchi_url,
+                                              rule['resource_type'],
+                                              rule['resource_constraint'])
+        except ValueError:
+            url = ("%s/v1/resource/%s?%s") % (self.gnocchi_url,
+                                              rule['resource_type'],
+                                              rule['resource_constraint'])
+
+        try:
+            r = requests.get(url, headers=self._get_headers())
+        except Exception:
+            raise
+
+        try:
+            fields = jsonutils.loads(r.text)
+            if not isinstance(fields, list):
+                fields = [fields]
+        except Exception:
+            raise Exception("Error with parsing response from metric.")
+
+        for resource in fields:
+            urlm = ("%s/v1/metric/%s?details=true") % (
+                self.gnocchi_url, resource['metrics'][rule['metric']])
+            try:
+                rm = requests.get(urlm, headers=self._get_headers())
+            except Exception:
+                raise
+            try:
+                fieldsm = jsonutils.loads(rm.text)
+            except Exception:
+                raise Exception("Error with parsing response from metric.")
+            for am in fieldsm['archive_policy']['definition']:
+                if (rule['evaluation_periods'] %
+                        rest.Timespan(am['granularity']) == 0):
+                    return rule
+        else:
+            raise Exception(
+                "Evaluation period doesn't matches with granularity.")
 
 
 class AlarmGnocchiMetricsThresholdRule(AlarmGnocchiThresholdRule):
@@ -106,4 +159,23 @@ class AlarmGnocchiMetricsThresholdRule(AlarmGnocchiThresholdRule):
                                        'threshold', 'aggregation_method',
                                        'evaluation_periods',
                                        'metrics'])
-        return rule
+        self.setUp()
+        for m in rule['metrics']:
+            url = ("%s/v1/metric/%s?details=true") % (self.gnocchi_url, m)
+            try:
+                r = requests.get(url, headers=self._get_headers())
+            except Exception:
+                raise
+
+            try:
+                fields = jsonutils.loads(r.text)
+            except Exception:
+                raise Exception("Error with parsing response.")
+
+            for a in fields['archive_policy']['definition']:
+                if (rule['evaluation_periods'] %
+                        rest.Timespan(a['granularity']) == 0):
+                    return rule
+        else:
+            raise Exception(
+                "Evaluation period doesn't matches with granularity.")
