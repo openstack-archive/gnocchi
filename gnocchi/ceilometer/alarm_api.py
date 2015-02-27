@@ -15,9 +15,11 @@
 
 import cachetools
 from ceilometer.api.controllers.v2 import base
+from gnocchi import rest
 from oslo_config import cfg
 from oslo_serialization import jsonutils
 import requests
+import uuid
 import wsme
 from wsme import types as wtypes
 
@@ -33,6 +35,18 @@ class GnocchiUnavailable(Exception):
 
 
 class AlarmGnocchiThresholdRule(base.AlarmRule):
+
+    def __init__(self, *args, **kwargs):
+        super(AlarmGnocchiThresholdRule, self).__init__(*args, **kwargs)
+        self.gnocchi_url = cfg.CONF.alarm_gnocchi.url
+        self._ks_client = utils.get_keystone_client()
+
+    def _get_headers(self, content_type="application/json"):
+        return {
+            'Content-Type': content_type,
+            'X-Auth-Token': self._ks_client.auth_token,
+        }
+
     comparison_operator = base.AdvEnum('comparison_operator', str,
                                        'lt', 'le', 'eq', 'ne', 'ge', 'gt',
                                        default='eq')
@@ -87,6 +101,50 @@ class AlarmGnocchiMetricOfResourcesThresholdRule(AlarmGnocchiThresholdRule):
     resource_type = wsme.wsattr(wtypes.text, mandatory=True)
     "The resource type"
 
+    @classmethod
+    def validate_alarm(cls, alarm):
+        rule = getattr(alarm, "%s_rule" % alarm.type)
+        super(AlarmGnocchiMetricOfResourcesThresholdRule,
+              rule).validate_alarm(alarm)
+        try:
+            uuid.UUID(rule.resource_constraint)
+            url = ("%s/v1/resource/%s/%s") % (rule.gnocchi_url,
+                                              rule.resource_type,
+                                              rule.resource_constraint)
+        except ValueError:
+            url = ("%s/v1/resource/%s?%s") % (rule.gnocchi_url,
+                                              rule.resource_type,
+                                              rule.resource_constraint)
+        try:
+            r = requests.get(url, headers=rule._get_headers())
+        except Exception:
+            raise
+        try:
+            fields = jsonutils.loads(r.text)
+            if not isinstance(fields, list):
+                fields = [fields]
+        except Exception:
+            raise Exception("Error with parsing response from metric.")
+
+        for resource in fields:
+            urlm = ("%s/v1/metric/%s?details=true") % (
+                rule.gnocchi_url, resource['metrics'][rule.metric])
+            try:
+                rm = requests.get(urlm, headers=rule._get_headers())
+            except Exception:
+                raise
+            try:
+                fieldsm = jsonutils.loads(rm.text)
+            except Exception:
+                raise Exception("Error with parsing response from metric.")
+            for am in fieldsm['archive_policy']['definition']:
+                if (rule.evaluation_periods %
+                        rest.Timespan(am['granularity']) == 0):
+                    return
+        else:
+            raise Exception(
+                "Evaluation period doesn't matches with granularity.")
+
     def as_dict(self):
         rule = self.as_dict_from_keys(['granularity', 'comparison_operator',
                                        'threshold', 'aggregation_method',
@@ -100,6 +158,31 @@ class AlarmGnocchiMetricOfResourcesThresholdRule(AlarmGnocchiThresholdRule):
 class AlarmGnocchiMetricsThresholdRule(AlarmGnocchiThresholdRule):
     metrics = wsme.wsattr([wtypes.text], mandatory=True)
     "A list of metric Ids"
+
+    @classmethod
+    def validate_alarm(cls, alarm):
+        rule = getattr(alarm, "%s_rule" % alarm.type)
+        super(AlarmGnocchiMetricsThresholdRule, rule).validate_alarm(alarm)
+
+        for m in rule.metrics:
+            url = ("%s/v1/metric/%s?details=true") % (rule.gnocchi_url, m)
+            try:
+                r = requests.get(url, headers=rule._get_headers())
+            except Exception:
+                raise
+
+            try:
+                fields = jsonutils.loads(r.text)
+            except Exception:
+                raise Exception("Error with parsing response.")
+
+            for a in fields['archive_policy']['definition']:
+                if (rule.evaluation_periods %
+                        rest.Timespan(a['granularity']) == 0):
+                    return
+        else:
+            raise Exception(
+                "Evaluation period doesn't matches with granularity.")
 
     def as_dict(self):
         rule = self.as_dict_from_keys(['granularity', 'comparison_operator',
