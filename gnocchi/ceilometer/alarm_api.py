@@ -15,6 +15,7 @@
 
 import cachetools
 from ceilometer.api.controllers.v2 import base
+from gnocchi import rest
 from oslo_config import cfg
 from oslo_serialization import jsonutils
 import requests
@@ -33,6 +34,17 @@ class GnocchiUnavailable(Exception):
 
 
 class AlarmGnocchiThresholdRule(base.AlarmRule):
+
+    def setUp(self):
+        self.gnocchi_url = cfg.CONF.alarm_gnocchi.url
+        self._ks_client = utils.get_keystone_client()
+
+    def _get_headers(self, content_type="application/json"):
+        return {
+            'Content-Type': content_type,
+            'X-Auth-Token': self._ks_client.auth_token,
+        }
+
     comparison_operator = base.AdvEnum('comparison_operator', str,
                                        'lt', 'le', 'eq', 'ne', 'ge', 'gt',
                                        default='eq')
@@ -106,4 +118,23 @@ class AlarmGnocchiMetricsThresholdRule(AlarmGnocchiThresholdRule):
                                        'threshold', 'aggregation_method',
                                        'evaluation_periods',
                                        'metrics'])
-        return rule
+        self.setUp()
+        for m in rule['metrics']:
+            url = ("%s/v1/metric/%s?details=true") % (self.gnocchi_url, m)
+            try:
+                r = requests.get(url, headers=self._get_headers())
+            except Exception:
+                raise
+
+            try:
+                fields = jsonutils.loads(r.text)
+            except Exception:
+                raise Exception("Error with parsing response.")
+
+            for a in fields['archive_policy']['definition']:
+                if (rule['evaluation_periods'] %
+                        rest.Timespan(a['granularity']) == 0):
+                    return rule
+        else:
+            raise Exception(
+                "Evaluation period doesn't matches with granularity.")
