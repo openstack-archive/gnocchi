@@ -1098,6 +1098,29 @@ class ResourceTest(RestTest):
                          result.headers['Location'])
         self.assertEqual(self.resource, resource)
 
+    def test_post_resource_short_uuid(self):
+        with self.app.use_another_user():
+            result = self.app.post_json(
+                "/v1/resource/" + self.resource_type,
+                params=self.attributes,
+                status=201)
+        resource = json.loads(result.text)
+        self.assertEqual("http://localhost/v1/resource/"
+                         + self.resource_type + "/" + self.attributes['id'],
+                         result.headers['Location'])
+
+        def uuid_with_dash(uuid):
+            dashed_uuid = list(uuid)
+            for i in [20, 16, 12, 8]:
+                dashed_uuid.insert(i, '-')
+            return "".join(dashed_uuid)
+
+        self.resource['created_by_user_id'] = uuid_with_dash(
+            FakeMemcache.USER_ID_2)
+        self.resource['created_by_project_id'] = uuid_with_dash(
+            FakeMemcache.PROJECT_ID_2)
+        self.assertEqual(self.resource, resource)
+
     def test_post_resource_with_invalid_metric(self):
         metric_id = str(uuid.uuid4())
         self.attributes['metrics'] = {"foo": metric_id}
