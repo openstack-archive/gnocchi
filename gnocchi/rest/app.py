@@ -2,8 +2,6 @@
 #
 # Copyright © 2014-2015 eNovance
 #
-# Authors: Julien Danjou <julien@danjou.info>
-#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -29,9 +27,11 @@ from oslo_serialization import jsonutils
 import pecan
 from pecan import templating
 import six
+import webob.exc
 from werkzeug import serving
 from werkzeug import wsgi
 
+from gnocchi import exceptions
 from gnocchi import indexer
 from gnocchi import storage
 
@@ -123,6 +123,18 @@ PECAN_CONFIG = {
 }
 
 
+class NotImplementedMiddleware(object):
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        try:
+            return self.app(environ, start_response)
+        except exceptions.NotImplementedError:
+            raise webob.exc.HTTPNotImplemented(
+                "Sorry this Gnocchi server does not implement this feature 😞")
+
+
 def setup_app(pecan_config=PECAN_CONFIG):
     conf = pecan_config['conf']
     s = pecan_config.get('storage')
@@ -157,6 +169,9 @@ def setup_app(pecan_config=PECAN_CONFIG):
         app,
         {"/static": root_dir + "/static"},
         cache=not conf.api.pecan_debug)
+
+    if pecan_config.get('not_implemented_middleware', True):
+        app = webob.exc.HTTPExceptionMiddleware(NotImplementedMiddleware(app))
 
     for middleware in reversed(pecan_config['conf'].api.middlewares):
         if not middleware:

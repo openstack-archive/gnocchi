@@ -156,6 +156,7 @@ class RestTest(tests_base.TestCase):
         c['conf'] = self.conf
         c['indexer'] = self.index
         c['storage'] = self.storage
+        c['not_implemented_middleware'] = False
         self.conf.import_opt("cache", "keystonemiddleware.auth_token",
                              group="keystone_authtoken")
         self.conf.set_override("cache", TestingApp.CACHE_NAME,
