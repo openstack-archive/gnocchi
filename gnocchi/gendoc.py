@@ -33,8 +33,6 @@ _RUN = False
 
 def _setup_test_app():
     t = test_rest.RestTest()
-    t.indexer_engine = 'sqlalchemy'
-    t.db_url = os.environ.get("GNOCCHI_TEST_PGSQL_URL")
     t.storage_engine = 'file'
     t.skip_archive_policies_creation = True
     t.setUp()
