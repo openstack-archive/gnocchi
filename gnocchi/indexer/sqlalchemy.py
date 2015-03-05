@@ -230,6 +230,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def __init__(self, conf):
         options.set_defaults(conf)
+        conf.set_override("connection", conf.indexer.url, "database")
         self.conf = conf
         self.qt = QueryTransformer()
 
