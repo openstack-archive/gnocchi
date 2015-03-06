@@ -161,6 +161,13 @@ class RestTest(tests_base.TestCase):
                              group="keystone_authtoken")
         self.conf.set_override("cache", TestingApp.CACHE_NAME,
                                group='keystone_authtoken')
+        # NOTE(jd) Override these options with values. They are not used, but
+        # if they are None (their defaults), the keystone authtoken middleware
+        # prints a warning… :(
+        self.conf.set_override("identity_uri", "foobar",
+                               group="keystone_authtoken")
+        self.conf.set_override("auth_uri", "foobar",
+                               group="keystone_authtoken")
         self.conf.import_opt("middlewares", "gnocchi.rest.app", group="api")
         if hasattr(self, "middlewares"):
             self.conf.set_override("middlewares",
