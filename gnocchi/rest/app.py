@@ -49,9 +49,8 @@ OPTS = [
                help='The listen IP for the Gnocchi API server.',
                ),
     cfg.BoolOpt('pecan_debug',
-                default='$debug',
-                help='Toggle Pecan Debug Middleware. '
-                'Defaults to global debug value.'
+                default=False,
+                help='Toggle Pecan Debug Middleware.'
                 ),
     cfg.MultiStrOpt('middlewares',
                     default=['keystonemiddleware.auth_token.AuthProtocol'],
