@@ -22,15 +22,15 @@ import uuid
 import warnings
 
 from gabbi import fixture
-from oslo.config import cfg
-from oslo.config import fixture as fixture_config
 import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
 
 from gnocchi import indexer
+from gnocchi.rest import app
+from gnocchi import service
 
 
-class ConfigFixture(fixture.GabbiFixture):
+class ConfigFixture(fixture.InterceptFixture):
     """Establish the relevant configuration fixture, per test file.
 
     Each test file gets its own oslo config and its own indexer and storage
@@ -44,7 +44,7 @@ class ConfigFixture(fixture.GabbiFixture):
     """
 
     def __init__(self):
-        self.conf = None
+        super(ConfigFixture, self).__init__(None, None, app.setup_app)
         self.db_url = None
         self.tmp_dir = None
 
@@ -56,19 +56,7 @@ class ConfigFixture(fixture.GabbiFixture):
         os.mkdir(coordination_dir)
         coordination_url = 'file://%s' % coordination_dir
 
-        fixture = fixture_config.Config()
-        conf = fixture.conf
-
-        try:
-            conf([], project='gnocchi', validate_default_values=True)
-        except cfg.ArgsAlreadyParsedError:
-            pass
-
-        conf.import_opt('file_basepath', 'gnocchi.storage.file',
-                        group='storage')
-
-        conf.set_override('policy_file',
-                          os.path.abspath('etc/gnocchi/policy.json'))
+        conf = service.prepare_service([])
         conf.set_override('file_basepath', data_tmp_dir, 'storage')
         conf.set_override('driver', 'file', 'storage')
         conf.set_override('coordination_url', coordination_url, 'storage')
@@ -80,12 +68,13 @@ class ConfigFixture(fixture.GabbiFixture):
 
         self.db_url = self._setup_database(conf)
         self.tmp_dir = data_tmp_dir
-        self.conf = conf
+
+        super(ConfigFixture, self).start_fixture()
 
     def stop_fixture(self):
         """Clean up the config fixture and storage artifacts."""
-        if self.conf:
-            self.conf.reset()
+        super(ConfigFixture, self).stop_fixture()
+
         if self.db_url:
             # Swallow noise from missing tables when dropping
             # database.
