@@ -75,12 +75,20 @@ class FakeRadosModule(object):
                                  flags):
             # Locking a not existing object create an empty one
             # so, do the same in test
+            if not isinstance(name, str):
+                raise TypeError("name in not a 'str' object")
+            if not isinstance(lock, str):
+                raise TypeError("lock in not a 'str' object")
             key = name.value.decode('ascii')
             if key not in self.kvs:
                 self.kvs[key] = ""
             return 0
 
         def rados_unlock(self, ctx, name, lock, locker):
+            if not isinstance(name, str):
+                raise TypeError("name in not a 'str' object")
+            if not isinstance(lock, str):
+                raise TypeError("lock in not a 'str' object")
             # Locking a not existing object create an empty one
             # so, do the same in test
             key = name.value.decode('ascii')
@@ -93,21 +101,29 @@ class FakeRadosModule(object):
             pass
 
         def write_full(self, key, value):
+            if not isinstance(key, str):
+                raise TypeError("key in not a 'str' object")
             self.kvs[key] = value
 
         def stat(self, key):
+            if not isinstance(key, str):
+                raise TypeError("key in not a 'str' object")
             if key not in self.kvs:
                 raise FakeRadosModule.ObjectNotFound
             else:
                 return (1024, "timestamp")
 
         def read(self, key, length=8192, offset=0):
+            if not isinstance(key, str):
+                raise TypeError("key in not a 'str' object")
             if key not in self.kvs:
                 raise FakeRadosModule.ObjectNotFound
             else:
                 return self.kvs[key][offset:offset+length]
 
         def remove_object(self, key):
+            if not isinstance(key, str):
+                raise TypeError("key in not a 'str' object")
             if key not in self.kvs:
                 raise FakeRadosModule.ObjectNotFound
             del self.kvs[key]
