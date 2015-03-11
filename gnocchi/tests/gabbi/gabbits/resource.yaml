@@ -383,6 +383,43 @@ tests:
                   archive_policy_name: noexist
       status: 400
 
+    - name: prepare metric for next test
+      url : /v1/metric
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      status: 201
+      data:
+          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          archive_policy_name: medium
+
+    - name: post new instance with metrics unicode
+      url: /v1/resource/instance
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: e47ce920-e1b5-49ea-aa4b-f7ef6148b5c8
+          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          flavor_id: 2
+          image_ref: http://image
+          host: compute3
+          display_name: myvm2
+          metrics:
+              '∞.unicode': $RESPONSE['id']
+      status: 201
+      response_json_paths:
+          created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          metrics:
+              '∞.unicode': $RESPONSE['id']
+
     - name: post new instance with metrics
       url: /v1/resource/instance
       method: post

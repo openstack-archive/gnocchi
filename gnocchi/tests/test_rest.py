@@ -1321,7 +1321,7 @@ class ResourceTest(RestTest):
                                     params=self.attributes,
                                     status=201)
         r = json.loads(result.text)
-        new_metrics = {'foo': {'archive_policy_name': "medium"}}
+        new_metrics = {u'foo\u221e': {'archive_policy_name': "medium"}}
         self.app.patch_json(
             "/v1/resource/" + self.resource_type + "/"
             + self.attributes['id'],
@@ -1331,7 +1331,7 @@ class ResourceTest(RestTest):
                               + self.resource_type + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
-        self.assertTrue(uuid.UUID(result['metrics']['foo']))
+        self.assertTrue(uuid.UUID(result['metrics'][u'foo\u221e']))
         del result['metrics']
         del r['metrics']
         self.assertEqual(r, result)
