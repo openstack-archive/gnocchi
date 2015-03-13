@@ -1,8 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
-# Copyright © 2014 eNovance
-#
-# Authors: Julien Danjou <julien@danjou.info>
+# Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -16,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import collections
+import operator
 
 from oslo.config import cfg
 from stevedore import driver
@@ -51,6 +50,104 @@ class Metric(object):
 
     def __hash__(self):
         return id(self)
+
+
+class InvalidQuery(Exception):
+    pass
+
+
+class MeasureQuery(object):
+    binary_operators = {
+        "=": operator.eq,
+        "==": operator.eq,
+        "eq": operator.eq,
+
+        "<": operator.lt,
+        "lt": operator.lt,
+
+        ">": operator.gt,
+        "gt": operator.gt,
+
+        "<=": operator.le,
+        "≤": operator.le,
+        "le": operator.le,
+
+        ">=": operator.ge,
+        "≥": operator.ge,
+        "ge": operator.ge,
+
+        "!=": operator.ne,
+        "≠": operator.ne,
+        "ne": operator.ne,
+
+        "%": operator.mod,
+        "mod": operator.mod,
+
+        "+": operator.add,
+        "add": operator.add,
+
+        "-": operator.sub,
+        "sub": operator.sub,
+
+        "*": operator.mul,
+        "×": operator.mul,
+        "mul": operator.mul,
+
+        "/": operator.truediv,
+        "÷": operator.truediv,
+        "div": operator.truediv,
+
+        "**": operator.pow,
+        "^": operator.pow,
+        "pow": operator.pow,
+
+    }
+
+    multiple_operators = {
+        "or": any,
+        "∨": any,
+        "and": all,
+        "∧": all,
+    }
+
+    def __init__(self, tree):
+        self._eval = self.build_evaluator(tree)
+
+    def __call__(self, value):
+        return self._eval(value)
+
+    def build_evaluator(self, tree):
+        try:
+            operator, nodes = list(tree.items())[0]
+        except Exception:
+            return lambda value: tree
+        try:
+            op = self.multiple_operators[operator]
+        except KeyError:
+            try:
+                op = self.binary_operators[operator]
+            except KeyError:
+                raise InvalidQuery("Unknown operator %s" % operator)
+            return self._handle_binary_op(op, nodes)
+        return self._handle_multiple_op(op, nodes)
+
+    def _handle_multiple_op(self, op, nodes):
+        elements = [self.build_evaluator(node) for node in nodes]
+        return lambda value: op((e(value) for e in elements))
+
+    def _handle_binary_op(self, op, node):
+        try:
+            iterator = iter(node)
+        except Exception:
+            return lambda value: op(value, node)
+        nodes = list(iterator)
+        if len(nodes) != 2:
+            raise InvalidQuery(
+                "Binary operator %s needs 2 arguments, %d given" %
+                (op, len(nodes)))
+        node0 = self.build_evaluator(node[0])
+        node1 = self.build_evaluator(node[1])
+        return lambda value: op(node0(value), node1(value))
 
 
 class MetricDoesNotExist(Exception):
