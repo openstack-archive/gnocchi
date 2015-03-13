@@ -739,14 +739,14 @@ class GenericResourcesController(rest.RestController):
             attr_filter = {"and": [{"=": {"created_by_user_id": user}},
                                    {"=": {"created_by_project_id": project}}]}
         else:
-            attr_filter = {}
+            attr_filter = None
 
         try:
             return pecan.request.indexer.list_resources(
                 self._resource_type,
                 attribute_filter=attr_filter,
                 details=details)
-        except indexer.ResourceAttributeError as e:
+        except indexer.IndexerException as e:
             abort(400, e)
 
 
@@ -801,7 +801,7 @@ class SearchResourceTypeController(rest.RestController):
         if pecan.request.body:
             attr_filter = deserialize(self.SearchSchema)
         else:
-            attr_filter = {}
+            attr_filter = None
 
         details = get_details(kwargs)
 
@@ -814,16 +814,23 @@ class SearchResourceTypeController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
-            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                   {"=": {"created_by_project_id": project}},
-                                   attr_filter]}
+            if attr_filter:
+                attr_filter = {"and": [
+                    {"=": {"created_by_user_id": user}},
+                    {"=": {"created_by_project_id": project}},
+                    attr_filter]}
+            else:
+                attr_filter = {"and": [
+                    {"=": {"created_by_user_id": user}},
+                    {"=": {"created_by_project_id": project}},
+                ]}
 
         try:
             return pecan.request.indexer.list_resources(
                 self._resource_type,
                 attribute_filter=attr_filter,
                 details=details)
-        except indexer.ResourceAttributeError as e:
+        except indexer.IndexerException as e:
             abort(400, e)
 
 
