@@ -810,12 +810,14 @@ class SearchResourceTypeController(rest.RestController):
             })
             user, project = get_user_and_project()
             if attr_filter:
-                attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                       {"=": {"created_by_project_id": project}},
-                                       attr_filter]}
+                attr_filter = {"and": [
+                    {"=": {"created_by_user_id": user}},
+                    {"=": {"created_by_project_id": project}},
+                    attr_filter]}
             else:
-                attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                       {"=": {"created_by_project_id": project}},
+                attr_filter = {"and": [
+                    {"=": {"created_by_user_id": user}},
+                    {"=": {"created_by_project_id": project}},
                 ]}
 
         try:
