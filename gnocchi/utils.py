@@ -52,3 +52,11 @@ def to_timespan(value):
     if seconds <= 0:
         raise ValueError("Timespan must be positive")
     return datetime.timedelta(seconds=seconds)
+
+
+class Retry(Exception):
+    pass
+
+
+def retry_if_retry_raised(exception):
+    return isinstance(exception, Retry)
