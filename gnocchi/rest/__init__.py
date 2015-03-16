@@ -292,9 +292,10 @@ class AggregatedMetricController(rest.RestController):
                    archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS))
 
         # Check RBAC policy
-        metrics = pecan.request.indexer.get_metrics(metric_ids)
-        missing_metric_ids = (set(six.text_type(m['id']) for m in metrics)
-                              - set(metric_ids))
+        metrics = pecan.request.indexer.get_metrics(metric_ids, details=True)
+        missing_metric_ids = (set(six.text_type(m['id'])
+                                  for m in metrics).symmetric_difference(
+                                          set(metric_ids)))
         if missing_metric_ids:
             # Return one of the missing one in the error
             abort(404, storage.MetricDoesNotExist(
@@ -307,10 +308,10 @@ class AggregatedMetricController(rest.RestController):
             if len(metric_ids) == 1:
                 # NOTE(sileht): don't do the aggregation if we only have one
                 # metric
-                # NOTE(jd): set the archive policy to None as it's not really
-                # used and it has a cost to request it from the indexer
                 measures = pecan.request.storage.get_measures(
-                    storage.Metric(metric_ids[0], None),
+                    storage.Metric(metric_ids[0],
+                                   archive_policy.ArchivePolicy.from_dict(
+                                       metrics[0]['archive_policy'])),
                     start, stop, aggregation)
             else:
                 # NOTE(jd): set the archive policy to None as it's not really
@@ -391,7 +392,7 @@ class MetricController(rest.RestController):
     @pecan.expose('json')
     @pecan.expose('measures.j2')
     def get_measures(self, start=None, stop=None, aggregation='mean', **param):
-        self.enforce_metric("get measures")
+        metric = self.enforce_metric("get measures", details=True)[0]
         if not (aggregation
                 in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS
                 or aggregation in self.custom_agg):
@@ -414,19 +415,18 @@ class MetricController(rest.RestController):
             except Exception:
                 abort(400, "Invalid value for stop")
 
+        metric = storage.Metric(
+            name=self.metric_id,
+            archive_policy=archive_policy.ArchivePolicy.from_dict(
+                metric['archive_policy']))
         try:
             if aggregation in self.custom_agg:
                 measures = self.custom_agg[aggregation].compute(
-                    pecan.request.storage, self.metric_id, start, stop,
+                    pecan.request.storage, metric, start, stop,
                     **param)
             else:
                 measures = pecan.request.storage.get_measures(
-                    # NOTE(jd) We don't set the archive policy in the object
-                    # here because it's not used; but we could do it if needed
-                    # by requesting the metric details from the indexer, for
-                    # example in the enforce_metric() call above.
-                    storage.Metric(name=self.metric_id, archive_policy=None),
-                    start, stop, aggregation)
+                    metric, start, stop, aggregation)
             # Replace timestamp keys by their string versions
             return [(timeutils.isotime(timestamp, subsecond=True), offset, v)
                     for timestamp, offset, v in measures]
