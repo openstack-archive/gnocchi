@@ -16,3 +16,4 @@ testtools>=0.9.38
 WebTest>=2.0.16
 doc8
 sphinxcontrib-httpdomain
+https://github.com/influxdb/influxdb-python/archive/0.9.0_support.tar.gz#egg=influxdb
