@@ -1107,8 +1107,7 @@ class SearchMetricController(rest.RestController):
                     pecan.request.storage.search_value(
                         # NOTE(jd) Don't pass the archive policy as no
                         # driver needs it for now
-                        [storage.Metric(str(metric.id), None)
-                         for metric in metrics],
+                        [metric for metric in metrics],
                         query, start, stop, aggregation)
                 )
             }
