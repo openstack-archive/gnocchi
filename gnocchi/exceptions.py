@@ -19,3 +19,11 @@
 
 class NotImplementedError(NotImplementedError):
     pass
+
+
+class Retry(Exception):
+    pass
+
+
+def retry_if_retry_raised(exception):
+    return isinstance(exception, Retry)

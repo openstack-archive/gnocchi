@@ -66,7 +66,7 @@ class TestStatsd(tests_base.TestCase):
                                             with_metrics=True)
 
         measures = self.stats.storage.get_measures(storage.Metric(
-            r.get_metric(metric_key), None))
+            r.get_metric(metric_key), self.archive_policies['high']))
         self.assertEqual([(datetime.datetime(2015, 1, 7), 86400.0, 1.0),
                           (datetime.datetime(2015, 1, 7, 13), 3600.0, 1.0),
                           (datetime.datetime(2015, 1, 7, 13, 58), 60.0, 1.0)],
