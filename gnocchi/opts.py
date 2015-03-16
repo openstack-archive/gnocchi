@@ -23,6 +23,7 @@ import gnocchi.indexer
 import gnocchi.storage
 import gnocchi.storage.ceph
 import gnocchi.storage.file
+import gnocchi.storage.influxdb
 import gnocchi.storage.swift
 
 
@@ -56,7 +57,8 @@ def list_opts():
                                     gnocchi.storage.OPTS,
                                     gnocchi.storage.ceph.OPTS,
                                     gnocchi.storage.file.OPTS,
-                                    gnocchi.storage.swift.OPTS)),
+                                    gnocchi.storage.swift.OPTS,
+                                    gnocchi.storage.influxdb.OPTS)),
         ("statsd", (
             cfg.StrOpt(
                 'resource_id',

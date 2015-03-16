@@ -56,6 +56,14 @@ def to_timespan(value):
     return datetime.timedelta(seconds=seconds)
 
 
+class Retry(Exception):
+    pass
+
+
+def retry_if_retry_raised(exception):
+    return isinstance(exception, Retry)
+
+
 def utcnow():
     """Better version of utcnow() that returns utcnow with a correct TZ."""
     return timeutils.utcnow(True)
@@ -63,3 +71,9 @@ def utcnow():
 
 def datetime_utc(*args):
     return datetime.datetime(*args, tzinfo=iso8601.iso8601.UTC)
+
+
+def tz_to_utc(timestamp):
+    if isinstance(timestamp, datetime.datetime):
+        return timestamp.replace(tzinfo=iso8601.iso8601.UTC)
+    return timestamp
