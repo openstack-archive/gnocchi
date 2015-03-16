@@ -48,6 +48,7 @@ Gnocchi provides these storage drivers:
 - File (default)
 - `Swift`_
 - `Ceph`_
+- `InfluxDB`_
 
 Gnocchi provides these indexer drivers:
 
@@ -58,6 +59,7 @@ Gnocchi provides these indexer drivers:
 .. _`Ceph`: http://ceph.com/
 .. _`PostgreSQL`: http://postgresql.org
 .. _`MySQL`: http://mysql.com
+.. _`InfluxDB`: http://influxdb.com
 
 Indexer Initialization
 ======================
@@ -79,7 +81,8 @@ To run Gnocchi, simple run the HTTP server:
     gnocchi-api
 
 You then need to run the `gnocchi-metricd` daemon to enable new measures
-processing in the background.
+processing in the background. Some storage drivers (such as `influxdb`) do not
+need this process to run – so it will exit gracefully at startup.
 
 Running As A WSGI Application
 =============================
