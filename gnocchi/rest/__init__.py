@@ -1100,6 +1100,18 @@ class SearchMetricController(rest.RestController):
 
         query = deserialize(self.MetricSearchSchema)
 
+        if start is not None:
+            try:
+                start = Timestamp(start)
+            except Exception:
+                abort(400, "Invalid value for start")
+
+        if stop is not None:
+            try:
+                stop = Timestamp(stop)
+            except Exception:
+                abort(400, "Invalid value for stop")
+
         try:
             return {
                 str(metric.id): values
@@ -1107,8 +1119,7 @@ class SearchMetricController(rest.RestController):
                     pecan.request.storage.search_value(
                         # NOTE(jd) Don't pass the archive policy as no
                         # driver needs it for now
-                        [storage.Metric(str(metric.id), None)
-                         for metric in metrics],
+                        [metric for metric in metrics],
                         query, start, stop, aggregation)
                 )
             }

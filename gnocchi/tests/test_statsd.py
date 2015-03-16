@@ -66,6 +66,9 @@ class TestStatsd(tests_base.TestCase):
                                             with_metrics=True)
 
         metric = r.get_metric(metric_key)
+        # NOTE(jd) We need to reload the metric from the indexer so its archive
+        # policy is attached, as it's required by some driver to be there.
+        metric = self.stats.indexer.get_metrics([metric.id])[0]
 
         self.stats.storage.process_measures(self.stats.indexer)
 
@@ -116,6 +119,9 @@ class TestStatsd(tests_base.TestCase):
                                             self.conf.statsd.resource_id,
                                             with_metrics=True)
         metric = r.get_metric(metric_key)
+        # NOTE(jd) We need to reload the metric from the indexer so its archive
+        # policy is attached, as it's required by some driver to be there.
+        metric = self.stats.indexer.get_metrics([metric.id])[0]
 
         self.stats.storage.process_measures(self.stats.indexer)
 
