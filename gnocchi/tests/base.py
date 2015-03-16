@@ -365,6 +365,9 @@ class TestCase(base.BaseTestCase):
             self.conf.set_override('file_basepath',
                                    tempdir.path,
                                    'storage')
+        elif self.conf.storage.driver == 'influxdb':
+            self.conf.set_override('influxdb_block_until_data_ingested', True,
+                                   'storage')
 
         self.storage = storage.get_driver(self.conf)
 
