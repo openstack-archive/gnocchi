@@ -687,6 +687,10 @@ class CephAccountResourceController(GenericResourceController):
     _resource_type = 'ceph_account'
 
 
+class NetworkAccountResourceController(GenericResourceController):
+    _resource_type = 'network'
+
+
 class GenericResourcesController(rest.RestController):
     _resource_type = 'generic'
     _resource_rest_class = GenericResourceController
@@ -777,12 +781,18 @@ class CephAccountsResourcesController(GenericResourcesController):
     _resource_rest_class = CephAccountResourceController
 
 
+class NetworkAccountsResourcesController(GenericResourcesController):
+    _resource_type = 'network'
+    _resource_rest_class = NetworkAccountResourceController
+
+
 class ResourcesController(rest.RestController):
     generic = GenericResourcesController()
     instance = InstancesResourcesController()
     swift_account = SwiftAccountsResourcesController()
     volume = VolumesResourcesController()
     ceph_account = CephAccountsResourcesController()
+    network = NetworkAccountsResourcesController()
 
 
 def _SearchSchema(v):
