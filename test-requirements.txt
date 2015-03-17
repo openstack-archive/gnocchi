@@ -4,7 +4,7 @@ coverage>=3.6
 fixtures
 keystonemiddleware
 mock
-MySQL-python
+MySQL-python; python_version < '3'
 oslotest
 sphinx
 python-subunit>=0.0.18
