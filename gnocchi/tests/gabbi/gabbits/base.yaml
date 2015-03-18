@@ -32,6 +32,17 @@ tests:
       $.definition.[0].points: 20
       $.definition.[0].timespan: 0:20:00
 
+- name: post archive policy no auth
+  url: /v1/archive_policy
+  method: POST
+  request_headers:
+      content-type: application/json
+  data:
+      definition:
+          - granularity: 1 second
+            points: 20
+  status: 403
+
 - name: post metric with archive policy
   url: /v1/metric
   request_headers:
