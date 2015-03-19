@@ -359,6 +359,8 @@ class MetricController(rest.RestController):
     @pecan.expose()
     def post_measures(self):
         metric = self.enforce_metric("post measures", details=True)[0]
+        location = "/v1/metric/" + self.metric_id + "/measures"
+        set_resp_location_hdr(location)
         try:
             pecan.request.storage.add_measures(
                 storage.Metric(
