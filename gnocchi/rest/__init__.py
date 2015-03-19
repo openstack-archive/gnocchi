@@ -354,11 +354,15 @@ class MetricController(rest.RestController):
                 archive_policy.ArchivePolicy.from_dict(
                     metric['archive_policy']
                 ).to_human_readable_dict())
+        location = '/v1/metric/{}'.format(self.metric_id)
+        set_resp_location_hdr(location)
         return metric
 
     @pecan.expose()
     def post_measures(self):
         metric = self.enforce_metric("post measures", details=True)[0]
+        location = "/v1/metric/" + self.metric_id + "/measures"
+        set_resp_location_hdr(location)
         try:
             pecan.request.storage.add_measures(
                 storage.Metric(
@@ -516,6 +520,7 @@ class MetricsController(rest.RestController):
         else:
             user_id = kwargs.get('user_id')
             project_id = kwargs.get('project_id')
+        set_resp_location_hdr("/v1/metric")
         return pecan.request.indexer.list_metrics(
             user_id, project_id)
 
