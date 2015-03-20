@@ -175,8 +175,13 @@ class RestTest(tests_base.TestCase):
 
     def test_root(self):
         result = self.app.get("/", status=200)
-        self.assertEqual(b"Nom nom nom.", result.body)
-        self.assertEqual("text/plain", result.content_type)
+        self.assertEqual("application/json", result.content_type)
+        api_info = json.loads(result.text)
+        self.assertEqual(
+            {"versions": [{"status": "CURRENT", "links": [
+                {"rel": "self", "href": "http://localhost/v1/"}],
+                "id": "v1.0", "updated": "2015-03-19"}]},
+            api_info)
 
     def test_deserialize_force_json(self):
         with self.app.use_admin_user():
