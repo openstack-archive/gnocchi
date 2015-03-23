@@ -251,6 +251,31 @@ greater than or equal to (`>=`, `ge` or `≥`) not equal to (`!=`, `ne` or `≠`
 value is in (`in`), value is like (`like`), or (`or` or `∨`), and (`and` or
 `∧`) and `not`.
 
+Searching for values in metrics
+===============================
+
+It's possible to search for values in metrics. For example, this will look for
+all values that are greater or equal than 50 if we add 23 to them and that are
+not equal to 55. You have to specify the list of metric to look into by using
+the `metric_id` query parameer several times.
+
+{{ scenarios['search-value-in-metric']['doc'] }}
+
+You can specify a time range to look for by specifying the `start` and/or
+`stop` query parameter, and the aggregation method to look by specifying the
+`aggregation` query parameter.
+
+The supported operators are: equal to (`=`, `==` or `eq`), lesser than (`<` or
+`lt`), greater than (`>` or `gt`), less than or equal to (`<=`, `le` or `≤`)
+greater than or equal to (`>=`, `ge` or `≥`) not equal to (`!=`, `ne` or `≠`),
+addition (`+` or `add`), substraction (`-` or `sub`), multiplication (`*`,
+`mul` or `×`), division (`/`, `div` or `÷`). These operations take either one
+argument, and in this case the second argument passed is the value. There can
+also takes two arguments by passing a list of 2 operations as argument.
+
+The operators or (`or` or `∨`), and (`and` or `∧`) and `not` are also
+supported, and take a list of arguments as parameters.
+
 Aggregation across metrics
 ==========================
 
