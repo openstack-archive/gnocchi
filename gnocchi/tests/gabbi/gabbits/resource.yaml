@@ -95,7 +95,7 @@ tests:
           content-type: application/json
       data:
           id: f93454f2-d8a5-4d67-9985-02511241e7f3
-          started_at: "2014-01-03T02:02:02.000000"
+          started_at: "2014-01-03T02:02:02.000000Z"
           user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
           project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       status: 201
@@ -109,7 +109,7 @@ tests:
           content-type: application/json
       data:
           id: f93450f2-d8a5-4d67-9985-02511241e7d1
-          started_at: "2014-01-03T02:02:02.000000"
+          started_at: "2014-01-03T02:02:02.000000Z"
           user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
           project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       status: 201
@@ -131,7 +131,7 @@ tests:
           content-type: application/json
       data:
           id: f93450f2-d8a5-4d67-9985-02511241e7d1
-          started_at: "2014-01-03T02:02:02.000000"
+          started_at: "2014-01-03T02:02:02.000000Z"
           user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
           project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       status: 409
@@ -145,7 +145,7 @@ tests:
           content-type: text/plain
       data:
           id: f93450f2-d8a5-4d67-9985-02511241e7d1
-          started_at: "2014-01-03T02:02:02.000000"
+          started_at: "2014-01-03T02:02:02.000000Z"
           user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
           project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       status: 415
