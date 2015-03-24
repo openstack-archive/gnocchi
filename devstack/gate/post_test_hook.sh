@@ -32,6 +32,8 @@ set -x
 
 export GNOCCHI_DIR="$BASE/new/gnocchi"
 sudo chown -R jenkins:stack $GNOCCHI_DIR
+sudo chown jenkins:stack "$BASE/data/gnocchi"
+sudo chmod 775 "$BASE/data/gnocchi"
 cd $GNOCCHI_DIR
 
 keystone endpoint-list
