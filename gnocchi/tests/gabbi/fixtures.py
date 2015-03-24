@@ -70,10 +70,12 @@ class ConfigFixture(fixture.GabbiFixture):
 
         conf = service.prepare_service([])
 
-        conf.set_override('url',
-                          os.environ.get("GNOCCHI_TEST_INDEXER_URL",
-                                         "null://"),
-                          'indexer')
+        # Use the indexer set in the conf, unless we have set an
+        # override via the environment.
+        if 'GNOCCHI_TEST_INDEXER_URL' in os.environ:
+            conf.set_override('url',
+                              os.environ.get("GNOCCHI_TEST_INDEXER_URL"),
+                              'indexer')
 
         # TODO(jd) It would be cool if Gabbi was able to use the null://
         # indexer, but this makes the API returns a lot of 501 error, which
@@ -85,6 +87,14 @@ class ConfigFixture(fixture.GabbiFixture):
                           os.path.abspath('etc/gnocchi/policy.json'),
                           group="oslo_policy")
         conf.set_override('file_basepath', data_tmp_dir, 'storage')
+
+        # If a swift or ceph storage backend is being used during
+        # testing, make sure each gabbi file uses a separate container
+        # or pool.
+        conf.set_override('swift_container_prefix', str(uuid.uuid4()),
+                          'storage')
+        conf.set_override('ceph_pool', str(uuid.uuid4()), 'storage')
+
         conf.set_override('driver', 'file', 'storage')
         conf.set_override('coordination_url', coordination_url, 'storage')
 
