@@ -31,7 +31,6 @@ function generate_testr_results {
 set -x
 
 export GNOCCHI_DIR="$BASE/new/gnocchi"
-sudo chown -R jenkins:stack $GNOCCHI_DIR
 cd $GNOCCHI_DIR
 
 keystone endpoint-list
@@ -46,7 +45,7 @@ export GNOCCHI_SERVICE_PORT=8041
 # Run tests
 echo "Running gnocchi functional test suite"
 set +e
-sudo -E -H -u jenkins tox -epy27-gate
+tox -epy27-gate
 EXIT_CODE=$?
 set -e
 
