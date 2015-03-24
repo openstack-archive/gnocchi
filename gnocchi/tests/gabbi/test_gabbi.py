@@ -32,7 +32,8 @@ def load_tests(loader, tests, pattern):
     if host:
         port = os.getenv('GNOCCHI_SERVICE_PORT', 8041)
         return driver.build_tests(test_dir, loader,
-                                  host=host, port=port)
+                                  host=host, port=port,
+                                  fixture_module=fixtures)
     else:
         return driver.build_tests(test_dir, loader, host=None,
                                   intercept=fixtures.setup_app,
