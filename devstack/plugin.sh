@@ -278,7 +278,7 @@ function start_gnocchi {
     # only die on API if it was actually intended to be turned on
     if is_service_enabled gnocchi-api; then
         echo "Waiting for gnocchi-api to start..."
-        if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl --noproxy '*' -s ${GNOCCHI_SERVICE_PROTOCOL}://${GNOCCHI_SERVICE_HOST}:${GNOCCHI_SERVICE_PORT}/v1/resource/generic >/dev/null; do sleep 1; done"; then
+        if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl --noproxy '*' -s ${GNOCCHI_SERVICE_PROTOCOL}://${GNOCCHI_SERVICE_HOST}:${GNOCCHI_SERVICE_PORT}/v1/archive_policy >/dev/null; do sleep 1; done"; then
             die $LINENO "gnocchi-api did not start"
         fi
     fi

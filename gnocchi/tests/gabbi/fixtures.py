@@ -70,21 +70,27 @@ class ConfigFixture(fixture.GabbiFixture):
 
         conf = service.prepare_service([])
 
-        conf.set_override('url',
-                          os.environ.get("GNOCCHI_TEST_INDEXER_URL",
-                                         "null://"),
-                          'indexer')
+        CONF = self.conf = conf
+        self.tmp_dir = data_tmp_dir
+
+        # Use the indexer set in the conf, unless we have set an
+        # override via the environment.
+        if 'GNOCCHI_TEST_INDEXER_URL' in os.environ:
+            conf.set_override('url',
+                              os.environ.get("GNOCCHI_TEST_INDEXER_URL"),
+                              'indexer')
 
         # TODO(jd) It would be cool if Gabbi was able to use the null://
         # indexer, but this makes the API returns a lot of 501 error, which
         # Gabbi does not want to see, so let's just disable it.
-        if conf.indexer.url is "null://":
+        if conf.indexer.url is None or conf.indexer.url == "null://":
             raise case.SkipTest("No indexer configured")
 
         conf.set_override('policy_file',
                           os.path.abspath('etc/gnocchi/policy.json'),
                           group="oslo_policy")
         conf.set_override('file_basepath', data_tmp_dir, 'storage')
+
         conf.set_override('driver', 'file', 'storage')
         conf.set_override('coordination_url', coordination_url, 'storage')
 
@@ -105,9 +111,6 @@ class ConfigFixture(fixture.GabbiFixture):
 
         # Turn off any middleware.
         conf.set_override('middlewares', [], 'api')
-
-        CONF = self.conf = conf
-        self.tmp_dir = data_tmp_dir
 
     def stop_fixture(self):
         """Clean up the config fixture and storage artifacts."""
