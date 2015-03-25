@@ -36,15 +36,18 @@ class Image(base.ResourceBase):
 class ImageSQLAlchemy(sqlalchemy_base.Resource):
     __tablename__ = 'image'
     __table_args__ = (
-        sqlalchemy.Index('ix_image_id', 'id'),
+        sqlalchemy.Index('ix_image_seq', 'seq'),
+        sqlalchemy.Index('ix_image_eid', 'eid'),
         sqlalchemy_base.COMMON_TABLES_ARGS,
     )
 
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           sqlalchemy.ForeignKey('resource.id',
-                                                 ondelete="CASCADE"),
-                           primary_key=True)
-
+    seq = sqlalchemy.Column(sqlalchemy.Integer,
+                            sqlalchemy.ForeignKey('resource.seq',
+                                                  ondelete="CASCADE"),
+                            primary_key=True)
+    eid = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                            sqlalchemy.ForeignKey('resourceid.id',
+                                                  ondelete="CASCADE"))
     name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
     container_format = sqlalchemy.Column(sqlalchemy.String(255),
                                          nullable=False)

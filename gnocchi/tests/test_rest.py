@@ -1301,6 +1301,8 @@ class ResourceTest(RestTest):
         self.assertEqual("http://localhost/v1/resource/"
                          + self.resource_type + "/" + self.attributes['id'],
                          result.headers['Location'])
+        self.assertIsNotNone(resource['updated_at'])
+        del resource['updated_at']
         self.assertEqual(self.resource, resource)
 
     def test_post_resource_with_invalid_metric(self):
@@ -1368,6 +1370,8 @@ class ResourceTest(RestTest):
                               + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
+        self.assertIsNotNone(result['updated_at'])
+        del result['updated_at']
         self.assertEqual(self.resource, result)
 
     def test_get_resource_non_admin(self):
@@ -1498,7 +1502,12 @@ class ResourceTest(RestTest):
                               + self.attributes['id'])
         result = json.loads(result.text)
         self.assertTrue(uuid.UUID(result['metrics']['foo']))
+        self.assertIsNotNone(result['updated_at'])
+        self.assertIsNotNone(r['updated_at'])
+        self.assertLess(r['updated_at'], result['updated_at'])
+        del result['updated_at']
         del result['metrics']
+        del r['updated_at']
         del r['metrics']
         self.assertEqual(r, result)
 
@@ -1555,6 +1564,13 @@ class ResourceTest(RestTest):
             + "/" + self.attributes['id'],
             params=self.patchable_attributes,
             status=204)
+
+        # Looking at the history
+        result = self.app.post_json(
+            "/v1/search/resource/" + self.resource_type + "?history=true",
+            params={"eq": {"id": self.attributes['id']}}, status=200)
+        self.assertEqual(2, len(json.loads(result.text)))
+
         result = self.app.get("/v1/resource/" + self.resource_type
                               + "/" + self.attributes['id'])
         result = json.loads(result.text)
@@ -1602,6 +1618,8 @@ class ResourceTest(RestTest):
                               + self.resource_type + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
+        self.assertIsNotNone(result['updated_at'])
+        del result['updated_at']
         self.assertEqual(self.resource, result)
 
     def test_patch_resource_non_existent(self):
@@ -1714,6 +1732,8 @@ class ResourceTest(RestTest):
                          + self.attributes['id'],
                          result.headers['Location'])
         self.resource['metrics'] = self.attributes['metrics']
+        self.assertIsNotNone(resource['updated_at'])
+        del resource['updated_at']
         self.assertEqual(self.resource, resource)
 
     def test_post_resource_with_null_metrics(self):

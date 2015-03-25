@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import
+import datetime
 import itertools
 import operator
 import uuid
@@ -33,6 +34,7 @@ Base = base.Base
 Metric = base.Metric
 ArchivePolicy = base.ArchivePolicy
 Resource = base.Resource
+ResourceId = base.ResourceId
 
 _marker = indexer._marker
 
@@ -96,11 +98,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
                 raise indexer.ArchivePolicyInUse(name)
 
-    def get_metrics(self, uuids, details=False):
-        if not uuids:
-            return []
-        session = self.engine_facade.get_session()
-        query = session.query(Metric).filter(Metric.id.in_(uuids))
+    def _get_metrics(self, query, details=False):
         if details:
             query = query.options(sqlalchemy.orm.joinedload(
                 Metric.archive_policy))
@@ -114,6 +112,13 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             return metrics
 
         return list(map(self._resource_to_dict, query.all()))
+
+    def get_metrics(self, uuids, details=False):
+        if not uuids:
+            return []
+        session = self.engine_facade.get_session()
+        query = session.query(Metric).filter(Metric.id.in_(uuids))
+        return self._get_metrics(query, details=details)
 
     def create_archive_policy(self, archive_policy):
         ap = ArchivePolicy(
@@ -154,18 +159,29 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.filter(Metric.created_by_project_id == project_id)
         return [self._resource_to_dict(m) for m in q.all()]
 
-    def create_resource(self, resource_type, id,
+    def create_resource(self, resource_type, resource_id,
                         created_by_user_id, created_by_project_id,
                         user_id=None, project_id=None,
                         started_at=None, ended_at=None, metrics=None,
                         **kwargs):
+
         resource_cls = self._resource_type_to_class(resource_type)
         if (started_at is not None
            and ended_at is not None
            and started_at > ended_at):
             raise ValueError("Start timestamp cannot be after end timestamp")
+
+        if resource_type != "generic":
+            # NOTE(sileht): To be able to keep the resource attributes history
+            # AND allow to "patch" a resource, we have to be able to
+            # duplicate a row and then update this duplicate in an atomic maner
+            # To do that in update_resource use "insert from select" scheme
+            # but to identity the latest revision of the attributes of the
+            # extra resource table, we have to put the id into this table too.
+            kwargs['eid'] = resource_id
+
         r = resource_cls(
-            id=id,
+            id=resource_id,
             type=resource_type,
             created_by_user_id=created_by_user_id,
             created_by_project_id=created_by_project_id,
@@ -174,78 +190,148 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             started_at=started_at,
             ended_at=ended_at,
             **kwargs)
+        self._fixup_created_by_uuid(r)
+
         session = self.engine_facade.get_session()
         with session.begin():
-            session.add(r)
+            session.add(ResourceId(id=resource_id))
             try:
                 session.flush()
             except exception.DBDuplicateEntry:
-                raise indexer.ResourceAlreadyExists(id)
+                raise indexer.ResourceAlreadyExists(resource_id)
+
+            session.add(r)
+            try:
+                session.flush()
             except exception.DBReferenceError as ex:
                 raise indexer.ResourceValueError(r.type,
                                                  ex.key,
                                                  getattr(r, ex.key))
             if metrics is not None:
-                self._set_metrics_for_resource(session, id,
+                self._set_metrics_for_resource(session, resource_id,
                                                created_by_user_id,
                                                created_by_project_id,
                                                metrics)
 
-        self._fixup_created_by_uuid(r)
         return self._resource_to_dict(r, with_metrics=True)
 
     @staticmethod
     def _resource_to_dict(resource, with_metrics=False):
         r = dict(resource)
-        if with_metrics and isinstance(resource, Resource):
-            r['metrics'] = dict((m['name'], six.text_type(m['id']))
-                                for m in resource.metrics)
+        if isinstance(resource, Resource):
+            if 'eid' in r:
+                del r['eid']
+            del r['seq']
+            if with_metrics:
+                r['metrics'] = dict((m['name'], six.text_type(m['id']))
+                                    for m in resource.metrics)
         return r
+
+    @staticmethod
+    def _build_select_names(columns, kwargs):
+        names = []
+        for col in columns:
+            if col.name in kwargs:
+                names.append(
+                    sqlalchemy.sql.expression.bindparam(
+                        col.name, kwargs[col.name], col.type))
+            else:
+                names.append(col)
+        return names
 
     def update_resource(self, resource_type,
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
+                        creates=False,
                         **kwargs):
+
+        kwargs['updated_at'] = datetime.datetime.utcnow()
+        if ended_at is not _marker:
+            if ended_at is None:
+                kwargs['ended_at'] = None
+            else:
+                # Convert to UTC because we store in UTC :(
+                kwargs['ended_at'] = timeutils.normalize_time(ended_at)
+
         resource_cls = self._resource_type_to_class(resource_type)
         session = self.engine_facade.get_session()
         with session.begin():
-            q = session.query(
-                resource_cls).filter(
-                    resource_cls.id == resource_id)
+            base_table = sqlalchemy.inspect(Resource).local_table
+            extra_table = sqlalchemy.inspect(resource_cls).local_table
+            base_columns = [c for c in base_table.c
+                            if c.name != "seq" and
+                            (not creates or c.name in kwargs)]
+            extra_columns = [c for c in extra_table.c
+                             if not creates or c.name in kwargs]
+            columns_names = ([c.name for c in base_columns] +
+                             [c.name for c in extra_columns])
+            invalid_attributes = [attr for attr in kwargs
+                                  if attr not in columns_names]
+            if invalid_attributes:
+                raise indexer.ResourceAttributeError(
+                    resource_type, invalid_attributes[0])
+
+            q = session.query(*self._build_select_names(base_columns, kwargs))
+            q = q.filter(Resource.id == resource_id)
+            q = q.order_by(Resource.seq.desc()).limit(1)
+
+            insert_stmt = base_table.insert().from_select(base_columns, q)
+            try:
+                result = session.execute(insert_stmt.returning(
+                    base_table.c.seq)).fetchone()
+            except sqlalchemy.exc.CompileError:
+                # Fallback to inserted_primary_key
+                resource_seq = session.execute(
+                    insert_stmt).inserted_primary_key[0]
+                if resource_seq is None:
+                    # Fallback to select
+                    q = session.query(Resource.seq)
+                    q = q.filter(Resource.id == resource_id)
+                    q = q.order_by(Resource.seq.desc()).limit(1)
+                    r = q.first()
+                    if r is not None:
+                        resource_seq = r.seq
+            else:
+                resource_seq = result[0] if result is not None else None
+
+            if not resource_seq:
+                raise indexer.NoSuchResource(resource_id)
+
+            if resource_cls is not Resource:
+                kwargs['seq'] = resource_seq
+                q = session.query(*self._build_select_names(
+                    extra_columns, kwargs))
+                q = q.filter(resource_cls.eid == resource_id)
+                q = q.order_by(resource_cls.seq.desc()).limit(1)
+                session.execute(extra_table.insert().from_select(
+                    extra_columns, q))
+
+            # Requery the whole resource, this query is concurrency safe
+            # because
+            q = session.query(resource_cls).filter(
+                Resource.seq == resource_seq)
             r = q.first()
             if r is None:
                 raise indexer.NoSuchResource(resource_id)
 
-            if ended_at is not _marker:
+            if (ended_at is not _marker
+                    and r.started_at is not None and r.ended_at is not None
+                    and r.started_at > r.ended_at):
                 # NOTE(jd) Could be better to have check in the db for that so
-                # we can just run the UPDATE
-                if r.started_at is not None and ended_at is not None:
-                    # Convert to UTC because we store in UTC :(
-                    ended_at = timeutils.normalize_time(ended_at)
-                    if r.started_at > ended_at:
-                        raise ValueError(
-                            "Start timestamp cannot be after end timestamp")
-                r.ended_at = ended_at
-
-            if kwargs:
-                for attribute, value in six.iteritems(kwargs):
-                    if hasattr(r, attribute):
-                        setattr(r, attribute, value)
-                    else:
-                        raise indexer.ResourceAttributeError(
-                            r.type, attribute)
+                # we can just run the INSERT
+                raise ValueError(
+                    "Start timestamp cannot be after end timestamp")
 
             if metrics is not _marker:
                 if not append_metrics:
                     session.query(Metric).filter(
                         Metric.resource_id == resource_id).update(
                             {"resource_id": None})
-                self._set_metrics_for_resource(session, resource_id,
+                self._set_metrics_for_resource(session, r.id,
                                                r.created_by_user_id,
                                                r.created_by_project_id,
                                                metrics)
 
-        self._fixup_created_by_uuid(r)
         return self._resource_to_dict(r, with_metrics=True)
 
     @staticmethod
@@ -266,37 +352,49 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def delete_resource(self, resource_id, delete_metrics=None):
         session = self.engine_facade.get_session()
         with session.begin():
-            q = session.query(Resource).filter(
-                Resource.id == resource_id).options(
-                    sqlalchemy.orm.joinedload(Resource.metrics))
-            r = q.first()
+            qr = session.query(ResourceId).filter(
+                ResourceId.id == resource_id)
+            r = qr.first()
             if r is None:
                 raise indexer.NoSuchResource(resource_id)
+
             if delete_metrics is not None:
-                delete_metrics(self.get_metrics([m.id for m in r.metrics],
-                                                details=True))
-            q.delete()
+                qm = session.query(Metric).filter(
+                    Metric.resource_id == resource_id)
+                delete_metrics(self._get_metrics(qm, details=True))
+
+            qr.delete()
 
     def get_resource(self, resource_type, resource_id, with_metrics=False):
         resource_cls = self._resource_type_to_class(resource_type)
         session = self.engine_facade.get_session()
-        q = session.query(
-            resource_cls).filter(
-                resource_cls.id == resource_id)
+
+        q = session.query(resource_cls).filter(resource_cls.id == resource_id)
+        q = q.order_by(resource_cls.seq.desc()).limit(1)
         if with_metrics:
             q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
+
         r = q.first()
         if r:
             return self._resource_to_dict(r, with_metrics)
 
     def list_resources(self, resource_type='generic',
                        attribute_filter=None,
-                       details=False):
+                       details=False, history=False):
 
         resource_cls = self._resource_type_to_class(resource_type)
         session = self.engine_facade.get_session()
 
-        q = session.query(resource_cls)
+        if history:
+            q = session.query(resource_cls)
+        else:
+            s = sqlalchemy.select(
+                [sqlalchemy.func.max(Resource.seq).label("seq")],
+                group_by=Resource.id).alias()
+            q = session.query(resource_cls).join(
+                s, s.c.seq == resource_cls.seq)
+
+        q = q.order_by(resource_cls.updated_at)
 
         if attribute_filter:
             try:

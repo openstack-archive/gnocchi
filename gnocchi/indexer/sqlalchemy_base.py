@@ -123,21 +123,37 @@ class Metric(Base, GnocchiBase):
         sqlalchemy_utils.UUIDType(binary=False))
     created_by_project_id = sqlalchemy.Column(
         sqlalchemy_utils.UUIDType(binary=False))
-    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                                    sqlalchemy.ForeignKey('resource.id',
-                                                          ondelete="CASCADE"))
     name = sqlalchemy.Column(sqlalchemy.String(255))
+
+    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                                    sqlalchemy.ForeignKey('resourceid.id',
+                                                          ondelete="CASCADE"))
+
+
+class ResourceId(Base, GnocchiBase):
+    __tablename__ = 'resourceid'
+    __table_args__ = (
+        sqlalchemy.Index('ix_resourceid', 'id'),
+        COMMON_TABLES_ARGS,
+    )
+
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                           primary_key=True)
 
 
 class Resource(Base, GnocchiBase):
     __tablename__ = 'resource'
     __table_args__ = (
         sqlalchemy.Index('ix_resource_id', 'id'),
+        sqlalchemy.Index('ix_resource_seq', 'seq'),
         COMMON_TABLES_ARGS,
     )
 
+    seq = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True,
+                            autoincrement=True)
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           primary_key=True)
+                           sqlalchemy.ForeignKey('resourceid.id',
+                                                 ondelete="CASCADE"))
     type = sqlalchemy.Column(sqlalchemy.Enum('metric', 'generic', 'instance',
                                              'swift_account', 'volume',
                                              'ceph_account', 'network',
@@ -149,7 +165,19 @@ class Resource(Base, GnocchiBase):
         sqlalchemy_utils.UUIDType(binary=False))
     created_by_project_id = sqlalchemy.Column(
         sqlalchemy_utils.UUIDType(binary=False))
-    metrics = sqlalchemy.orm.relationship(Metric)
+    metrics = sqlalchemy.orm.relationship(
+        Metric, primaryjoin='Metric.resource_id == Resource.id',
+        foreign_keys='Metric.resource_id')
+
+    updated_at = sqlalchemy.Column(PreciseTimestamp, nullable=False,
+                                   # NOTE(jd): We would like to use
+                                   # sqlalchemy.func.now, but we can't
+                                   # because the type of PreciseTimestamp in
+                                   # MySQL is not a Timestamp, so it would
+                                   # not store a timestamp but a date as an
+                                   # integer.
+                                   default=datetime.datetime.utcnow)
+
     started_at = sqlalchemy.Column(PreciseTimestamp, nullable=False,
                                    # NOTE(jd): We would like to use
                                    # sqlalchemy.func.now, but we can't

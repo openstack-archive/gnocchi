@@ -44,13 +44,16 @@ class Volume(base.ResourceBase):
 class VolumeSQLAlchemy(sqlalchemy_base.Resource):
     __tablename__ = 'volume'
     __table_args__ = (
-        sqlalchemy.Index('ix_volume_id', 'id'),
+        sqlalchemy.Index('ix_volume_seq', 'seq'),
+        sqlalchemy.Index('ix_volume_eid', 'eid'),
         sqlalchemy_base.COMMON_TABLES_ARGS,
     )
 
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           sqlalchemy.ForeignKey('resource.id',
-                                                 ondelete="CASCADE"),
-                           primary_key=True)
-
+    seq = sqlalchemy.Column(sqlalchemy.Integer,
+                            sqlalchemy.ForeignKey('resource.seq',
+                                                  ondelete="CASCADE"),
+                            primary_key=True)
+    eid = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                            sqlalchemy.ForeignKey('resourceid.id',
+                                                  ondelete="CASCADE"))
     display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)

@@ -89,7 +89,9 @@ class TestIndexerDriver(tests_base.TestCase):
         project = uuid.uuid4()
         rc = self.index.create_resource('generic', r1, user, project)
         self.assertIsNotNone(rc['started_at'])
+        self.assertIsNotNone(rc['updated_at'])
         del rc['started_at']
+        updated_at = rc.pop('updated_at')
         self.assertEqual({"id": r1,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -101,6 +103,7 @@ class TestIndexerDriver(tests_base.TestCase):
                          rc)
         rg = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertEqual(rc['id'], rg['id'])
+        self.assertEqual(updated_at, rg['updated_at'])
         self.assertEqual(rc['metrics'], rg['metrics'])
 
     def test_create_non_existent_metric(self):
@@ -135,7 +138,9 @@ class TestIndexerDriver(tests_base.TestCase):
                                         host="foo",
                                         display_name="lol", **kwargs)
         self.assertIsNotNone(rc['started_at'])
+        self.assertIsNotNone(rc['updated_at'])
         del rc['started_at']
+        updated_at = rc.pop('updated_at')
         self.assertEqual({"id": r1,
                           "type": "instance",
                           "created_by_user_id": user,
@@ -152,6 +157,7 @@ class TestIndexerDriver(tests_base.TestCase):
                          rc)
         rg = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertEqual(rc['id'], rg['id'])
+        self.assertEqual(updated_at, rg['updated_at'])
         self.assertEqual(rc['metrics'], rg['metrics'])
 
     def test_create_instance(self):
@@ -193,6 +199,8 @@ class TestIndexerDriver(tests_base.TestCase):
             'generic',
             r1, user, project,
             started_at=ts)
+        self.assertIsNotNone(rc['updated_at'])
+        del rc['updated_at']
         self.assertEqual({"id": r1,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -203,6 +211,8 @@ class TestIndexerDriver(tests_base.TestCase):
                           "type": "generic",
                           "metrics": {}}, rc)
         r = self.index.get_resource('generic', r1, with_metrics=True)
+        self.assertIsNotNone(r['updated_at'])
+        del r['updated_at']
         self.assertEqual(rc, r)
 
     def test_create_resource_with_metrics(self):
@@ -220,7 +230,9 @@ class TestIndexerDriver(tests_base.TestCase):
         rc = self.index.create_resource('generic', r1, user, project,
                                         metrics={'foo': e1, 'bar': e2})
         self.assertIsNotNone(rc['started_at'])
+        self.assertIsNotNone(rc['updated_at'])
         del rc['started_at']
+        del rc['updated_at']
         self.assertEqual({"id": r1,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -231,7 +243,9 @@ class TestIndexerDriver(tests_base.TestCase):
                           "metrics": {'foo': str(e1), 'bar': str(e2)}}, rc)
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
+        self.assertIsNotNone(r['updated_at'])
         del r['started_at']
+        del r['updated_at']
         self.assertEqual({"id": r1,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -255,13 +269,15 @@ class TestIndexerDriver(tests_base.TestCase):
         user = uuid.uuid4()
         project = uuid.uuid4()
         self.index.create_resource('generic', r1, user, project)
-        self.index.update_resource(
+        r = self.index.update_resource(
             'generic',
             r1,
             ended_at=datetime.datetime(2043, 1, 1, 2, 3, 4))
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
+        self.assertIsNotNone(r['updated_at'])
         del r['started_at']
+        updated_at = r.pop('updated_at')
         self.assertEqual({"id": r1,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -276,7 +292,10 @@ class TestIndexerDriver(tests_base.TestCase):
             ended_at=None)
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
+        self.assertIsNotNone(r['updated_at'])
+        self.assertLess(updated_at, r['updated_at'])
         del r['started_at']
+        del r['updated_at']
         self.assertEqual({"id": r1,
                           "ended_at": None,
                           "created_by_user_id": user,
@@ -409,7 +428,9 @@ class TestIndexerDriver(tests_base.TestCase):
         self.index.delete_metric(e1)
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertIsNotNone(r['started_at'])
+        self.assertIsNotNone(r['updated_at'])
         del r['started_at']
+        del r['updated_at']
         self.assertEqual({"id": r1,
                           "ended_at": None,
                           "created_by_user_id": user,
@@ -547,6 +568,60 @@ class TestIndexerDriver(tests_base.TestCase):
         else:
             self.fail("Some resources were not found")
 
+    def test_list_resources_without_history(self):
+        e = uuid.uuid4()
+        rid = uuid.uuid4()
+        user = uuid.uuid4()
+        project = uuid.uuid4()
+        new_user = uuid.uuid4()
+        new_project = uuid.uuid4()
+
+        self.index.create_metric(e, user, project,
+                                 archive_policy_name="low")
+
+        self.index.create_resource('generic', rid, user, project,
+                                   user, project,
+                                   metrics={'foo': e})
+        r2 = self.index.update_resource('generic', rid, user_id=new_user,
+                                        project_id=new_project,
+                                        append_metrics=True)
+
+        self.assertEqual({'foo': str(e)}, r2['metrics'])
+        self.assertEqual(new_user, r2['user_id'])
+        self.assertEqual(new_project, r2['project_id'])
+        resources = self.index.list_resources('generic', history=False,
+                                              details=True)
+        self.assertGreaterEqual(len(resources), 1)
+        expected_resources = [r for r in resources
+                              if r['id'] == rid]
+        self.assertIn(r2, expected_resources)
+
+    def test_list_resources_with_history(self):
+        e = uuid.uuid4()
+        rid = uuid.uuid4()
+        user = uuid.uuid4()
+        project = uuid.uuid4()
+        new_user = uuid.uuid4()
+        new_project = uuid.uuid4()
+
+        self.index.create_metric(e, user, project,
+                                 archive_policy_name="low")
+
+        r1 = self.index.create_resource('generic', rid, user, project,
+                                        user, project,
+                                        metrics={'foo': e})
+        r2 = self.index.update_resource('generic', rid, user_id=new_user,
+                                        project_id=new_project,
+                                        append_metrics=True)
+
+        self.assertEqual({'foo': str(e)}, r2['metrics'])
+        self.assertEqual(new_user, r2['user_id'])
+        self.assertEqual(new_project, r2['project_id'])
+        resources = self.index.list_resources('generic', history=True,
+                                              details=True)
+        self.assertGreaterEqual(len(resources), 1)
+        self.assertEqual([r1, r2], [r for r in resources if r['id'] == rid])
+
     def test_list_resources_started_after_ended_before(self):
         # NOTE(jd) So this test is a bit fuzzy right now as we uses the same
         # database for all tests and the tests are running concurrently, but
@@ -662,7 +737,7 @@ class TestIndexerDriver(tests_base.TestCase):
              "created_by_user_id": user,
              "created_by_project_id": project,
              "name": None,
-             "resource_id": None}
+             "resource_id": None},
         ], metric)
 
     def test_get_metric_with_bad_uuid(self):
