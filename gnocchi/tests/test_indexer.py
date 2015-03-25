@@ -79,7 +79,8 @@ class TestIndexerDriver(tests_base.TestCase):
                           "created_by_project_id": project,
                           "archive_policy_name": "low",
                           "name": None,
-                          "resource_id": None}, m)
+                          "resource_id": None,
+                          "resource_revision": None}, m)
         m2 = self.index.get_metrics([r1])
         self.assertEqual([m], m2)
 
@@ -91,6 +92,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(rc['started_at'])
         del rc['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 0,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
                           "user_id": None,
@@ -101,6 +103,7 @@ class TestIndexerDriver(tests_base.TestCase):
                          rc)
         rg = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertEqual(rc['id'], rg['id'])
+        self.assertEqual(rc['revision'], rg['revision'])
         self.assertEqual(rc['metrics'], rg['metrics'])
 
     def test_create_non_existent_metric(self):
@@ -137,6 +140,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(rc['started_at'])
         del rc['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 0,
                           "type": "instance",
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -194,6 +198,7 @@ class TestIndexerDriver(tests_base.TestCase):
             r1, user, project,
             started_at=ts)
         self.assertEqual({"id": r1,
+                          "revision": 0,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
                           "user_id": None,
@@ -222,6 +227,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(rc['started_at'])
         del rc['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 0,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
                           "user_id": None,
@@ -233,6 +239,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 0,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
                           "type": "generic",
@@ -263,6 +270,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 1,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
                           "ended_at": datetime.datetime(2043, 1, 1, 2, 3, 4),
@@ -278,6 +286,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 2,
                           "ended_at": None,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -411,6 +420,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNotNone(r['started_at'])
         del r['started_at']
         self.assertEqual({"id": r1,
+                          "revision": 0,
                           "ended_at": None,
                           "created_by_user_id": user,
                           "created_by_project_id": project,
@@ -627,7 +637,8 @@ class TestIndexerDriver(tests_base.TestCase):
                            "created_by_user_id": user,
                            "created_by_project_id": project,
                            "name": None,
-                           "resource_id": None}],
+                           "resource_id": None,
+                           "resource_revision": None}],
                          metric)
 
     def test_get_metric_with_details(self):
@@ -662,7 +673,8 @@ class TestIndexerDriver(tests_base.TestCase):
              "created_by_user_id": user,
              "created_by_project_id": project,
              "name": None,
-             "resource_id": None}
+             "resource_id": None,
+             "resource_revision": None},
         ], metric)
 
     def test_get_metric_with_bad_uuid(self):
