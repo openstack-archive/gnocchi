@@ -1301,6 +1301,8 @@ class ResourceTest(RestTest):
         self.assertEqual("http://localhost/v1/resource/"
                          + self.resource_type + "/" + self.attributes['id'],
                          result.headers['Location'])
+        self.assertEqual(resource['revision'], 0)
+        del resource['revision']
         self.assertEqual(self.resource, resource)
 
     def test_post_resource_with_invalid_metric(self):
@@ -1368,6 +1370,8 @@ class ResourceTest(RestTest):
                               + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
+        self.assertEqual(result['revision'], 0)
+        del result['revision']
         self.assertEqual(self.resource, result)
 
     def test_get_resource_non_admin(self):
@@ -1498,8 +1502,12 @@ class ResourceTest(RestTest):
                               + self.attributes['id'])
         result = json.loads(result.text)
         self.assertTrue(uuid.UUID(result['metrics']['foo']))
+        self.assertEqual(0, r['revision'])
+        self.assertEqual(1, result['revision'])
         del result['metrics']
+        del result['revision']
         del r['metrics']
+        del r['revision']
         self.assertEqual(r, result)
 
     def test_patch_resource_existent_metrics_from_another_user(self):
@@ -1602,6 +1610,8 @@ class ResourceTest(RestTest):
                               + self.resource_type + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
+        self.assertEqual(result['revision'], 0)
+        del result['revision']
         self.assertEqual(self.resource, result)
 
     def test_patch_resource_non_existent(self):
@@ -1714,6 +1724,7 @@ class ResourceTest(RestTest):
                          + self.attributes['id'],
                          result.headers['Location'])
         self.resource['metrics'] = self.attributes['metrics']
+        self.resource['revision'] = 0
         self.assertEqual(self.resource, resource)
 
     def test_post_resource_with_null_metrics(self):

@@ -131,16 +131,22 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def create_metric(self, id, created_by_user_id, created_by_project_id,
                       archive_policy_name,
-                      name=None, resource_id=None):
+                      name=None, resource_id=None, resource_revision=None):
         m = Metric(id=id,
                    created_by_user_id=created_by_user_id,
                    created_by_project_id=created_by_project_id,
                    archive_policy_name=archive_policy_name,
                    name=name,
-                   resource_id=resource_id)
+                   resource_id=resource_id,
+                   resource_revision=resource_revision)
         session = self.engine_facade.get_session()
-        session.add(m)
-        session.flush()
+        with session.begin():
+            if resource_id is not None and resource_revision is None:
+                q = session.query(Resource.revision).filter(
+                    Resource.id == resource_id).order_by(
+                        sqlalchemy.desc(Resource.revision))
+                m.resource_revision = q.first()[0]
+            session.add(m)
         return self._resource_to_dict(m)
 
     def list_metrics(self, user_id=None, project_id=None):
@@ -152,7 +158,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.filter(Metric.created_by_project_id == project_id)
         return [self._resource_to_dict(m) for m in q.all()]
 
-    def create_resource(self, resource_type, id,
+    def create_resource(self, resource_type, resource_id,
                         created_by_user_id, created_by_project_id,
                         user_id=None, project_id=None,
                         started_at=None, ended_at=None, metrics=None,
@@ -162,8 +168,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
            and ended_at is not None
            and started_at > ended_at):
             raise ValueError("Start timestamp cannot be after end timestamp")
+
         r = resource_cls(
-            id=id,
+            id=resource_id,
+            revision=0,
+            last_revision=True,
             type=resource_type,
             created_by_user_id=created_by_user_id,
             created_by_project_id=created_by_project_id,
@@ -172,32 +181,35 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             started_at=started_at,
             ended_at=ended_at,
             **kwargs)
+        self._fixup_created_by_uuid(r)
+
         session = self.engine_facade.get_session()
         with session.begin():
             session.add(r)
             try:
                 session.flush()
             except exception.DBDuplicateEntry:
-                raise indexer.ResourceAlreadyExists(id)
+                raise indexer.ResourceAlreadyExists(resource_id)
             except exception.DBReferenceError as ex:
                 raise indexer.ResourceValueError(r.type,
                                                  ex.key,
                                                  getattr(r, ex.key))
             if metrics is not None:
-                self._set_metrics_for_resource(session, id,
+                self._set_metrics_for_resource(session, resource_id, 0,
                                                created_by_user_id,
                                                created_by_project_id,
                                                metrics)
 
-        self._fixup_created_by_uuid(r)
         return self._resource_to_dict(r, with_metrics=True)
 
     @staticmethod
     def _resource_to_dict(resource, with_metrics=False):
         r = dict(resource)
-        if with_metrics and isinstance(resource, Resource):
-            r['metrics'] = dict((m['name'], six.text_type(m['id']))
-                                for m in resource.metrics)
+        if isinstance(resource, Resource):
+            del r['last_revision']
+            if with_metrics:
+                r['metrics'] = dict((m['name'], six.text_type(m['id']))
+                                    for m in resource.metrics)
         return r
 
     def update_resource(self, resource_type,
@@ -209,10 +221,19 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         with session.begin():
             q = session.query(
                 resource_cls).filter(
-                    resource_cls.id == resource_id)
+                    resource_cls.id == resource_id,
+                    resource_cls.last_revision)
             r = q.first()
             if r is None:
                 raise indexer.NoSuchResource(resource_id)
+
+            r.last_revision = False
+            session.flush()
+
+            # NOTE(sileht): releases the orm resource resource
+            # to copy all the previous value into a new row
+            session.expunge(r)
+            sqlalchemy.orm.session.make_transient(r)
 
             if ended_at is not _marker:
                 # NOTE(jd) Could be better to have check in the db for that so
@@ -233,21 +254,42 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         raise indexer.ResourceAttributeError(
                             r.type, attribute)
 
+            r.revision += 1
+            r.last_revision = True
+
+            self._fixup_created_by_uuid(r)
+            session.add(r)
+            try:
+                session.flush()
+            except exception.DBDuplicateEntry:
+                # NOTE(sileht): Should we retry ?
+                raise ValueError("Resource have been modified in the mean "
+                                 "times")
+            except exception.DBReferenceError as ex:
+                raise indexer.ResourceValueError(r.type,
+                                                 ex.key,
+                                                 getattr(r, ex.key))
+
             if metrics is not _marker:
                 if not append_metrics:
                     session.query(Metric).filter(
                         Metric.resource_id == resource_id).update(
-                            {"resource_id": None})
+                            {"resource_id": None,
+                             "resource_revision": None})
                 self._set_metrics_for_resource(session, resource_id,
+                                               r.revision,
                                                r.created_by_user_id,
                                                r.created_by_project_id,
                                                metrics)
+            if append_metrics:
+                session.query(Metric).filter(
+                    Metric.resource_id == resource_id).update(
+                        {"resource_revision": r.revision})
 
-        self._fixup_created_by_uuid(r)
         return self._resource_to_dict(r, with_metrics=True)
 
     @staticmethod
-    def _set_metrics_for_resource(session, resource_id,
+    def _set_metrics_for_resource(session, resource_id, resource_revision,
                                   user_id, project_id, metrics):
         for name, metric_id in six.iteritems(metrics):
             try:
@@ -255,7 +297,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                     Metric.id == metric_id,
                     Metric.created_by_user_id == user_id,
                     Metric.created_by_project_id == project_id).update(
-                        {"resource_id": resource_id, "name": name})
+                        {"resource_id": resource_id,
+                         "resource_revision": resource_revision, "name": name})
             except exception.DBDuplicateEntry:
                 raise indexer.NamedMetricAlreadyExists(name)
             if update == 0:
@@ -278,23 +321,29 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def get_resource(self, resource_type, resource_id, with_metrics=False):
         resource_cls = self._resource_type_to_class(resource_type)
         session = self.engine_facade.get_session()
+
         q = session.query(
             resource_cls).filter(
-                resource_cls.id == resource_id)
+                resource_cls.id == resource_id,
+                resource_cls.last_revision)
         if with_metrics:
             q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
+
         r = q.first()
         if r:
             return self._resource_to_dict(r, with_metrics)
 
     def list_resources(self, resource_type='generic',
                        attribute_filter=None,
-                       details=False):
+                       details=False, history=False):
 
         resource_cls = self._resource_type_to_class(resource_type)
         session = self.engine_facade.get_session()
 
         q = session.query(resource_cls)
+
+        if not history:
+            q = q.filter(resource_cls.last_revision)
 
         if attribute_filter:
             try:

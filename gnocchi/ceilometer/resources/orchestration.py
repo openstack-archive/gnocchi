@@ -38,10 +38,13 @@ class StackSQLAlchemy(sqlalchemy_base.Resource):
     __tablename__ = 'stack'
     __table_args__ = (
         sqlalchemy.Index('ix_stack_id', 'id'),
+        sqlalchemy.Index('ix_stack_revision', 'revision'),
+        sqlalchemy.ForeignKeyConstraint(['id', 'revision'],
+                                        ['resource.id', 'resource.revision'],
+                                        ondelete="CASCADE"),
         sqlalchemy_base.COMMON_TABLES_ARGS,
     )
 
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           sqlalchemy.ForeignKey('resource.id',
-                                                 ondelete="CASCADE"),
                            primary_key=True)
+    revision = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
