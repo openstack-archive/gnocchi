@@ -108,6 +108,9 @@ class Metric(Base, GnocchiBase):
         sqlalchemy.Index('ix_metric_id', 'id'),
         sqlalchemy.UniqueConstraint("resource_id", "name",
                                     name="uniq_metric0resource_id0name"),
+        sqlalchemy.ForeignKeyConstraint(['resource_id', 'resource_revision'],
+                                        ['resource.id', 'resource.revision'],
+                                        ondelete="CASCADE"),
         COMMON_TABLES_ARGS,
     )
 
@@ -123,21 +126,35 @@ class Metric(Base, GnocchiBase):
         sqlalchemy_utils.UUIDType(binary=False))
     created_by_project_id = sqlalchemy.Column(
         sqlalchemy_utils.UUIDType(binary=False))
-    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                                    sqlalchemy.ForeignKey('resource.id',
-                                                          ondelete="CASCADE"))
     name = sqlalchemy.Column(sqlalchemy.String(255))
+
+    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
+    resource_revision = sqlalchemy.Column(sqlalchemy.Integer)
 
 
 class Resource(Base, GnocchiBase):
     __tablename__ = 'resource'
     __table_args__ = (
         sqlalchemy.Index('ix_resource_id', 'id'),
+        sqlalchemy.Index('ix_resource_revision', 'revision'),
         COMMON_TABLES_ARGS,
     )
 
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            primary_key=True)
+    # NOTE(sileht): The update of a resource can't be done in an atomic way,
+    # so we track manually (without autoincrement) the revision to catch
+    # concurrency update of a resource.
+    revision = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True,
+                                 # NOTE(sileht): unsolved enigma:
+                                 # without that mysql write 1 if
+                                 # the orm object set revision to 0
+                                 server_default="0",
+                                 nullable=False)
+    # NOTE(sileht): We track the last revision of the resource to avoid
+    # to build complicated innerjoin/groupby that work with the
+    # QueryTransformer
+    last_revision = sqlalchemy.Column(sqlalchemy.Boolean, default=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('metric', 'generic', 'instance',
                                              'swift_account', 'volume',
                                              'ceph_account', 'network',
