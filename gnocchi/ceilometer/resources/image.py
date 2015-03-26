@@ -40,7 +40,7 @@ class ImageSQLAlchemy(sqlalchemy_base.Resource):
         sqlalchemy_base.COMMON_TABLES_ARGS,
     )
 
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
                            sqlalchemy.ForeignKey('resource.id',
                                                  ondelete="CASCADE"),
                            primary_key=True)

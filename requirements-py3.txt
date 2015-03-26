@@ -1,6 +1,6 @@
 numpy
 oslo.config>=1.4.0.0a1
-oslo.db>=0.5.0
+oslo.db>=1.8.0
 oslo.log
 oslo.policy>=0.3.0
 oslo.serialization>=1.0.0

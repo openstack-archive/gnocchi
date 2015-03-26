@@ -111,7 +111,7 @@ class Metric(Base, GnocchiBase):
         COMMON_TABLES_ARGS,
     )
 
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
                            primary_key=True)
     archive_policy_name = sqlalchemy.Column(
         sqlalchemy.String(255),
@@ -120,10 +120,10 @@ class Metric(Base, GnocchiBase):
         nullable=False)
     archive_policy = sqlalchemy.orm.relationship(ArchivePolicy)
     created_by_user_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False))
+        sqlalchemy_utils.UUIDType())
     created_by_project_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False))
-    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+        sqlalchemy_utils.UUIDType())
+    resource_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
                                     sqlalchemy.ForeignKey('resource.id',
                                                           ondelete="CASCADE"))
     name = sqlalchemy.Column(sqlalchemy.String(255))
@@ -136,7 +136,7 @@ class Resource(Base, GnocchiBase):
         COMMON_TABLES_ARGS,
     )
 
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
                            primary_key=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('metric', 'generic', 'instance',
                                              'swift_account', 'volume',
@@ -146,9 +146,9 @@ class Resource(Base, GnocchiBase):
                                              name="resource_type_enum"),
                              nullable=False, default='generic')
     created_by_user_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False))
+        sqlalchemy_utils.UUIDType())
     created_by_project_id = sqlalchemy.Column(
-        sqlalchemy_utils.UUIDType(binary=False))
+        sqlalchemy_utils.UUIDType())
     metrics = sqlalchemy.orm.relationship(Metric)
     started_at = sqlalchemy.Column(PreciseTimestamp, nullable=False,
                                    # NOTE(jd): We would like to use
@@ -159,5 +159,5 @@ class Resource(Base, GnocchiBase):
                                    # integer.
                                    default=datetime.datetime.utcnow)
     ended_at = sqlalchemy.Column(PreciseTimestamp)
-    user_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
-    project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
+    user_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType())
+    project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType())
