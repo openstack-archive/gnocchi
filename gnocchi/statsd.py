@@ -102,31 +102,24 @@ class Stats(object):
                 # is not designed to run in parallel and we do not envision
                 # operators manipulating the resource/metrics using the Gnocchi
                 # API at the same time.
-                if metric_name in resource['metrics']:
-                    metric_id = resource['metrics'][metric_name]
-                else:
-                    metric_id = uuid.uuid4()
-                # TODO(jd) Archive policies cannot be modified, so cache it?
-                metric = storage.Metric(
-                    str(metric_id),
-                    archive_policy.ArchivePolicy.from_dict(
-                        self.indexer.get_archive_policy(
-                            self.conf.statsd.archive_policy_name)))
-                if metric_name not in resource['metrics']:
+                metric = resource.get_metric(metric_name)
+                if not metric:
                     ap_name = self.conf.statsd.archive_policy_name
-                    self.indexer.create_metric(
-                        metric_id,
+                    metric = self.indexer.create_metric(
+                        uuid.uuid4(),
                         self.conf.statsd.user_id,
                         self.conf.statsd.project_id,
                         archive_policy_name=ap_name,
                         name=metric_name,
-                        resource_id=self.conf.statsd.resource_id)
+                        resource_id=self.conf.statsd.resource_id,
+                        details=True)
                     # TODO(jd) Slight optimization would be to change the
                     # driver to allow creation of metric with initial measures
                     # included!
                     self.storage.create_metric(metric)
                 self.storage.add_measures(metric, (measure,))
             except Exception as e:
+                raise
                 LOG.error("Unable to add measure %s: %s"
                           % (metric_name, e))
 
