@@ -1,0 +1,11 @@
+Verified+2: Jenkins
+Code-Review+2: Mehdi Abaakouk <mehdi.abaakouk@enovance.com>
+Workflow+1: Mehdi Abaakouk <mehdi.abaakouk@enovance.com>
+Code-Review+1: Ilya Tyaptin <ityaptin@mirantis.com>
+Code-Review+1: Igor Degtiarov <idegtiarov@mirantis.com>
+Code-Review+2: Chris Dent <chdent@redhat.com>
+Submitted-by: Jenkins
+Submitted-at: Thu, 26 Mar 2015 15:25:13 +0000
+Reviewed-on: https://review.openstack.org/167242
+Project: stackforge/gnocchi
+Branch: refs/heads/master
