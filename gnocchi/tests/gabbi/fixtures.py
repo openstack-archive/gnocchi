@@ -63,6 +63,11 @@ class ConfigFixture(fixture.GabbiFixture):
 
         global CONF
 
+        dll = CONF.default_log_levels
+        if "swiftclient=DEBUG" not in dll:
+            dll.append("swiftclient=DEBUG")
+            CONF.set_override("default_log_levels", dll)
+
         data_tmp_dir = tempfile.mkdtemp(prefix='gnocchi')
         coordination_dir = os.path.join(data_tmp_dir, 'tooz')
         os.mkdir(coordination_dir)
