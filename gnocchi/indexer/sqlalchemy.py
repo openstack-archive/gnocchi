@@ -98,7 +98,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def get_metrics(self, uuids, details=False):
         session = self.engine_facade.get_session()
-        query = session.query(Metric).filter(Metric.id.in_(uuids))
+        query = session.query(Metric)
+        # Avoid sqlalchemy getting upset about performance and
+        # making warnings when uuids is empty.
+        if uuids:
+            query = query.filter(Metric.id.in_(uuids))
         if details:
             query = query.options(sqlalchemy.orm.joinedload(
                 Metric.archive_policy))
