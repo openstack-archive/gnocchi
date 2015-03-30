@@ -19,7 +19,7 @@ try:
     import asyncio
 except ImportError:
     import trollius as asyncio
-from oslo.utils import timeutils
+from oslo_utils import timeutils
 from oslo_log import log
 import six
 

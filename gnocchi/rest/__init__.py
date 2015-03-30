@@ -16,8 +16,8 @@
 import json
 import uuid
 
-from oslo.utils import strutils
-from oslo.utils import timeutils
+from oslo_utils import strutils
+from oslo_utils import timeutils
 from oslo_log import log
 import pecan
 from pecan import rest

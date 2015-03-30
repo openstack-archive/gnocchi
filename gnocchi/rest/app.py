@@ -19,7 +19,7 @@ import uuid
 
 from flask import json as flask_json
 import keystonemiddleware.auth_token
-from oslo.utils import importutils
+from oslo_utils import importutils
 from oslo_log import log
 from oslo_policy import policy
 from oslo_serialization import jsonutils
