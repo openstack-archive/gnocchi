@@ -36,7 +36,7 @@ set +o xtrace
 # --------
 
 # Setup repository
-GNOCCHI_REPO=${GNOCCHI_REPO:-${GIT_BASE}/stackforge/gnocchi.git}
+GNOCCHI_REPO=${GNOCCHI_REPO:-${GIT_BASE}/openstack/gnocchi.git}
 GNOCCHI_BRANCH=${GNOCCHI_BRANCH:-master}
 
 # Set up default directories
