@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import json
+import pkg_resources
 import uuid
 
 from oslo_log import log
@@ -834,6 +835,17 @@ class ResourcesController(rest.RestController):
     ipmi = IPMIResourcesController()
     stack = StackResourcesController()
     image = ImageResourcesController()
+
+    @staticmethod
+    @pecan.expose('json')
+    def index():
+        base_url = pecan.request.application_url
+        return dict(
+            (image_type.name, '/'.join((pecan.request.application_url,
+                                        'v1/resource',
+                                        image_type.name)))
+            for image_type in pkg_resources.iter_entry_points(
+                group='gnocchi.indexer.resources'))
 
 
 def _SearchSchema(v):
