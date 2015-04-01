@@ -824,16 +824,20 @@ class ImageResourcesController(GenericResourcesController):
 
 
 class ResourcesController(rest.RestController):
-    generic = GenericResourcesController()
-    instance = InstancesResourcesController()
-    swift_account = SwiftAccountsResourcesController()
-    volume = VolumesResourcesController()
-    ceph_account = CephAccountsResourcesController()
-    network = NetworkResourcesController()
-    identity = IdentityResourcesController()
-    ipmi = IPMIResourcesController()
-    stack = StackResourcesController()
-    image = ImageResourcesController()
+    resources_type_and_url = {}
+
+    def __init__(self):
+        resources = extension.ExtensionManager('gnocchi.controller.resources')
+
+        for ext in resources.extensions:
+            setattr(self, ext.name, ext.plugin())
+            self.resources_type_and_url[ext.name] = '/v1/resource/' + ext.name
+
+    @pecan.expose('json')
+    def index(self):
+        return dict(
+            (type_name, pecan.request.application_url + url)
+            for type_name, url in self.resources_type_and_url.items())
 
 
 def _SearchSchema(v):
