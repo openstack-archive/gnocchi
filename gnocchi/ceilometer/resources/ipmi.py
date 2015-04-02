@@ -34,3 +34,8 @@ class IPMI(base.ResourceBase):
 class IPMISQLAlchemy(sqlalchemy_base.ResourceExtMixin,
                      sqlalchemy_base.Resource):
     __tablename__ = 'ipmi'
+
+
+class IPMIHistorySQLAlchemy(sqlalchemy_base.ResourceHistoryExtMixin,
+                            sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'ipmi_history'

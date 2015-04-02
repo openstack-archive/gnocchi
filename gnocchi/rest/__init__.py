@@ -165,20 +165,27 @@ def Timespan(value):
     return seconds
 
 
-def get_details(params):
+def get_header_option(name, params):
     type, options = werkzeug.http.parse_options_header(
         pecan.request.headers.get('Accept'))
     try:
-        details = strutils.bool_from_string(
-            options.get('details', params.pop('details', 'false')),
+        return strutils.bool_from_string(
+            options.get(name, params.pop(name, 'false')),
             strict=True)
     except ValueError as e:
-        method = 'Accept' if 'details' in options else 'query'
+        method = 'Accept' if name in options else 'query'
         abort(
             400,
-            "Unable to parse details value in %s: %s"
-            % (method, six.text_type(e)))
-    return details
+            "Unable to parse %s value in %s: %s"
+            % (name, method, six.text_type(e)))
+
+
+def get_history(params):
+    return get_header_option('history', params)
+
+
+def get_details(params):
+    return get_header_option('details', params)
 
 
 def ValidAggMethod(value):
@@ -748,6 +755,7 @@ class GenericResourcesController(rest.RestController):
     @pecan.expose('json')
     def get_all(self, **kwargs):
         details = get_details(kwargs)
+        history = get_history(kwargs)
 
         try:
             enforce("list all resource", {
@@ -767,7 +775,8 @@ class GenericResourcesController(rest.RestController):
             return pecan.request.indexer.list_resources(
                 self._resource_type,
                 attribute_filter=attr_filter,
-                details=details)
+                details=details,
+                history=history)
         except indexer.IndexerException as e:
             abort(400, e)
 
@@ -882,6 +891,7 @@ class SearchResourceTypeController(rest.RestController):
             attr_filter = None
 
         details = get_details(kwargs)
+        history = get_history(kwargs)
 
         try:
             enforce("search all resource", {
@@ -907,7 +917,8 @@ class SearchResourceTypeController(rest.RestController):
             return pecan.request.indexer.list_resources(
                 self._resource_type,
                 attribute_filter=attr_filter,
-                details=details)
+                details=details,
+                history=history)
         except indexer.IndexerException as e:
             abort(400, e)
 
