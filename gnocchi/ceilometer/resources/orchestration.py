@@ -34,3 +34,8 @@ class Stack(base.ResourceBase):
 class StackSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
                       sqlalchemy_base.Resource):
     __tablename__ = 'stack'
+
+
+class StackHistorySQLAlchemy(sqlalchemy_base.ResourceHistoryExtMixin,
+                             sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'stack_history'

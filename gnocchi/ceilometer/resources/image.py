@@ -32,11 +32,20 @@ class Image(base.ResourceBase):
                 'image.size']
 
 
-class ImageSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
-                      sqlalchemy_base.Resource):
-    __tablename__ = 'image'
-
+class ImageSQLAlchemyMixin(object):
     name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
     container_format = sqlalchemy.Column(sqlalchemy.String(255),
                                          nullable=False)
     disk_format = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+
+
+class ImageSQLAlchemy(ImageSQLAlchemyMixin,
+                      sqlalchemy_base.ResourceExtMixin,
+                      sqlalchemy_base.Resource):
+    __tablename__ = 'image'
+
+
+class ImageHistorySQLAlchemy(ImageSQLAlchemyMixin,
+                             sqlalchemy_base.ResourceHistoryExtMixin,
+                             sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'image_history'

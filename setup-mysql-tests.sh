@@ -24,6 +24,7 @@ export GNOCCHI_COORDINATION_URL="file:///$MYSQL_DATA/tooz"
 $*
 
 ret=$?
+mysql --no-defaults -S ${MYSQL_DATA}/mysql.socket
 kill $(jobs -p)
 rm -rf "${MYSQL_DATA}"
 exit $ret

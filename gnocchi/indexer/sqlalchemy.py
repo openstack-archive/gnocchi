@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import
+import datetime
 import itertools
 import operator
 import uuid
@@ -33,15 +34,21 @@ Base = base.Base
 Metric = base.Metric
 ArchivePolicy = base.ArchivePolicy
 Resource = base.Resource
+ResourceHistory = base.ResourceHistory
 
 _marker = indexer._marker
 
 
 class SQLAlchemyIndexer(indexer.IndexerDriver):
     resources = extension.ExtensionManager('gnocchi.indexer.resources')
+    resources_history = extension.ExtensionManager(
+        'gnocchi.indexer.resources_history')
 
     _RESOURCE_CLASS_MAPPER = {ext.name: ext.plugin
                               for ext in resources.extensions}
+
+    _RESOURCE_HISTORY_CLASS_MAPPER = {ext.name: ext.plugin
+                                      for ext in resources_history.extensions}
 
     def __init__(self, conf):
         conf.set_override("connection", conf.indexer.url, "database")
@@ -61,6 +68,11 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if resource_type not in self._RESOURCE_CLASS_MAPPER:
             raise indexer.UnknownResourceType(resource_type)
         return self._RESOURCE_CLASS_MAPPER[resource_type]
+
+    def _resource_type_to_history_class(self, resource_type):
+        if resource_type not in self._RESOURCE_HISTORY_CLASS_MAPPER:
+            raise indexer.UnknownResourceType(resource_type)
+        return self._RESOURCE_HISTORY_CLASS_MAPPER[resource_type]
 
     @staticmethod
     def _fixup_created_by_uuid(obj):
@@ -197,7 +209,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     @staticmethod
     def _resource_to_dict(resource, with_metrics=False):
         r = dict(resource)
-        if with_metrics and isinstance(resource, Resource):
+        if with_metrics and (isinstance(resource, Resource) or
+                             isinstance(resource, ResourceHistory)):
+            if 'revision' in r:
+                del r['revision']
             r['metrics'] = dict((m['name'], six.text_type(m['id']))
                                 for m in resource.metrics)
         return r
@@ -206,16 +221,28 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
                         **kwargs):
+
+        now = datetime.datetime.utcnow()
+
         resource_cls = self._resource_type_to_class(resource_type)
+        resource_history_cls = self._resource_type_to_history_class(
+            resource_type)
         session = self.engine_facade.get_session()
         with session.begin():
-            q = session.query(
-                resource_cls).filter(
-                    resource_cls.id == resource_id)
+            q = session.query(resource_cls).filter(
+                resource_cls.id == resource_id)
             r = q.first()
             if r is None:
                 raise indexer.NoSuchResource(resource_id)
 
+            # Build history
+            rh = resource_history_cls()
+            for col in sqlalchemy.inspect(resource_cls).columns:
+                setattr(rh, col.name, getattr(r, col.name))
+            rh.lifetime_to = now
+            session.add(rh)
+
+            # Update the resource
             if ended_at is not _marker:
                 # NOTE(jd) Could be better to have check in the db for that so
                 # we can just run the UPDATE
@@ -226,6 +253,9 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         raise ValueError(
                             "Start timestamp cannot be after end timestamp")
                 r.ended_at = ended_at
+
+            r.lifetime_from = now
+            self._fixup_created_by_uuid(r)
 
             if kwargs:
                 for attribute, value in six.iteritems(kwargs):
@@ -244,8 +274,14 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                                                r.created_by_user_id,
                                                r.created_by_project_id,
                                                metrics)
+            try:
+                session.flush()
+            except exception.DBDeadlock:
+                # TODO(sileht): retry ourself
+                raise ValueError(
+                    "The resource have been updated in the meantime, "
+                    "please retry...")
 
-        self._fixup_created_by_uuid(r)
         return self._resource_to_dict(r, with_metrics=True)
 
     @staticmethod
@@ -289,18 +325,12 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if r:
             return self._resource_to_dict(r, with_metrics)
 
-    def list_resources(self, resource_type='generic',
-                       attribute_filter=None,
-                       details=False):
-
-        resource_cls = self._resource_type_to_class(resource_type)
-        session = self.engine_facade.get_session()
-
-        q = session.query(resource_cls)
-
+    def _do_list_resources(self, session, target_cls, resource_type,
+                           attribute_filter):
+        q = session.query(target_cls)
         if attribute_filter:
             try:
-                f = QueryTransformer.build_filter(resource_cls,
+                f = QueryTransformer.build_filter(target_cls,
                                                   attribute_filter)
             except indexer.QueryAttributeError as e:
                 # NOTE(jd) The QueryAttributeError does not know about
@@ -310,25 +340,45 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.filter(f)
 
         # Always include metrics
-        q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
+        q = q.options(sqlalchemy.orm.joinedload(target_cls.metrics))
+        return q.all()
+
+    def list_resources(self, resource_type='generic',
+                       attribute_filter=None,
+                       details=False,
+                       history=False):
+
+        resource_cls = self._resource_type_to_class(resource_type)
+        history_cls = self._resource_type_to_history_class(resource_type)
+        session = self.engine_facade.get_session()
+
+        all_resources = []
+        if history:
+            all_resources.extend(self._do_list_resources(
+                session, history_cls, resource_type, attribute_filter))
+        all_resources.extend(self._do_list_resources(
+            session, resource_cls, resource_type, attribute_filter))
 
         if details:
-            grouped_by_type = itertools.groupby(q.all(),
-                                                operator.attrgetter('type'))
+            grouped_by_type = itertools.groupby(
+                all_resources, lambda r: (hasattr(r, 'revision'), r.type))
             all_resources = []
-            for type, resources in grouped_by_type:
+            for (is_history, type), resources in grouped_by_type:
                 if type == 'generic':
                     # No need for a second query
                     all_resources.extend(resources)
+                elif is_history:
+                    all_resources.extend(session.query(
+                        self._RESOURCE_HISTORY_CLASS_MAPPER[type]).filter(
+                            self._RESOURCE_HISTORY_CLASS_MAPPER[
+                                type].revision.in_(
+                                [r.revision for r in resources])).all())
                 else:
-                    resources_ids = [r.id for r in resources]
                     all_resources.extend(
                         session.query(
                             self._RESOURCE_CLASS_MAPPER[type]).filter(
                                 self._RESOURCE_CLASS_MAPPER[type].id.in_(
-                                    resources_ids)).all())
-        else:
-            all_resources = q.all()
+                                    [r.id for r in resources])).all())
 
         return [self._resource_to_dict(r, with_metrics=True)
                 for r in all_resources]

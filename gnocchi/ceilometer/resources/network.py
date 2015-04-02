@@ -45,3 +45,8 @@ class Network(base.ResourceBase):
 class NetworkSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
                         sqlalchemy_base.Resource):
     __tablename__ = 'network'
+
+
+class NetworkHistorySQLAlchemy(sqlalchemy_base.ResourceHistoryExtMixin,
+                               sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'network_history'
