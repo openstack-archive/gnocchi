@@ -1271,6 +1271,8 @@ class ResourceTest(RestTest):
         self.assertEqual("http://localhost/v1/resource/"
                          + self.resource_type + "/" + self.attributes['id'],
                          result.headers['Location'])
+        del resource['lifetime_from']
+        del resource['lifetime_to']
         self.assertEqual(self.resource, resource)
 
     def test_post_resource_with_invalid_metric(self):
@@ -1336,6 +1338,8 @@ class ResourceTest(RestTest):
                               + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
+        del result['lifetime_from']
+        del result['lifetime_to']
         self.assertEqual(self.resource, result)
 
     def test_get_resource_non_admin(self):
@@ -1463,8 +1467,13 @@ class ResourceTest(RestTest):
                               + self.attributes['id'])
         result = json.loads(result.text)
         self.assertTrue(uuid.UUID(result['metrics']['foo']))
+        self.assertNotEqual(r['lifetime_from'], result['lifetime_from'])
         del result['metrics']
+        del result['lifetime_from']
+        del result['lifetime_to']
         del r['metrics']
+        del r['lifetime_from']
+        del r['lifetime_to']
         self.assertEqual(r, result)
 
     def test_patch_resource_existent_metrics_from_another_user(self):
@@ -1564,6 +1573,8 @@ class ResourceTest(RestTest):
                               + self.resource_type + "/"
                               + self.attributes['id'])
         result = json.loads(result.text)
+        del result['lifetime_from']
+        del result['lifetime_to']
         self.assertEqual(self.resource, result)
 
     def test_patch_resource_non_existent(self):
@@ -1672,6 +1683,8 @@ class ResourceTest(RestTest):
                          + self.attributes['id'],
                          result.headers['Location'])
         self.resource['metrics'] = self.attributes['metrics']
+        del resource['lifetime_from']
+        del resource['lifetime_to']
         self.assertEqual(self.resource, resource)
 
     def test_post_resource_with_null_metrics(self):
