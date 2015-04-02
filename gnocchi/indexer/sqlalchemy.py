@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import
+import datetime
 import itertools
 import operator
 
@@ -32,14 +33,33 @@ Base = base.Base
 Metric = base.Metric
 ArchivePolicy = base.ArchivePolicy
 Resource = base.Resource
+ResourceHistory = base.ResourceHistory
 
 _marker = indexer._marker
+
+
+def get_resource_mappers(ext):
+    if ext.name == "generic":
+        resource_ext = ext.plugin
+        resource_history_ext = ResourceHistory
+    else:
+        resource_ext = type(str(ext.name),
+                            (ext.plugin, base.ResourceExtMixin, Resource),
+                            {"__tablename__": ext.name})
+        resource_history_ext = type(str("%s_history" % ext.name),
+                                    (ext.plugin, base.ResourceHistoryExtMixin,
+                                     ResourceHistory),
+                                    {"__tablename__": (
+                                        "%s_history" % ext.name)})
+
+    return {'resource': resource_ext,
+            'history': resource_history_ext}
 
 
 class SQLAlchemyIndexer(indexer.IndexerDriver):
     resources = extension.ExtensionManager('gnocchi.indexer.resources')
 
-    _RESOURCE_CLASS_MAPPER = {ext.name: ext.plugin
+    _RESOURCE_CLASS_MAPPER = {ext.name: get_resource_mappers(ext)
                               for ext in resources.extensions}
 
     def __init__(self, conf):
@@ -56,10 +76,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         engine = self.engine_facade.get_engine()
         Base.metadata.create_all(engine, checkfirst=True)
 
-    def _resource_type_to_class(self, resource_type):
+    def _resource_type_to_class(self, resource_type, purpose="resource"):
         if resource_type not in self._RESOURCE_CLASS_MAPPER:
             raise indexer.UnknownResourceType(resource_type)
-        return self._RESOURCE_CLASS_MAPPER[resource_type]
+        return self._RESOURCE_CLASS_MAPPER[resource_type][purpose]
 
     def list_archive_policies(self):
         session = self.engine_facade.get_session()
@@ -177,20 +197,38 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
                         **kwargs):
+
+        now = datetime.datetime.utcnow()
+
         resource_cls = self._resource_type_to_class(resource_type)
+        resource_history_cls = self._resource_type_to_class(resource_type,
+                                                            "history")
         session = self.engine_facade.get_session()
         with session.begin():
-            q = session.query(
-                resource_cls).filter(
-                    resource_cls.id == resource_id)
+            # NOTE(sileht): We use FOR UPDATE that is not galera friendly,
+            # but they are no other way to cleanly patch a resource and store
+            # the history that safe when two concurrents call are done.
+            q = session.query(resource_cls).filter(
+                resource_cls.id == resource_id).with_for_update()
+
             # NOTE(jd) Always load metrics. It's sad, but since anyway what we
             # return will end up on the wire, the user wants full info, so
             # don't bother providing a with_metrics parameter.
-            q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
+            # NOTE(sileht): joinedload is not possible with 'FOR UPDATE'
+            # q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
+
             r = q.first()
             if r is None:
                 raise indexer.NoSuchResource(resource_id)
 
+            # Build history
+            rh = resource_history_cls()
+            for col in sqlalchemy.inspect(resource_cls).columns:
+                setattr(rh, col.name, getattr(r, col.name))
+            rh.lifetime_to = now
+            session.add(rh)
+
+            # Update the resource
             if ended_at is not _marker:
                 # NOTE(jd) Could be better to have check in the db for that so
                 # we can just run the UPDATE
@@ -201,6 +239,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         raise ValueError(
                             "Start timestamp cannot be after end timestamp")
                 r.ended_at = ended_at
+
+            r.lifetime_from = now
 
             if kwargs:
                 for attribute, value in six.iteritems(kwargs):
@@ -217,9 +257,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             {"resource_id": None})
                 self._set_metrics_for_resource(session, r, metrics)
 
-        if metrics is not _marker:
-            # NOTE(jd) Force reload of metrics – do it outside the session!
-            r.metrics
+        # NOTE(jd) Force reload of metrics – do it outside the session!
+        r.metrics
 
         return r
 
@@ -262,18 +301,12 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
         return q.first()
 
-    def list_resources(self, resource_type='generic',
-                       attribute_filter=None,
-                       details=False):
-
-        resource_cls = self._resource_type_to_class(resource_type)
-        session = self.engine_facade.get_session()
-
-        q = session.query(resource_cls)
-
+    def _do_list_resources(self, session, target_cls, resource_type,
+                           attribute_filter):
+        q = session.query(target_cls)
         if attribute_filter:
             try:
-                f = QueryTransformer.build_filter(resource_cls,
+                f = QueryTransformer.build_filter(target_cls,
                                                   attribute_filter)
             except indexer.QueryAttributeError as e:
                 # NOTE(jd) The QueryAttributeError does not know about
@@ -283,28 +316,50 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.filter(f)
 
         # Always include metrics
-        q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
+        q = q.options(sqlalchemy.orm.joinedload(target_cls.metrics))
+        return q.all()
+
+    def list_resources(self, resource_type='generic',
+                       attribute_filter=None,
+                       details=False,
+                       history=False):
+
+        resource_cls = self._resource_type_to_class(resource_type)
+        session = self.engine_facade.get_session()
+
+        all_resources = []
+        if history:
+            history_cls = self._resource_type_to_class(resource_type,
+                                                       "history")
+            all_resources.extend(self._do_list_resources(
+                session, history_cls, resource_type, attribute_filter))
+        all_resources.extend(self._do_list_resources(
+            session, resource_cls, resource_type, attribute_filter))
 
         if details:
-            grouped_by_type = itertools.groupby(q.all(),
-                                                operator.attrgetter('type'))
+            grouped_by_type = itertools.groupby(
+                all_resources, lambda r: (r.revision != -1, r.type))
             all_resources = []
-            for type, resources in grouped_by_type:
+            for (is_history, type), resources in grouped_by_type:
                 if type == 'generic':
                     # No need for a second query
                     all_resources.extend(resources)
                 else:
-                    q = session.query(
-                        self._RESOURCE_CLASS_MAPPER[type]).filter(
-                            self._RESOURCE_CLASS_MAPPER[type].id.in_(
-                                [r.id for r in resources])).options(
-                                    # Always include metrics
-                                    sqlalchemy.orm.joinedload(
-                                        resource_cls.metrics))
-                    all_resources.extend(q.all())
-            return all_resources
+                    if is_history:
+                        target_cls = self._resource_type_to_class(type,
+                                                                  "history")
+                        f = target_cls.revision.in_(
+                            [r.revision for r in resources])
+                    else:
+                        target_cls = self._resource_type_to_class(type)
+                        f = target_cls.id.in_([r.id for r in resources])
 
-        return q.all()
+                    q = session.query(target_cls).filter(f)
+                    # Always include metrics
+                    q = q.options(
+                        sqlalchemy.orm.joinedload(target_cls.metrics))
+                    all_resources.extend(q.all())
+        return all_resources
 
     def delete_metric(self, id):
         session = self.engine_facade.get_session()
