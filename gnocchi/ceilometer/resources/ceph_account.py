@@ -35,3 +35,8 @@ class CephAccount(base.ResourceBase):
 class CephAccountSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
                             sqlalchemy_base.Resource):
     __tablename__ = 'ceph_account'
+
+
+class CephAccountHistorySQLAlchemy(sqlalchemy_base.ResourceHistoryExtMixin,
+                                   sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'ceph_account_history'

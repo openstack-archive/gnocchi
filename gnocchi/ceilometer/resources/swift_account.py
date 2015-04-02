@@ -37,3 +37,8 @@ class SwiftAccount(base.ResourceBase):
 class SwiftAccountSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
                              sqlalchemy_base.Resource):
     __tablename__ = 'swift_account'
+
+
+class SwiftAccountHistorySQLAlchemy(sqlalchemy_base.ResourceHistoryExtMixin,
+                                    sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'swift_account_history'

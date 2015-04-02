@@ -56,12 +56,21 @@ class Instance(base.ResourceBase):
                 'cpu_util']
 
 
-class InstanceSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
-                         sqlalchemy_base.Resource):
-    __tablename__ = 'instance'
-
+class InstanceSQLAlchemyMixin(object):
     flavor_id = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
     image_ref = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
     host = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
     display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
     server_group = sqlalchemy.Column(sqlalchemy.String(255))
+
+
+class InstanceSQLAlchemy(InstanceSQLAlchemyMixin,
+                         sqlalchemy_base.ResourceExtMixin,
+                         sqlalchemy_base.Resource):
+    __tablename__ = 'instance'
+
+
+class InstanceHistorySQLAlchemy(InstanceSQLAlchemyMixin,
+                                sqlalchemy_base.ResourceHistoryExtMixin,
+                                sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'instance_history'
