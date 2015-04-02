@@ -29,8 +29,3 @@ class Stack(base.ResourceBase):
                 'stack.resume',
                 'stack.suspend',
                 ]
-
-
-class StackSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
-                      sqlalchemy_base.Resource):
-    __tablename__ = 'stack'

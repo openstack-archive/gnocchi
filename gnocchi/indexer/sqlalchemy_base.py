@@ -173,15 +173,12 @@ class Metric(Base, GnocchiBase, storage.Metric):
                 or (storage.Metric.__eq__(self, other)))
 
 
-class Resource(Base, GnocchiBase):
-    __tablename__ = 'resource'
-    __table_args__ = (
-        sqlalchemy.Index('ix_resource_id', 'id'),
-        COMMON_TABLES_ARGS,
-    )
+class ResourceMixin(object):
+    @declarative.declared_attr
+    def __table_args__(cls):
+        return (sqlalchemy.Index('ix_%s_id' % cls.__tablename__, 'id'),
+                COMMON_TABLES_ARGS)
 
-    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
-                           primary_key=True)
     type = sqlalchemy.Column(sqlalchemy.Enum('metric', 'generic', 'instance',
                                              'swift_account', 'volume',
                                              'ceph_account', 'network',
@@ -193,7 +190,6 @@ class Resource(Base, GnocchiBase):
         sqlalchemy_utils.UUIDType(binary=False))
     created_by_project_id = sqlalchemy.Column(
         sqlalchemy_utils.UUIDType(binary=False))
-    metrics = sqlalchemy.orm.relationship(Metric)
     started_at = sqlalchemy.Column(PreciseTimestamp, nullable=False,
                                    # NOTE(jd): We would like to use
                                    # sqlalchemy.func.now, but we can't
@@ -202,9 +198,41 @@ class Resource(Base, GnocchiBase):
                                    # not store a timestamp but a date as an
                                    # integer.
                                    default=datetime.datetime.utcnow)
+    lifetime_from = sqlalchemy.Column(PreciseTimestamp, nullable=False,
+                                      default=datetime.datetime.utcnow)
     ended_at = sqlalchemy.Column(PreciseTimestamp)
     user_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
     project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
+
+
+class Resource(ResourceMixin, Base, GnocchiBase):
+    __tablename__ = 'resource'
+    _extra_keys = ['revision', 'lifetime_to']
+    revision = -1
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                           primary_key=True)
+    lifetime_to = None
+    metrics = sqlalchemy.orm.relationship(Metric)
+
+
+class ResourceHistory(ResourceMixin, Base, GnocchiBase):
+    __tablename__ = 'resource_history'
+    revision = sqlalchemy.Column(sqlalchemy.Integer, autoincrement=True,
+                                 primary_key=True)
+    id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
+                           sqlalchemy.ForeignKey('resource.id',
+                                                 ondelete="CASCADE"))
+    lifetime_to = sqlalchemy.Column(PreciseTimestamp, nullable=False,
+                                    default=datetime.datetime.utcnow)
+    metrics = sqlalchemy.orm.relationship(
+        Metric, primaryjoin="Metric.resource_id == ResourceHistory.id",
+        foreign_keys='Metric.resource_id')
+
+
+class ResourceExt(object):
+    # Default extension class for plugin that doesn't need additional
+    # columns
+    pass
 
 
 class ResourceExtMixin(object):
@@ -218,4 +246,20 @@ class ResourceExtMixin(object):
         return sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                                  sqlalchemy.ForeignKey('resource.id',
                                                        ondelete="CASCADE"),
+                                 primary_key=True)
+
+
+class ResourceHistoryExtMixin(object):
+    @declarative.declared_attr
+    def __table_args__(cls):
+        return (sqlalchemy.Index('ix_%s_revision' % cls.__tablename__,
+                                 'revision'),
+                COMMON_TABLES_ARGS)
+
+    @declarative.declared_attr
+    def revision(cls):
+        return sqlalchemy.Column(sqlalchemy.Integer,
+                                 sqlalchemy.ForeignKey(
+                                     'resource_history.revision',
+                                     ondelete="CASCADE"),
                                  primary_key=True)
