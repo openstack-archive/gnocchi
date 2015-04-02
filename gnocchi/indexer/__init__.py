@@ -38,6 +38,9 @@ class Resource(object):
     def __eq__(self, other):
         return (self.id == other.id
                 and self.type == other.type
+                and self.revision == other.revision
+                and self.lifetime_from == other.lifetime_from
+                and self.lifetime_to == other.lifetime_to
                 and self.created_by_user_id == other.created_by_user_id
                 and self.created_by_project_id == other.created_by_project_id
                 and self.user_id == other.user_id
