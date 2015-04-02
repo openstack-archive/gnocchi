@@ -48,3 +48,8 @@ class Identity(base.ResourceBase):
 class IdentitySQLAlchemy(sqlalchemy_base.ResourceExtMixin,
                          sqlalchemy_base.Resource):
     __tablename__ = 'identity'
+
+
+class IdentityHistorySQLAlchemy(sqlalchemy_base.ResourceHistoryExtMixin,
+                                sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'identity_history'

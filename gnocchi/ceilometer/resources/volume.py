@@ -40,8 +40,17 @@ class Volume(base.ResourceBase):
                 ]
 
 
-class VolumeSQLAlchemy(sqlalchemy_base.ResourceExtMixin,
+class VolumeSQLAlchemyMixin(object):
+    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+
+
+class VolumeSQLAlchemy(VolumeSQLAlchemyMixin,
+                       sqlalchemy_base.ResourceExtMixin,
                        sqlalchemy_base.Resource):
     __tablename__ = 'volume'
 
-    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+
+class VolumeHistorySQLAlchemy(VolumeSQLAlchemyMixin,
+                              sqlalchemy_base.ResourceHistoryExtMixin,
+                              sqlalchemy_base.ResourceHistory):
+    __tablename__ = 'volume_history'
