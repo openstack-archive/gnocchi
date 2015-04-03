@@ -19,6 +19,7 @@ import itertools
 import operator
 
 from oslo_db import exception
+from oslo_db.sqlalchemy import models
 from oslo_db.sqlalchemy import session
 from oslo_utils import timeutils
 import six
@@ -304,9 +305,59 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.options(sqlalchemy.orm.joinedload(resource_cls.metrics))
         return q.first()
 
-    def _do_list_resources(self, session, target_cls, resource_type,
-                           attribute_filter):
+    def _get_history_result_mapper(self, resource_type):
+            resource_cls = self._resource_type_to_class(resource_type)
+            history_cls = self._resource_type_to_class(resource_type,
+                                                       'history')
+
+            resource_cols = {}
+            history_cols = {}
+            for col in sqlalchemy.inspect(history_cls).columns:
+                history_cols[col.name] = col
+                if col.name in ["revision", "lifetime_to"]:
+                    value = None if col.name == "lifetime_to" else -1
+                    resource_cols[col.name] = sqlalchemy.bindparam(
+                        col.name, value, col.type).label(col.name)
+                else:
+                    resource_cols[col.name] = getattr(resource_cls,
+                                                      col.name)
+            s1 = sqlalchemy.select(history_cols.values())
+            s2 = sqlalchemy.select(resource_cols.values())
+            if resource_type != "generic":
+                s1 = s1.where(history_cls.revision == ResourceHistory.revision)
+                s2 = s2.where(resource_cls.id == Resource.id)
+            union_stmt = sqlalchemy.union(s1, s2)
+            stmt = union_stmt.alias("result")
+
+            class Result(base.ResourceJsonifier, base.GnocchiBase):
+                def __iter__(self):
+                    return models.ModelIterator(self, iter(stmt.c.keys()))
+
+            sqlalchemy.orm.mapper(
+                Result, stmt, primary_key=[stmt.c.id, stmt.c.revision],
+                properties={
+                    'metrics': sqlalchemy.orm.relationship(
+                        Metric,
+                        primaryjoin=Metric.resource_id == stmt.c.id,
+                        foreign_keys=Metric.resource_id)
+                })
+
+            return Result
+
+    def list_resources(self, resource_type='generic',
+                       attribute_filter=None,
+                       details=False,
+                       history=False):
+
+        session = self.engine_facade.get_session()
+
+        if history:
+            target_cls = self._get_history_result_mapper(resource_type)
+        else:
+            target_cls = self._resource_type_to_class(resource_type)
+
         q = session.query(target_cls)
+
         if attribute_filter:
             try:
                 f = QueryTransformer.build_filter(target_cls,
@@ -316,28 +367,18 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 # resource_type, so convert it
                 raise indexer.ResourceAttributeError(resource_type,
                                                      e.attribute)
+
             q = q.filter(f)
 
-        # Always include metrics
-        q = q.options(sqlalchemy.orm.joinedload(target_cls.metrics))
-        return q.all()
-
-    def list_resources(self, resource_type='generic',
-                       attribute_filter=None,
-                       details=False,
-                       history=False):
-
-        resource_cls = self._resource_type_to_class(resource_type)
-        session = self.engine_facade.get_session()
-
-        all_resources = []
         if history:
-            history_cls = self._resource_type_to_class(resource_type,
-                                                       "history")
-            all_resources.extend(self._do_list_resources(
-                session, history_cls, resource_type, attribute_filter))
-        all_resources.extend(self._do_list_resources(
-            session, resource_cls, resource_type, attribute_filter))
+            # TODO(sileht): use joinedload or contains_eager
+            # to avoid an additionnal query per row
+            q = q.options(sqlalchemy.orm.lazyload("metrics"))
+        else:
+            q = q.options(sqlalchemy.orm.joinedload("metrics"))
+
+        q = q.order_by(target_cls.lifetime_from)
+        all_resources = q.all()
 
         if details:
             grouped_by_type = itertools.groupby(
@@ -346,6 +387,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             for (is_history, type), resources in grouped_by_type:
                 if type == 'generic':
                     # No need for a second query
+                    if history:
+                        # NOTE(jd) Force load of metrics :)
+                        for r in all_resources:
+                            r.metrics
                     all_resources.extend(resources)
                 else:
                     if is_history:
@@ -362,6 +407,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                     q = q.options(
                         sqlalchemy.orm.joinedload(target_cls.metrics))
                     all_resources.extend(q.all())
+        elif history:
+            # NOTE(jd) Force load of metrics :)
+            for r in all_resources:
+                r.metrics
         return all_resources
 
     def delete_metric(self, id):
