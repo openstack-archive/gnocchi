@@ -325,9 +325,45 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if r:
             return self._resource_to_dict(r, with_metrics)
 
-    def _do_list_resources(self, session, target_cls, resource_type,
-                           attribute_filter):
-        q = session.query(target_cls)
+    def list_resources(self, resource_type='generic',
+                       attribute_filter=None,
+                       details=False,
+                       history=False):
+
+        resource_cls = self._resource_type_to_class(resource_type)
+        history_cls = self._resource_type_to_history_class(resource_type)
+        session = self.engine_facade.get_session()
+        metric_alias = sqlalchemy.orm.aliased(Metric)
+
+        if not history:
+            target_cls = resource_cls
+            q = session.query(resource_cls)
+        else:
+            target_cls = history_cls
+            resource_cols = []
+            history_cols = []
+            for col in sqlalchemy.inspect(history_cls).columns:
+                label = col.name
+                if col.name in ["revision", "lifetime_to"]:
+                    resource_cols.append(sqlalchemy.bindparam(
+                        label, None, col.type))
+                    history_cols.append(col.label(label))
+                else:
+                    resource_cols.append(getattr(resource_cls,
+                                                 col.name).label(label))
+                    history_cols.append(col.label(label))
+
+            qr = session.query().add_columns(*resource_cols)
+            qr = qr.add_entity(metric_alias)
+            qr = qr.outerjoin(metric_alias,
+                              resource_cls.id == metric_alias.resource_id)
+
+            q = session.query().add_columns(*history_cols)
+            q = q.add_entity(metric_alias)
+            q = q.outerjoin(metric_alias,
+                            history_cls.id == metric_alias.resource_id)
+            q = q.union_all(qr)
+
         if attribute_filter:
             try:
                 f = QueryTransformer.build_filter(target_cls,
@@ -340,39 +376,25 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             q = q.filter(f)
 
         # Always include metrics
-        q = q.options(sqlalchemy.orm.joinedload(target_cls.metrics))
-        return q.all()
-
-    def list_resources(self, resource_type='generic',
-                       attribute_filter=None,
-                       details=False,
-                       history=False):
-
-        resource_cls = self._resource_type_to_class(resource_type)
-        history_cls = self._resource_type_to_history_class(resource_type)
-        session = self.engine_facade.get_session()
-
-        all_resources = []
-        if history:
-            all_resources.extend(self._do_list_resources(
-                session, history_cls, resource_type, attribute_filter))
-        all_resources.extend(self._do_list_resources(
-            session, resource_cls, resource_type, attribute_filter))
+        if not history:
+            q = q.options(sqlalchemy.orm.joinedload(target_cls.metrics))
+            all_resources = q.all()
+        else:
+            result = session.execute(q.subquery("resource_history"))
+            q = session.query(target_cls)
+            q = q.options(sqlalchemy.orm.contains_eager("metrics",
+                                                        alias=metric_alias))
+            all_resources = q.instances(result)
 
         if details:
-            grouped_by_type = itertools.groupby(
-                all_resources, lambda r: (hasattr(r, 'revision'), r.type))
+            # TODO(sileht): exercice this code in tests with history=True
+            grouped_by_type = itertools.groupby(all_resources,
+                                                operator.attrgetter('type'))
             all_resources = []
-            for (is_history, type), resources in grouped_by_type:
+            for type, resources in grouped_by_type:
                 if type == 'generic':
                     # No need for a second query
                     all_resources.extend(resources)
-                elif is_history:
-                    all_resources.extend(session.query(
-                        self._RESOURCE_HISTORY_CLASS_MAPPER[type]).filter(
-                            self._RESOURCE_HISTORY_CLASS_MAPPER[
-                                type].revision.in_(
-                                [r.revision for r in resources])).all())
                 else:
                     all_resources.extend(
                         session.query(

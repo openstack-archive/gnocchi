@@ -174,7 +174,16 @@ class ResourceHistory(ResourceMixin, Base, GnocchiBase):
                                  primary_key=True)
     id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False),
                            sqlalchemy.ForeignKey('resource.id',
-                                                 ondelete="CASCADE"))
+                                                 ondelete="CASCADE"),
+                           # NOTE(sileht): we use this class for two purposes:
+                           # to store the resource history and as view
+                           # when we query the history.
+                           # For the second case because we 'union' the
+                           # resource and the resource_history table, the view
+                           # need to have that as primary_key in additionnal to
+                           # the revision (the resource row got (None, <uuid>)
+                           # as primary)
+                           primary_key=True)
     lifetime_to = sqlalchemy.Column(PreciseTimestamp, nullable=False,
                                     default=datetime.datetime.utcnow)
     metrics = sqlalchemy.orm.relationship(

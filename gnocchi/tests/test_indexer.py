@@ -608,6 +608,7 @@ class TestIndexerDriver(tests_base.TestCase):
                                         append_metrics=True)
 
         r1['lifetime_to'] = r2['lifetime_from']
+        r2['lifetime_to'] = None
         self.assertEqual({'foo': str(e)}, r2['metrics'])
         self.assertEqual(new_user, r2['user_id'])
         self.assertEqual(new_project, r2['project_id'])
