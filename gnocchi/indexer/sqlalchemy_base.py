@@ -176,7 +176,17 @@ class Metric(Base, GnocchiBase, storage.Metric):
                 or (storage.Metric.__eq__(self, other)))
 
 
-class ResourceMixin(indexer.Resource):
+class ResourceJsonifier(indexer.Resource):
+    def jsonify(self):
+        d = dict(self)
+        del d['revision']
+        if 'metrics' not in sqlalchemy.inspect(self).unloaded:
+            d['metrics'] = dict((m['name'], six.text_type(m['id']))
+                                for m in self.metrics)
+        return d
+
+
+class ResourceMixin(ResourceJsonifier):
     @declarative.declared_attr
     def __table_args__(cls):
         return (sqlalchemy.Index('ix_%s_id' % cls.__tablename__, 'id'),
@@ -206,14 +216,6 @@ class ResourceMixin(indexer.Resource):
     ended_at = sqlalchemy.Column(PreciseTimestamp)
     user_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
     project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(binary=False))
-
-    def jsonify(self):
-        d = dict(self)
-        del d['revision']
-        if 'metrics' not in sqlalchemy.inspect(self).unloaded:
-            d['metrics'] = dict((m['name'], six.text_type(m['id']))
-                                for m in self.metrics)
-        return d
 
 
 class Resource(ResourceMixin, Base, GnocchiBase):
