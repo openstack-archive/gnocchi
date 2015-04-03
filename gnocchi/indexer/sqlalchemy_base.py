@@ -179,6 +179,8 @@ class Resource(Base, GnocchiBase, indexer.Resource):
     __tablename__ = 'resource'
     __table_args__ = (
         sqlalchemy.Index('ix_resource_id', 'id'),
+        sqlalchemy.CheckConstraint('started_at <= ended_at',
+                                   name="ck_started_before_ended"),
         COMMON_TABLES_ARGS,
     )
 
