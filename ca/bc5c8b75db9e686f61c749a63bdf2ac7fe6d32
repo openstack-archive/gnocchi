@@ -1,0 +1,9 @@
+Verified+2: Jenkins
+Workflow+1: Julien Danjou <julien@danjou.info>
+Code-Review+2: Mehdi Abaakouk <mehdi.abaakouk@enovance.com>
+Code-Review+2: Chris Dent <chdent@redhat.com>
+Submitted-by: Jenkins
+Submitted-at: Fri, 03 Apr 2015 14:41:33 +0000
+Reviewed-on: https://review.openstack.org/167965
+Project: openstack/gnocchi
+Branch: refs/heads/master
