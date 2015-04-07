@@ -600,6 +600,54 @@ class ArchivePolicyTest(RestTest):
             self.assertIn(apj, aps)
 
 
+class ArchivePolicyRuleTest(RestTest):
+
+    def test_post_archive_policy_rule(self):
+        name = "test_ap_rule"
+        with self.app.use_admin_user():
+            result = self.app.post_json(
+                "/v1/archive_policy_rule",
+                params={"name": name,
+                        "metric_pattern": "foo.bar.*",
+                        "archive_policy_name": "low"
+                        },
+                status=201)
+        self.assertEqual("application/json", result.content_type)
+        apr = json.loads(result.text)
+        self.assertEqual("http://localhost/v1/archive_policy_rule/" + name,
+                         result.headers['Location'])
+        self.assertEqual(name, apr['name'])
+        self.assertEqual("foo.bar.*", apr['metric_pattern'])
+        self.assertEqual("low", apr['archive_policy_name'])
+
+    def test_get_archive_policy_rule(self):
+        with self.app.use_admin_user():
+            result = self.app.post_json(
+                "/v1/archive_policy_rule",
+                params={"name": "test_get_one_rule",
+                        "metric_pattern": "foo.bar.*",
+                        "archive_policy_name": "low"
+                        },
+                status=201)
+
+        result = self.app.get("/v1/archive_policy_rule/test_get_one_rule")
+        apr = json.loads(result.text)
+        self.assertEqual("foo.bar.*", apr['metric_pattern'])
+        self.assertEqual("low", apr['archive_policy_name'])
+
+    def test_delete_archive_policy_rule(self):
+        params = {"name": "test_ap_rule_del",
+                  "archive_policy_name": "low",
+                  "metric_pattern": "disk.*"
+                  }
+        with self.app.use_admin_user():
+            self.app.post_json(
+                "/v1/archive_policy_rule",
+                params=params)
+            self.app.delete("/v1/archive_policy_rule/%s" % params['name'],
+                            status=204)
+
+
 class MetricTest(RestTest):
     def test_post_metric(self):
         result = self.app.post_json("/v1/metric",
