@@ -164,3 +164,25 @@ class ArchivePolicyItem(dict):
                 datetime.timedelta(seconds=self.granularity)),
             'points': self.points,
         }
+
+
+class ArchivePolicyRule(object):
+
+    def __init__(self, name, archive_policy_name, metric_pattern):
+        self.name = name
+        self.archive_policy_name = archive_policy_name
+        self.metric_pattern = metric_pattern
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(d['name'],
+                   d['archive_policy_name'],
+                   d['metric_pattern'],
+                   )
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "archive_policy_name": self.archive_policy_name,
+            "metric_pattern": self.metric_pattern,
+        }
