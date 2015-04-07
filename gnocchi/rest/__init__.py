@@ -88,7 +88,6 @@ def enforce(rule, target):
 
     if not isinstance(target, dict):
         target = target.__dict__
-
     if not pecan.request.policy_enforcer.enforce(rule, target, creds):
         abort(403)
 
@@ -257,6 +256,60 @@ class ArchivePoliciesController(rest.RestController):
         except indexer.NoSuchArchivePolicy as e:
             abort(404, e)
         except indexer.ArchivePolicyInUse as e:
+            abort(400, e)
+
+
+class ArchivePolicyRulesController(rest.RestController):
+    _custom_actions = {
+        'measures': ['GET', 'POST']
+    }
+
+    @pecan.expose('json')
+    def post(self):
+        enforce("create archive policy rule", {})
+        ArchivePolicyRuleSchema = voluptuous.Schema({
+            voluptuous.Required("name"): six.text_type,
+            voluptuous.Required("metric_pattern"): six.text_type,
+            voluptuous.Required("archive_policy_name"): six.text_type,
+            })
+
+        body = deserialize(ArchivePolicyRuleSchema)
+        # Validate the data
+        try:
+            apr = archive_policy.ArchivePolicyRule.from_dict(body)
+        except ValueError as e:
+            abort(400, e)
+        enforce("create archive policy rule", apr.to_dict())
+        try:
+            ap = pecan.request.indexer.create_archive_policy_rule(apr)
+        except indexer.ArchivePolicyRuleAlreadyExists as e:
+            abort(409, e)
+
+        location = "/v1/archive_policy_rule/" + ap['name']
+        set_resp_location_hdr(location)
+        pecan.response.status = 201
+        return ap
+
+    @pecan.expose('json')
+    def get_one(self, id):
+        ap = pecan.request.indexer.get_archive_policy_rule(id)
+        if ap:
+            enforce("get archive policy rule", ap)
+            return ap
+        abort(404)
+
+    @pecan.expose('json')
+    def get_all(self):
+        enforce("list archive policy rule", {})
+        return pecan.request.indexer.list_archive_policy_rules()
+
+    @pecan.expose()
+    def delete(self, name):
+        try:
+            pecan.request.indexer.delete_archive_policy_rule(name)
+        except indexer.NoSuchArchivePolicyRule as e:
+            abort(404, e)
+        except indexer.ArchivePolicyRuleInUse as e:
             abort(400, e)
 
 
@@ -459,7 +512,7 @@ class MetricsController(rest.RestController):
 
     @staticmethod
     def create_metric(created_by_user_id, created_by_project_id,
-                      archive_policy_name,
+                      archive_policy_name=None,
                       user_id=None, project_id=None):
         enforce("create metric", {
             "created_by_user_id": created_by_user_id,
@@ -1040,6 +1093,7 @@ class V1Controller(rest.RestController):
     search = SearchController()
 
     archive_policy = ArchivePoliciesController()
+    archive_policy_rule = ArchivePolicyRulesController()
     metric = MetricsController()
     resource = ResourcesController()
     aggregation = Aggregation()
