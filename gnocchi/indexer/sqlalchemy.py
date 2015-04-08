@@ -385,14 +385,18 @@ class QueryTransformer(object):
             field_name, value = list(nodes.items())[0]
         except Exception:
             raise indexer.QueryError()
-        try:
-            attr = getattr(table, field_name)
-        except AttributeError:
-            raise indexer.QueryAttributeError(table, field_name)
 
-        # Convert value to the right type
-        if isinstance(attr.type, base.PreciseTimestamp):
-            value = utils.to_timestamp(value)
+        if field_name == "lifespan":
+            attr = getattr(table, "ended_at") - getattr(table, "started_at")
+            value = utils.to_timespan(value)
+        else:
+            try:
+                attr = getattr(table, field_name)
+            except AttributeError:
+                raise indexer.QueryAttributeError(table, field_name)
+            # Convert value to the right type
+            if isinstance(attr.type, base.PreciseTimestamp):
+                value = utils.to_timestamp(value)
 
         return op(attr, value)
 
