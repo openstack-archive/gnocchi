@@ -277,20 +277,13 @@ class AggregatedMetricController(rest.RestController):
     @pecan.expose('json')
     def get_measures(self, start=None, stop=None, aggregation='mean',
                      needed_overlap=100.0):
-        return self.get_cross_metric_measures(self.metric_ids, start, stop,
-                                              aggregation, needed_overlap)
+        return self.get_cross_metric_measures_from_ids(
+            self.metric_ids, start, stop, aggregation, needed_overlap)
 
-    @staticmethod
-    def get_cross_metric_measures(metric_ids, start=None, stop=None,
-                                  aggregation='mean', needed_overlap=100.0):
-        if (aggregation
-           not in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS):
-            abort(
-                400,
-                'Invalid aggregation value %s, must be one of %s'
-                % (aggregation,
-                   archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS))
-
+    @classmethod
+    def get_cross_metric_measures_from_ids(cls, metric_ids, start=None,
+                                           stop=None, aggregation='mean',
+                                           needed_overlap=100.0):
         # Check RBAC policy
         metrics = pecan.request.indexer.get_metrics(metric_ids)
         missing_metric_ids = (set(metric_ids)
@@ -299,6 +292,21 @@ class AggregatedMetricController(rest.RestController):
             # Return one of the missing one in the error
             abort(404, storage.MetricDoesNotExist(
                 missing_metric_ids.pop()))
+        cls.get_cross_metric_measures_from_objs(
+            metrics, start, stop, aggregation, needed_overlap)
+
+    @staticmethod
+    def get_cross_metric_measures_from_objs(metrics, start=None, stop=None,
+                                            aggregation='mean',
+                                            needed_overlap=100.0):
+
+        if (aggregation
+           not in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS):
+            abort(
+                400,
+                'Invalid aggregation value %s, must be one of %s'
+                % (aggregation,
+                   archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS))
 
         for metric in metrics:
             enforce("get metric", metric)
@@ -1011,10 +1019,8 @@ class AggregationResource(rest.RestController):
         for r in resources:
             m = r.get_metric(self.metric_name)
             if m:
-                # TODO(jd) Pass the full metric object to avoid refetching
-                # them!
-                metrics.append(str(m.id))
-        return AggregatedMetricController.get_cross_metric_measures(
+                metrics.append(m)
+        return AggregatedMetricController.get_cross_metric_measures_from_objs(
             metrics, start, stop, aggregation, needed_overlap)
 
 
@@ -1034,7 +1040,7 @@ class Aggregation(rest.RestController):
     def get_metric(self, metric=None, start=None,
                    stop=None, aggregation='mean',
                    needed_overlap=100.0):
-        return AggregatedMetricController.get_cross_metric_measures(
+        return AggregatedMetricController.get_cross_metric_measures_from_ids(
             arg_to_list(metric), start, stop, aggregation, needed_overlap)
 
 
