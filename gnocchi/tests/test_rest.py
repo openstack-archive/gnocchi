@@ -1582,6 +1582,17 @@ class ResourceTest(RestTest):
         self.assertEqual(h['lifetime_from'],
                          "2014-01-01T10:23:00.000000Z")
 
+        # Get latest version with lifetime_to
+        history = self.app.post_json(
+            "/v1/search/resource/" + self.resource_type,
+            headers={"Accept": "application/json; history=true"},
+            params={"and": [{"=": {"id": result['id']}},
+                            {"=": {"lifetime_to": None}}]},
+            status=200)
+        history = json.loads(history.text)
+        self.assertGreaterEqual(len(history), 1)
+        self.assertEqual(result, history[0])
+
     def test_patch_resource_attributes_unauthorized(self):
         self.app.post_json("/v1/resource/" + self.resource_type,
                            params=self.attributes,
