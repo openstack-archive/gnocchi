@@ -14,16 +14,13 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from __future__ import absolute_import
-import calendar
-import datetime
-import decimal
 
 import iso8601
 from oslo_db.sqlalchemy import models
 from oslo_utils import timeutils
-from oslo_utils import units
 import six
 import sqlalchemy
+from sqlalchemy.dialects import mysql
 from sqlalchemy.ext import declarative
 from sqlalchemy import types
 import sqlalchemy_utils
@@ -41,63 +38,23 @@ COMMON_TABLES_ARGS = {'mysql_charset': "utf8",
                       'mysql_engine': "InnoDB"}
 
 
-class PreciseTimestamp(types.TypeDecorator):
+class TimestampUTC(types.TypeDecorator):
     """Represents a timestamp precise to the microsecond."""
 
     impl = sqlalchemy.DateTime
 
-    @staticmethod
-    def _decimal_to_dt(dec):
-        """Return a datetime from Decimal unixtime format."""
-        if dec is None:
-            return None
-
-        integer = int(dec)
-        micro = (dec - decimal.Decimal(integer)) * decimal.Decimal(units.M)
-        daittyme = datetime.datetime.utcfromtimestamp(integer)
-        return daittyme.replace(microsecond=int(round(micro)))
-
-    @staticmethod
-    def _dt_to_decimal(utc):
-        """Datetime to Decimal.
-
-        Some databases don't store microseconds in datetime
-        so we always store as Decimal unixtime.
-        """
-        if utc is None:
-            return None
-
-        decimal.getcontext().prec = 30
-        return (decimal.Decimal(str(calendar.timegm(utc.utctimetuple()))) +
-                (decimal.Decimal(str(utc.microsecond)) /
-                 decimal.Decimal("1000000.0")))
-
     def load_dialect_impl(self, dialect):
         if dialect.name == 'mysql':
-            return dialect.type_descriptor(
-                types.DECIMAL(precision=20,
-                              scale=6,
-                              asdecimal=True))
-        return dialect.type_descriptor(self.impl)
-
-    def compare_against_backend(self, dialect, conn_type):
-        if dialect.name == 'mysql':
-            return issubclass(type(conn_type), types.DECIMAL)
-        return issubclass(type(conn_type), type(self.impl))
+            return dialect.type_descriptor(mysql.DATETIME(fsp=6))
+        return self.impl
 
     def process_bind_param(self, value, dialect):
         if value is not None:
-            value = timeutils.normalize_time(value)
-        if dialect.name == 'mysql':
-            return self._dt_to_decimal(value)
-        return value
+            return timeutils.normalize_time(value)
 
     def process_result_value(self, value, dialect):
-        if dialect.name == 'mysql':
-            value = self._decimal_to_dt(value)
         if value is not None:
-            return timeutils.normalize_time(value).replace(
-                tzinfo=iso8601.iso8601.UTC)
+            return value.replace(tzinfo=iso8601.iso8601.UTC)
 
 
 class GnocchiBase(models.ModelBase):
@@ -288,17 +245,11 @@ class ResourceMixin(ResourceJsonifier):
         sqlalchemy.String(255))
     created_by_project_id = sqlalchemy.Column(
         sqlalchemy.String(255))
-    started_at = sqlalchemy.Column(PreciseTimestamp, nullable=False,
-                                   # NOTE(jd): We would like to use
-                                   # sqlalchemy.func.now, but we can't
-                                   # because the type of PreciseTimestamp in
-                                   # MySQL is not a Timestamp, so it would
-                                   # not store a timestamp but a date as an
-                                   # integer.
+    started_at = sqlalchemy.Column(TimestampUTC, nullable=False,
                                    default=lambda: utils.utcnow())
-    revision_start = sqlalchemy.Column(PreciseTimestamp, nullable=False,
+    revision_start = sqlalchemy.Column(TimestampUTC, nullable=False,
                                        default=lambda: utils.utcnow())
-    ended_at = sqlalchemy.Column(PreciseTimestamp)
+    ended_at = sqlalchemy.Column(TimestampUTC)
     user_id = sqlalchemy.Column(sqlalchemy.String(255))
     project_id = sqlalchemy.Column(sqlalchemy.String(255))
     original_resource_id = sqlalchemy.Column(sqlalchemy.String(255))
@@ -337,7 +288,7 @@ class ResourceHistory(ResourceMixin, Base, GnocchiBase):
                                ondelete="CASCADE",
                                name="fk_rh_id_resource_id"),
                            nullable=False)
-    revision_end = sqlalchemy.Column(PreciseTimestamp, nullable=False,
+    revision_end = sqlalchemy.Column(TimestampUTC, nullable=False,
                                      default=lambda: utils.utcnow())
     metrics = sqlalchemy.orm.relationship(
         Metric, primaryjoin="Metric.resource_id == ResourceHistory.id",
