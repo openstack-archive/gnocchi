@@ -35,8 +35,7 @@ measurement.
 
 The *storage* is responsible for storing metrics of created metrics. It
 receives timestamps and values and computes aggregations according the the
-defined
-archive policies.
+defined archive policies.
 
 The *indexer* is responsible for storing the index of all resources, along with
 their types and their properties. Gnocchi only knows resource types from the
