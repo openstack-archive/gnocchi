@@ -33,9 +33,8 @@ driver. The REST API exposed to the user manipulates both these drivers to
 provide all the features that are needed to provide correct infrastructure
 measurement.
 
-The *storage* is responsible for storing metrics of created metrics. It
-receives timestamps and values and computes aggregations according the the
-defined
+The *storage* is responsible for storing measures of created metrics. It
+receives timestamps and values and computes aggregations according the defined
 archive policies.
 
 The *indexer* is responsible for storing the index of all resources, along with
