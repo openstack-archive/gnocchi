@@ -93,7 +93,7 @@ def enforce(rule, target):
         target = target.__dict__
 
     if not pecan.request.policy_enforcer.enforce(rule, target, creds):
-        abort(403)
+        abort(403, "BOOM %s/%s/%s" % (rule, target, creds))
 
 
 def set_resp_location_hdr(location):
