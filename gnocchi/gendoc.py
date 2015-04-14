@@ -116,7 +116,7 @@ def setup(app):
         fake_file.seek(0)
         request = webapp.RequestClass.from_file(fake_file)
         # TODO(jd) Fix this lame bug in webob
-        if request.method in ("PATCH"):
+        if request.method in ("PATCH") and not request.body:
             # Webob has a bug it does not read the body for PATCH, l4m3r
             clen = request.content_length
             if clen is None:
