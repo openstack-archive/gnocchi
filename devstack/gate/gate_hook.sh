@@ -21,6 +21,11 @@ ENABLED_SERVICES="key,gnocchi-api,"
 ENABLED_SERVICES+="ceilometer-acentral,ceilometer-collector,ceilometer-api,"
 ENABLED_SERVICES+="ceilometer-alarm-notifier,ceilometer-alarm-evaluator,ceilometer-anotification,"
 
+
+# Test with oslo.db master
+export LIBS_FROM_GIT=oslo.db
+export OSLODB_BRANCH=1.8.0
+
 export DEVSTACK_GATE_INSTALL_TESTONLY=1
 export DEVSTACK_GATE_NO_SERVICES=1
 export DEVSTACK_GATE_TEMPEST=0
