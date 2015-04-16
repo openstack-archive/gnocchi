@@ -90,7 +90,14 @@ class PreciseTimestamp(types.TypeDecorator):
 
 
 class GnocchiBase(models.ModelBase):
-    pass
+    def __setitem__(self, key, value):
+        raise Exception("No dict")
+
+    def __getitem__(self, key):
+        raise Exception("No dict")
+
+    def __contains__(self, key):
+        raise Exception("No dict")
 
 
 class ArchivePolicyDefinitionType(sqlalchemy_utils.JSONType):
