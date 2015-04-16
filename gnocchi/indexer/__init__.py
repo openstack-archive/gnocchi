@@ -38,6 +38,9 @@ class Resource(object):
     def get_metric(self, metric_name):
         for m in self.metrics:
             if m.name == metric_name:
+                # NOTE(jd) Does this trigger an update?
+                # We have to do that to fake that the resource was loaded.
+                m.resource = self
                 return m
 
     def __eq__(self, other):
@@ -269,11 +272,10 @@ class IndexerDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
-    def get_metrics(uuids, details=False):
+    def get_metrics(uuids):
         """Get metrics informations from the indexer.
 
         :param uuids: A list of metric UUID.
-        :param details: Whether to return metrics details.
         """
         raise exceptions.NotImplementedError
 
