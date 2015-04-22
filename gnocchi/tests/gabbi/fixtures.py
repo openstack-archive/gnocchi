@@ -22,6 +22,7 @@ import uuid
 import warnings
 
 from gabbi import fixture
+from oslo_utils import netutils
 import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
 
@@ -79,7 +80,6 @@ class ConfigFixture(fixture.GabbiFixture):
             conf.set_override('url',
                               os.environ.get("GNOCCHI_TEST_INDEXER_URL"),
                               'indexer')
-
         # TODO(jd) It would be cool if Gabbi was able to use the null://
         # indexer, but this makes the API returns a lot of 501 error, which
         # Gabbi does not want to see, so let's just disable it.
@@ -97,15 +97,17 @@ class ConfigFixture(fixture.GabbiFixture):
                               group="oslo_policy")
             conf.set_override('file_basepath', data_tmp_dir, 'storage')
 
-        # NOTE(jd) All of that is still very SQL centric but we only support
-        # SQL for now so let's say it's good enough.
-        url = sqlalchemy_url.make_url(conf.indexer.url)
+        split = netutils.urlsplit(conf.indexer.url)
 
-        url.database = url.database + str(uuid.uuid4()).replace('-', '')
-        db_url = str(url)
-        conf.set_override('url', db_url, 'indexer')
-        sqlalchemy_utils.create_database(db_url)
-
+        if split.scheme == 'mongodb':
+            db_url = conf.indexer.url + str(uuid.uuid4()).replace('-', '')
+            conf.set_override('url', db_url, 'indexer')
+        else:
+            url = sqlalchemy_url.make_url(conf.indexer.url)
+            url.database = url.database + str(uuid.uuid4()).replace('-', '')
+            db_url = str(url)
+            conf.set_override('url', db_url, 'indexer')
+            sqlalchemy_utils.create_database(db_url)
         index = indexer.get_driver(conf)
         index.connect()
         index.upgrade()
@@ -119,7 +121,11 @@ class ConfigFixture(fixture.GabbiFixture):
         """Clean up the config fixture and storage artifacts."""
         self.conf.reset()
 
-        if not self.conf.indexer.url.startswith("null://"):
+        split = netutils.urlsplit(self.conf.indexer.url)
+
+        if split.scheme == "mongodb":
+            self.conn.drop_database(split['database'])
+        else:
             # Swallow noise from missing tables when dropping
             # database.
             with warnings.catch_warnings():
