@@ -252,12 +252,17 @@ class DispatcherWorkflowTest(base.BaseTestCase,
         patch_responses = []
         post_responses = []
 
-        expected_calls.append(mock.call.post(
-            "%(url)s/%(resource_type)s/%(resource_id)s/"
-            "metric/%(metric_name)s/measures" % url_params,
-            headers=headers,
-            data=json_matcher(self.measures_attributes))
-        )
+        expected_calls.extend([
+            mock.call.session(),
+            mock.call.adapters.HTTPAdapter(pool_block=True),
+            mock.call.session().mount('http://', mock.ANY),
+            mock.call.session().mount('https://', mock.ANY),
+            mock.call.session().post(
+                "%(url)s/%(resource_type)s/%(resource_id)s/"
+                "metric/%(metric_name)s/measures" % url_params,
+                headers=headers,
+                data=json_matcher(self.measures_attributes))
+        ])
         post_responses.append(MockResponse(self.measure))
 
         if self.post_resource:
@@ -267,7 +272,7 @@ class DispatcherWorkflowTest(base.BaseTestCase,
             attributes['metrics'] = dict((metric_name,
                                           {'archive_policy_name': 'low'})
                                          for metric_name in self.metric_names)
-            expected_calls.append(mock.call.post(
+            expected_calls.append(mock.call.session().post(
                 "%(url)s/%(resource_type)s" % url_params,
                 headers=headers,
                 data=json_matcher(attributes)),
@@ -275,16 +280,17 @@ class DispatcherWorkflowTest(base.BaseTestCase,
             post_responses.append(MockResponse(self.post_resource))
 
         if self.metric:
-            expected_calls.append(mock.call.post(
+            expected_calls.append(mock.call.session().post(
                 "%(url)s/%(resource_type)s/%(resource_id)s/metric"
-                % url_params, headers=headers,
+                % url_params,
+                headers=headers,
                 data=json_matcher({self.sample['counter_name']:
                                    {'archive_policy_name': 'low'}})
             ))
             post_responses.append(MockResponse(self.metric))
 
         if self.measure_retry:
-            expected_calls.append(mock.call.post(
+            expected_calls.append(mock.call.session().post(
                 "%(url)s/%(resource_type)s/%(resource_id)s/"
                 "metric/%(metric_name)s/measures" % url_params,
                 headers=headers,
@@ -293,15 +299,16 @@ class DispatcherWorkflowTest(base.BaseTestCase,
             post_responses.append(MockResponse(self.measure_retry))
 
         if self.patch_resource:
-            expected_calls.append(mock.call.patch(
+            expected_calls.append(mock.call.session().patch(
                 "%(url)s/%(resource_type)s/%(resource_id)s" % url_params,
                 headers=headers,
                 data=json_matcher(self.patchable_attributes)),
             )
             patch_responses.append(MockResponse(self.patch_resource))
 
-        requests.patch.side_effect = patch_responses
-        requests.post.side_effect = post_responses
+        s = requests.session.return_value
+        s.patch.side_effect = patch_responses
+        s.post.side_effect = post_responses
 
         self.dispatcher.record_metering_data([self.sample])
 
