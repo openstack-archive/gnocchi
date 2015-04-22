@@ -1,0 +1,4 @@
+Verified-1: Jenkins
+Reviewed-on: https://review.openstack.org/175880
+Project: openstack/gnocchi
+Branch: refs/heads/stable/1.0
