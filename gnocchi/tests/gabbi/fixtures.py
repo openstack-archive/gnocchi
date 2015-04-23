@@ -107,6 +107,7 @@ class ConfigFixture(fixture.GabbiFixture):
             conf.set_override('url', db_url, 'indexer')
             sqlalchemy_utils.create_database(db_url)
         elif split.scheme == 'mongodb':
+            raise case.SkipTest("No indexer configured")
             db_url = conf.indexer.url + str(uuid.uuid4()).replace('-', '')
             conf.set_override('url', db_url, 'indexer')
         index = indexer.get_driver(conf)
