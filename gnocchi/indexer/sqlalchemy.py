@@ -108,9 +108,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             return []
         session = self.engine_facade.get_session()
         query = session.query(Metric).filter(Metric.id.in_(uuids)).options(
-            sqlalchemy.orm.joinedload(
-                Metric.archive_policy)).options(
-                    sqlalchemy.orm.joinedload(Metric.resource))
+            sqlalchemy.orm.joinedload(Metric.resource))
 
         return list(query.all())
 
