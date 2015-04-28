@@ -65,6 +65,9 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
         self._container_prefix = conf.swift_container_prefix
 
+    def stop(self):
+        self._lock.stop()
+
     def _container_name(self, metric):
         return '%s.%s' % (self._container_prefix, str(metric.id))
 
