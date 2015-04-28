@@ -5,6 +5,7 @@ fixtures
 keystonemiddleware>=1.5.0
 mock
 MySQL-python
+pymysql
 oslotest
 sphinx
 python-subunit>=0.0.18
@@ -16,3 +17,4 @@ testtools>=0.9.38
 WebTest>=2.0.16
 doc8
 sphinxcontrib-httpdomain
+sysv_ipc
