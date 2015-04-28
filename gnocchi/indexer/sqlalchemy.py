@@ -97,7 +97,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             ctxt = migration.MigrationContext.configure(engine.connect())
             current_version = ctxt.get_current_revision()
             if current_version is None:
-                Base.metadata.create_all(engine)
+                Base.metadata.create_all(engine, check_first=True)
                 command.stamp(cfg, "head")
             else:
                 command.upgrade(cfg, "head")
