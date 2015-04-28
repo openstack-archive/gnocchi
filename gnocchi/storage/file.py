@@ -38,6 +38,9 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         self.basepath = conf.file_basepath
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
 
+    def stop(self):
+        self._lock.stop()
+
     def _build_metric_path(self, metric, aggregation=None):
         path = os.path.join(self.basepath, str(metric.id))
         if aggregation:
