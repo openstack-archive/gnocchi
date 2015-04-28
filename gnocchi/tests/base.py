@@ -33,17 +33,7 @@ from gnocchi import service
 from gnocchi import storage
 
 
-class SkipNotImplementedMeta(type):
-    def __new__(cls, name, bases, local):
-        for attr in local:
-            value = local[attr]
-            if callable(value) and (
-                    attr.startswith('test_') or attr == 'setUp'):
-                local[attr] = _skip_decorator(value)
-        return type.__new__(cls, name, bases, local)
-
-
-def _skip_decorator(func):
+def skip_if_not_implemented(func):
     @functools.wraps(func)
     def skip_if_not_implemented(*args, **kwargs):
         try:
@@ -195,7 +185,6 @@ class FakeSwiftClient(object):
                                         http_status=404)
 
 
-@six.add_metaclass(SkipNotImplementedMeta)
 class TestCase(base.BaseTestCase):
 
     ARCHIVE_POLICIES = {
