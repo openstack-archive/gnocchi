@@ -78,6 +78,11 @@ class PreciseTimestamp(types.TypeDecorator):
                               asdecimal=True))
         return self.impl
 
+    def compare_against_backend(self, dialect, conn_type):
+        if dialect.name == 'mysql':
+            return isinstance(conn_type, types.DECIMAL)
+        return isinstance(conn_type, self.impl)
+
     def process_bind_param(self, value, dialect):
         if dialect.name == 'mysql':
             return self._dt_to_decimal(value)
