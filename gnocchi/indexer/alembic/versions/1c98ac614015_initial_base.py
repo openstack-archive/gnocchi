@@ -55,7 +55,7 @@ def upgrade():
     )
     op.create_index('ix_volume_id', 'volume', ['id'], unique=False)
     op.create_table('instance',
-    sa.Column('flavor_id', sa.Integer(), nullable=False),
+    sa.Column('flavor_id', sa.String(length=255), nullable=False),
     sa.Column('image_ref', sa.String(length=255), nullable=False),
     sa.Column('host', sa.String(length=255), nullable=False),
     sa.Column('display_name', sa.String(length=255), nullable=False),
@@ -178,7 +178,7 @@ def upgrade():
     )
     op.create_index('ix_identity_history_revision', 'identity_history', ['revision'], unique=False)
     op.create_table('instance_history',
-    sa.Column('flavor_id', sa.Integer(), nullable=False),
+    sa.Column('flavor_id', sa.String(length=255), nullable=False),
     sa.Column('image_ref', sa.String(length=255), nullable=False),
     sa.Column('host', sa.String(length=255), nullable=False),
     sa.Column('display_name', sa.String(length=255), nullable=False),
