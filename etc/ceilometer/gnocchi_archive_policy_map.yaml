@@ -3,5 +3,6 @@
 # and used by the ceilometer dispatcher.
 # Format: <metric_name>: <policy>
 
-#cpu_utils: "high"
-#disk.*: "low"
+#---
+#  - cpu_utils: "high"
+#  - disk.*: "low"
