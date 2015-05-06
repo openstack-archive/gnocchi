@@ -155,10 +155,10 @@ class GnocchiDispatcher(dispatcher.Base):
         return config_file
 
     def _match_metric(self, metric_name):
-        for metric, policy in enumerate(self.gnocchi_archive_policy_data):
+        for metric_policy in self.gnocchi_archive_policy_data:
             # Support wild cards such as disk.*
-            if fnmatch.fnmatch(metric_name, metric):
-                return policy
+            if fnmatch.fnmatch(metric_name, metric_policy.keys()[0]):
+                return metric_policy.values()[0]
 
     @property
     def gnocchi_project_id(self):

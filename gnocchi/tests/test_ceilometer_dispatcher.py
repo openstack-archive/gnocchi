@@ -26,7 +26,6 @@ import requests
 import six.moves.urllib.parse as urlparse
 import tempfile
 import testscenarios
-import yaml
 
 from ceilometer import service as ceilometer_service
 from gnocchi.ceilometer import dispatcher
@@ -114,19 +113,36 @@ class DispatcherTest(base.BaseTestCase):
         self.assertEqual(d.gnocchi_archive_policy_default, "low")
 
     def test_archive_policy_map_config(self):
-        archive_policy_map = yaml.dump([{
-            'foo.*': 'low'
-        }])
+        archive_policy_map = str("---\
+                                  \n  - cpu_utils: \"high\"\
+                                  \n  - disk.*: \"low\"\n")
         archive_policy_cfg_file = tempfile.NamedTemporaryFile(
             mode='w+b', prefix="foo", suffix=".yaml")
         archive_policy_cfg_file.write(archive_policy_map.encode())
         archive_policy_cfg_file.seek(0)
-        d = dispatcher.GnocchiDispatcher(self.conf.conf)
-        d.conf.dispatcher_gnocchi.archive_policy_file = (
+        self.conf.conf.dispatcher_gnocchi.archive_policy_file = (
             archive_policy_cfg_file.name)
+        d = dispatcher.GnocchiDispatcher(self.conf.conf)
         self.assertEqual(
             d.get_archive_policy(
-                'foo.disk.rate')['archive_policy_name'], "low")
+                'disk.root.size')['archive_policy_name'], "low")
+        archive_policy_cfg_file.close()
+
+    def test_archive_policy_map_empty_config(self):
+        archive_policy_map = str("#---\
+                                  \n#  - cpu_utils: \"high\"\
+                                  \n#  - disk.*: \"low\"\n")
+        archive_policy_cfg_file = tempfile.NamedTemporaryFile(
+            mode='w+b', prefix="foo", suffix=".yaml")
+        archive_policy_cfg_file.write(archive_policy_map.encode())
+        archive_policy_cfg_file.seek(0)
+        self.conf.conf.dispatcher_gnocchi.archive_policy_file = (
+            archive_policy_cfg_file.name)
+        d = dispatcher.GnocchiDispatcher(self.conf.conf)
+        self.assertEqual(
+            d.get_archive_policy('disk.root.size')['archive_policy_name'],
+            d.gnocchi_archive_policy_default)
+        print d.gnocchi_archive_policy_default
         archive_policy_cfg_file.close()
 
     def test_activity_filter_match_project_id(self):
