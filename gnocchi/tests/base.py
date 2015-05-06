@@ -294,8 +294,12 @@ class TestCase(base.BaseTestCase):
             os.getenv("GNOCCHI_COORDINATION_URL", "ipc://"),
             str(uuid.uuid4()).encode('ascii'))
 
+        self.coord.start()
+
         with self.coord.get_lock(b"gnocchi-tests-db-lock"):
             self.index.upgrade()
+
+        self.coord.stop()
 
         self.archive_policies = self.ARCHIVE_POLICIES
         # Used in gnocchi.gendoc
