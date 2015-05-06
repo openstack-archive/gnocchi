@@ -135,7 +135,7 @@ class GnocchiDispatcher(dispatcher.Base):
     def get_archive_policy(self, metric_name):
 
         archive_policy = {}
-        if self.gnocchi_archive_policy_data is not None:
+        if self.gnocchi_archive_policy_data:
             policy_match = self._match_metric(metric_name)
             archive_policy['archive_policy_name'] = (
                 policy_match or self.gnocchi_archive_policy_default)
@@ -155,7 +155,7 @@ class GnocchiDispatcher(dispatcher.Base):
         return config_file
 
     def _match_metric(self, metric_name):
-        for metric, policy in enumerate(self.gnocchi_archive_policy_data):
+        for metric, policy in self.gnocchi_archive_policy_data.items():
             # Support wild cards such as disk.*
             if fnmatch.fnmatch(metric_name, metric):
                 return policy
