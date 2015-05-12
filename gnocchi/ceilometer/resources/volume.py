@@ -22,7 +22,7 @@ class Volume(base.ResourceBase):
     def get_resource_extra_attributes(sample):
         metadata = sample['resource_metadata']
         params = {
-            "display_name": metadata['display_name'],
+            "display_name": str(metadata['display_name']),
         }
         return params
 

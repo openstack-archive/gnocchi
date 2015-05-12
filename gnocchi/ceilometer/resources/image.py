@@ -19,9 +19,9 @@ class Image(base.ResourceBase):
     def get_resource_extra_attributes(sample):
         metadata = sample['resource_metadata']
         params = {
-            "name": metadata['name'],
-            "container_format": metadata["container_format"],
-            "disk_format": metadata["disk_format"]
+            "name": str(metadata['name']),
+            "container_format": str(metadata["container_format"]),
+            "disk_format": str(metadata["disk_format"])
         }
         return params
 
