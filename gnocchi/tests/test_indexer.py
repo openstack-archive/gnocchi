@@ -81,7 +81,6 @@ class TestIndexerDriver(tests_base.TestCase):
         m2 = self.index.get_metrics([r1])
         self.assertEqual([m], m2)
 
-    def test_create_resource(self):
         r1 = uuid.uuid4()
         user = uuid.uuid4()
         project = uuid.uuid4()
@@ -128,7 +127,7 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         user = uuid.uuid4()
         project = uuid.uuid4()
-        kwargs = {'server_group': server_group} if server_group else {}
+        kwargs = {'server_group': server_group}
 
         rc = self.index.create_resource('instance', r1, user, project,
                                         flavor_id="1",
@@ -191,7 +190,7 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_create_resource_with_start_timestamp(self):
         r1 = uuid.uuid4()
-        ts = datetime.datetime(2014, 1, 1, 23, 34, 23, 1234)
+        ts = datetime.datetime(2014, 1, 1, 23, 34, 23, 123000)
         user = uuid.uuid4()
         project = uuid.uuid4()
         rc = self.index.create_resource(
