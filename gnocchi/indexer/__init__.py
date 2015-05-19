@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import hashlib
+import copy
 
 from oslo_config import cfg
 from oslo_utils import netutils
@@ -35,6 +36,44 @@ _marker = object()
 
 
 class Resource(object):
+
+    def __init__(self, id=None, type=None, created_by_user_id=None,
+                 created_by_project_id=None, user_id=None, project_id=None,
+                 started_at=None, ended_at=None, revision=-1,
+                 revision_start=None, revision_end=None, metrics=None,
+                 **kwargs):
+        self.id = id
+        self.type = type
+        self.created_by_user_id = created_by_user_id
+        self.created_by_project_id = created_by_project_id
+        self.user_id = user_id
+        self.project_id = project_id
+        self.started_at = started_at
+        self.ended_at = ended_at
+        self.revision = revision
+        self.revision_start = revision_start
+        self.revision_end = revision_end
+        self.metrics = metrics or []
+        if kwargs:
+            for key, value in six.iteritems(kwargs):
+                if key == 'display_name':
+                    self.display_name = value
+                elif key == 'server_group':
+                    self.server_group = value
+                elif key == 'host':
+                    self.host = value
+                elif key == 'image_ref':
+                    self.image_ref = value
+                elif key == 'flavor_id':
+                    self.flavor_id = value
+
+    def jsonify(self):
+        d = copy.deepcopy(self.__dict__)
+        del d['revision']
+        if not d['metrics']:
+            d['metrics'] = {}
+        return d
+
     def get_metric(self, metric_name):
         for m in self.metrics:
             if m.name == metric_name:
