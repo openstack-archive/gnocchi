@@ -265,7 +265,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         append_metrics=False,
                         **kwargs):
 
-        now = timeutils.utcnow()
+        now = utils.utcnow()
 
         resource_cls = self._resource_type_to_class(resource_type)
         resource_history_cls = self._resource_type_to_class(resource_type,

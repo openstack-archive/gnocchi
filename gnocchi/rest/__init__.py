@@ -379,7 +379,7 @@ class AggregatedMetricController(rest.RestController):
                 measures = pecan.request.storage.get_cross_metric_measures(
                     metrics, start, stop, aggregation, needed_overlap)
             # Replace timestamp keys by their string versions
-            return [(timeutils.isotime(timestamp, subsecond=True), offset, v)
+            return [(timestamp.isoformat(), offset, v)
                     for timestamp, offset, v in measures]
         except storage.MetricUnaggregatable:
             abort(400, "One of the metric to aggregated doesn't have "
@@ -471,7 +471,7 @@ class MetricController(rest.RestController):
                     # by requesting the metric details from the indexer
                     self.metric, start, stop, aggregation)
             # Replace timestamp keys by their string versions
-            return [(timeutils.isotime(timestamp, subsecond=True), offset, v)
+            return [(timestamp.isoformat(), offset, v)
                     for timestamp, offset, v in measures]
         except storage.MetricDoesNotExist as e:
             abort(404, e)
