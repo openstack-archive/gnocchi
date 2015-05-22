@@ -3,6 +3,7 @@ gabbi>=0.6.0
 fixtures
 keystonemiddleware>=1.5.0
 mock
+pymysql
 oslotest
 python-subunit>=0.0.18
 tempest-lib>=0.2.0
