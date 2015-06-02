@@ -20,7 +20,6 @@ import mock
 from oslo_utils import timeutils
 
 from gnocchi import statsd
-from gnocchi import storage
 from gnocchi.tests import base as tests_base
 from gnocchi import utils
 
@@ -66,8 +65,13 @@ class TestStatsd(tests_base.TestCase):
                                             self.conf.statsd.resource_id,
                                             with_metrics=True)
 
-        measures = self.stats.storage.get_measures(storage.Metric(
-            r.get_metric(metric_key), None))
+        metric = r.get_metric(metric_key)
+
+        with mock.patch.object(self.index, 'get_metrics') as f:
+            f.return_value = [metric]
+            self.storage.process_measures(self.index)
+
+        measures = self.stats.storage.get_measures(metric)
         self.assertEqual([
             (utils.datetime_utc(2015, 1, 7), 86400.0, 1.0),
             (utils.datetime_utc(2015, 1, 7, 13), 3600.0, 1.0),
@@ -84,8 +88,11 @@ class TestStatsd(tests_base.TestCase):
             ("127.0.0.1", 12345))
         self.stats.flush()
 
-        measures = self.stats.storage.get_measures(storage.Metric(
-            r.get_metric(metric_key), None))
+        with mock.patch.object(self.index, 'get_metrics') as f:
+            f.return_value = [metric]
+            self.storage.process_measures(self.index)
+
+        measures = self.stats.storage.get_measures(metric)
         self.assertEqual([
             (utils.datetime_utc(2015, 1, 7), 86400.0, 1.5),
             (utils.datetime_utc(2015, 1, 7, 13), 3600.0, 1.5),
@@ -112,9 +119,13 @@ class TestStatsd(tests_base.TestCase):
         r = self.stats.indexer.get_resource('generic',
                                             self.conf.statsd.resource_id,
                                             with_metrics=True)
+        metric = r.get_metric(metric_key)
 
-        measures = self.stats.storage.get_measures(storage.Metric(
-            r.get_metric(metric_key), None))
+        with mock.patch.object(self.index, 'get_metrics') as f:
+            f.return_value = [metric]
+            self.storage.process_measures(self.index)
+
+        measures = self.stats.storage.get_measures(metric)
         self.assertEqual([
             (utils.datetime_utc(2015, 1, 7), 86400.0, 1.0),
             (utils.datetime_utc(2015, 1, 7, 13), 3600.0, 1.0),
@@ -129,8 +140,11 @@ class TestStatsd(tests_base.TestCase):
             ("127.0.0.1", 12345))
         self.stats.flush()
 
-        measures = self.stats.storage.get_measures(storage.Metric(
-            r.get_metric(metric_key), None))
+        with mock.patch.object(self.index, 'get_metrics') as f:
+            f.return_value = [metric]
+            self.storage.process_measures(self.index)
+
+        measures = self.stats.storage.get_measures(metric)
         self.assertEqual([
             (utils.datetime_utc(2015, 1, 7), 86400.0, 28),
             (utils.datetime_utc(2015, 1, 7, 13), 3600.0, 28),
