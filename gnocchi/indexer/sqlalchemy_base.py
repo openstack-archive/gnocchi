@@ -239,7 +239,7 @@ class ResourceMixin(ResourceJsonifier):
     project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType())
 
 
-class Resource(ResourceMixin, Base, GnocchiBase):
+class Resource(Base, ResourceMixin, GnocchiBase):
     __tablename__ = 'resource'
     _extra_keys = ['revision', 'revision_end']
     revision = -1

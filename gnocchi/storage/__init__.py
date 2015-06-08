@@ -46,6 +46,17 @@ class Metric(object):
         self.name = name
         self.resource_id = resource_id
 
+    def jsonify(self):
+        d = {
+            "id": self.id,
+            "archive_policy": self.archive_policy,
+            "created_by_user_id": self.created_by_user_id,
+            "created_by_project_id": self.created_by_project_id,
+            "name": self.name,
+            "resource_id": self.resource_id,
+        }
+        return d
+
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.id)
 
