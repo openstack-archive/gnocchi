@@ -239,7 +239,7 @@ class ResourceMixin(ResourceJsonifier):
     project_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType())
 
 
-class Resource(ResourceMixin, Base, GnocchiBase):
+class Resource(Base, ResourceMixin, GnocchiBase):
     __tablename__ = 'resource'
     _extra_keys = ['revision', 'revision_end']
     revision = -1
@@ -258,7 +258,7 @@ class Resource(ResourceMixin, Base, GnocchiBase):
             return m
 
 
-class ResourceHistory(ResourceMixin, Base, GnocchiBase):
+class ResourceHistory(Base, ResourceMixin, GnocchiBase):
     __tablename__ = 'resource_history'
     revision = sqlalchemy.Column(sqlalchemy.Integer, autoincrement=True,
                                  primary_key=True)

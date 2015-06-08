@@ -217,7 +217,6 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if details:
             q = q.options(sqlalchemy.orm.joinedload(Metric.archive_policy)
                           ).options(sqlalchemy.orm.joinedload(Metric.resource))
-
         return q.all()
 
     def create_resource(self, resource_type, id,

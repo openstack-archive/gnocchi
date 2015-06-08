@@ -23,7 +23,7 @@ import six
 
 def to_timestamp(v):
     if isinstance(v, datetime.datetime):
-        return v
+        return v.replace(tzinfo=iso8601.iso8601.UTC)
     try:
         v = float(v)
     except (ValueError, TypeError):
