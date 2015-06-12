@@ -17,6 +17,8 @@ try:
 except ImportError:
     import trollius as asyncio
 import logging
+import multiprocessing
+import time
 
 from gnocchi import indexer
 from gnocchi.indexer import sqlalchemy as sql_db
@@ -44,7 +46,9 @@ def statsd():
     statsd_service.start()
 
 
-def metricd():
+def _metricd(cpu_number):
+    # Sleep a bit just not to start and poll everything at the same time.
+    time.sleep(cpu_number)
     conf = service.prepare_service()
     s = storage.get_driver(conf)
     i = indexer.get_driver(conf)
@@ -58,3 +62,22 @@ def metricd():
 
     process()
     loop.run_forever()
+
+
+def _wrap_metricd(cpu_number):
+    """Small wrapper for _metricd() that ensure it ALWAYS return.
+
+    Otherwise multiprocessing.Pool is stuck for ever.
+    """
+    try:
+        return _metricd(cpu_number)
+    finally:
+        return
+
+
+def metricd():
+    cpu_count = multiprocessing.cpu_count()
+    p = multiprocessing.Pool(cpu_count)
+    p.map(_wrap_metricd, range(cpu_count))
+    p.terminate()
+    p.join()
