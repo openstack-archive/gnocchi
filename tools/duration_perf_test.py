@@ -36,6 +36,7 @@
 
 import argparse
 import datetime
+import errno
 import json
 import os
 import random
@@ -137,7 +138,11 @@ class PerfTools(object):
             filepath = "%s_%s.csv" % (self.args.result_path, name)
             dirpath = os.path.dirname(filepath)
             if dirpath:
-                os.makedirs(dirpath)
+                try:
+                    os.makedirs(dirpath)
+                except OSError as e:
+                    if e.errno != errno.EEXIST:
+                        raise
             with open(filepath, 'w') as f:
                 f.write("Index,Duration,Count\n")
                 for meter in data:
