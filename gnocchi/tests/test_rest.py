@@ -36,7 +36,6 @@ from gnocchi import archive_policy
 from gnocchi.rest import app
 from gnocchi import storage
 from gnocchi.tests import base as tests_base
-from gnocchi import utils
 
 
 load_tests = testscenarios.load_tests_apply_scenarios
@@ -402,15 +401,16 @@ class MetricTest(RestTest):
         result = self.app.post_json("/v1/metric",
                                     params={"archive_policy_name": "high"})
         metric = json.loads(result.text)
-        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
-                           params=[{"timestamp": utils.utcnow().isoformat(),
-                                    "value": 1234.2}])
+        self.app.post_json(
+            "/v1/metric/%s/measures" % metric['id'],
+            params=[{"timestamp": timeutils.utcnow(True).isoformat(),
+                     "value": 1234.2}])
         ret = self.app.get(
             "/v1/metric/%s/measures?start=-10 minutes"
             % metric['id'],
             status=200)
         result = json.loads(ret.text)
-        now = utils.utcnow()
+        now = timeutils.utcnow(True)
         self.assertEqual([
             [(now
               - datetime.timedelta(
