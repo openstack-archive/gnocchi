@@ -34,7 +34,7 @@ def to_timestamp(v):
             delta = timeparse.timeparse(v)
             if delta is None:
                 raise ValueError("Unable to parse timestamp %s" % v)
-            return utcnow() + datetime.timedelta(seconds=delta)
+            return timeutils.utcnow(True) + datetime.timedelta(seconds=delta)
     return datetime.datetime.utcfromtimestamp(v).replace(
         tzinfo=iso8601.iso8601.UTC)
 
@@ -54,11 +54,6 @@ def to_timespan(value):
     if seconds <= 0:
         raise ValueError("Timespan must be positive")
     return datetime.timedelta(seconds=seconds)
-
-
-def utcnow():
-    """Better version of utcnow() that returns utcnow with a correct TZ."""
-    return timeutils.utcnow().replace(tzinfo=iso8601.iso8601.UTC)
 
 
 def datetime_utc(*args):

@@ -21,6 +21,7 @@ import os.path
 from oslo_db import exception
 from oslo_db.sqlalchemy import models
 from oslo_db.sqlalchemy import session
+from oslo_utils import timeutils
 import six
 import sqlalchemy
 from stevedore import extension
@@ -264,7 +265,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         append_metrics=False,
                         **kwargs):
 
-        now = utils.utcnow()
+        now = timeutils.utcnow(True)
 
         resource_cls = self._resource_type_to_class(resource_type)
         resource_history_cls = self._resource_type_to_class(resource_type,
