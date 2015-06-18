@@ -50,6 +50,12 @@ sudo -E -H -u stack tox -epy27-gate
 EXIT_CODE=$?
 set -e
 
+echo "post test run dir $(pwd)"
+cd $GNOCCHI_DIR
+ls -l .tox
+ls -l .tox/py27-gate
+ls -l .tox/py27-gate/bin
+.tox/py27-gate/bin/pip freeze
 # Collect and parse result
 generate_testr_results
 exit $EXIT_CODE
