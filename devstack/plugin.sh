@@ -59,8 +59,9 @@ fi
 
 # Gnocchi connection info.
 GNOCCHI_SERVICE_PROTOCOL=http
+GNOCCHI_SERVICE_PORT=8041
+GNOCCHI_SERVICE_PREFIX=${GNOCCHI_SERVICE_PREFIX:-'/gnocchi'}
 GNOCCHI_SERVICE_HOST=$SERVICE_HOST
-GNOCCHI_SERVICE_PORT=${GNOCCHI_SERVICE_PORT:-8041}
 
 # Gnocchi ceilometer default archive_policy
 GNOCCHI_ARCHIVE_POLICY=${GNOCCHI_ARCHIVE_POLICY:-low}
@@ -93,7 +94,7 @@ function is_gnocchi_enabled {
 # -------------------------------------------------------------------------
 # $SERVICE_TENANT_NAME  gnocchi        service
 # gnocchi_swift         gnocchi_swift  ResellerAdmin  (if Swift is enabled)
-create_gnocchi_accounts() {
+function create_gnocchi_accounts {
     # Gnocchi
     if [[ "$ENABLED_SERVICES" =~ "gnocchi-api" ]]; then
         create_service_user "gnocchi"
@@ -103,9 +104,9 @@ create_gnocchi_accounts() {
                 "metric" "OpenStack Metric Service")
             get_or_create_endpoint $gnocchi_service \
                 "$REGION_NAME" \
-                "$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST:$GNOCCHI_SERVICE_PORT/" \
-                "$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST:$GNOCCHI_SERVICE_PORT/" \
-                "$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST:$GNOCCHI_SERVICE_PORT/"
+                "$(gnocchi_service_url)/" \
+                "$(gnocchi_service_url)/" \
+                "$(gnocchi_service_url)/"
         fi
         if is_service_enabled swift; then
             get_or_create_project "gnocchi_swift"
@@ -114,6 +115,11 @@ create_gnocchi_accounts() {
             get_or_add_user_project_role "ResellerAdmin" $gnocchi_swift_user "gnocchi_swift"
         fi
     fi
+}
+
+# return the service url for gnocchi
+function gnocchi_service_url {
+    echo "$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST$GNOCCHI_SERVICE_PREFIX"
 }
 
 function _cleanup_gnocchi_apache_wsgi {
@@ -127,6 +133,7 @@ function _config_gnocchi_apache_wsgi {
 
     local gnocchi_apache_conf=$(apache_site_config_for gnocchi)
     local venv_path=""
+    local script_name=$GNOCCHI_SERVICE_PREFIX
 
     if [[ ${USE_VENV} = True ]]; then
         venv_path="python-path=${PROJECT_VENV["gnocchi"]}/lib/$(python_version)/site-packages"
@@ -139,6 +146,7 @@ function _config_gnocchi_apache_wsgi {
     sudo sed -e "
         s|%GNOCCHI_PORT%|$GNOCCHI_SERVICE_PORT|g;
         s|%APACHE_NAME%|$APACHE_NAME|g;
+        s|%SCRIPT_NAME%|$script_name|g;
         s|%WSGI%|$GNOCCHI_WSGI_DIR/app.wsgi|g;
         s|%USER%|$STACK_USER|g
         s|%VIRTUALENV%|$venv_path|g
@@ -238,7 +246,7 @@ function configure_heat_gnocchi {
 }
 
 function configure_ceilometer_gnocchi {
-    gnocchi_url=$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST:$GNOCCHI_SERVICE_PORT
+    gnocchi_url=$(gnocchi_service_url)
     iniset $CEILOMETER_CONF DEFAULT dispatcher gnocchi
     iniset $CEILOMETER_CONF alarms gnocchi_url $gnocchi_url
     iniset $CEILOMETER_CONF dispatcher_gnocchi url $gnocchi_url
@@ -298,13 +306,13 @@ function start_gnocchi {
     # only die on API if it was actually intended to be turned on
     if is_service_enabled gnocchi-api; then
         echo "Waiting for gnocchi-api to start..."
-        if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl --noproxy '*' -s ${GNOCCHI_SERVICE_PROTOCOL}://${GNOCCHI_SERVICE_HOST}:${GNOCCHI_SERVICE_PORT}/v1/resource/generic >/dev/null; do sleep 1; done"; then
+        if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl --noproxy '*' -s $(gnocchi_service_url)/v1/resource/generic >/dev/null; do sleep 1; done"; then
             die $LINENO "gnocchi-api did not start"
         fi
     fi
 
     # Create a default policy
-    archive_policy_url="${GNOCCHI_SERVICE_PROTOCOL}://${GNOCCHI_SERVICE_HOST}:${GNOCCHI_SERVICE_PORT}/v1/archive_policy"
+    archive_policy_url="$(gnocchi_service_url)/v1/archive_policy"
     if [ "$GNOCCHI_USE_KEYSTONE" == "True" ]; then
         token=$(openstack token issue -f value -c id)
         create_archive_policy() { curl -X POST -H "X-Auth-Token: $token" -H "Content-Type: application/json" -d "$1" $archive_policy_url ; }

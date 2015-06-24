@@ -42,6 +42,7 @@ curl -X GET http://localhost:8041/v1/archive_policy -H "Content-Type: applicatio
 
 export GNOCCHI_SERVICE_HOST=localhost
 export GNOCCHI_SERVICE_PORT=8041
+export GNOCCHI_SERVICE_PREFIX=/gnocchi
 
 # Run tests
 echo "Running gnocchi functional test suite"

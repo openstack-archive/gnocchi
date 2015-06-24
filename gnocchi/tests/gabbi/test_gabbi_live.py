@@ -29,5 +29,8 @@ def load_tests(loader, tests, pattern):
     if host:
         test_dir = os.path.join(os.path.dirname(__file__), TESTS_DIR)
         port = os.getenv('GNOCCHI_SERVICE_PORT', 8041)
+        prefix = os.getenv('GNOCCHI_SERVICE_PREFIX')
+        if prefix:
+            port = None
         return driver.build_tests(test_dir, loader,
-                                  host=host, port=port)
+                                  host=host, prefix=prefix, port=port)
