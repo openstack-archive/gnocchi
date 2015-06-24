@@ -18,6 +18,7 @@
 import os
 
 from gabbi import driver
+import six.moves.urllib.parse as urlparse
 
 
 TESTS_DIR = 'gabbits-live'
@@ -25,9 +26,14 @@ TESTS_DIR = 'gabbits-live'
 
 def load_tests(loader, tests, pattern):
     """Provide a TestSuite to the discovery process."""
-    host = os.getenv('GNOCCHI_SERVICE_HOST')
-    if host:
+    gnocchi_url = os.getenv('GNOCCHI_SERVICE_URL')
+    if gnocchi_url:
+        parsed_url = urlparse.urlsplit(gnocchi_url)
+        host = parsed_url[1]
+        port = 443 if parsed_url[0] == 'https' else 80
+        if ':' in host:
+            host, port = host.split(':')
+        prefix = parsed_url[2].rstrip('/')  # turn it into a prefix
         test_dir = os.path.join(os.path.dirname(__file__), TESTS_DIR)
-        port = os.getenv('GNOCCHI_SERVICE_PORT', 8041)
         return driver.build_tests(test_dir, loader,
-                                  host=host, port=port)
+                                  host=host, prefix=prefix, port=port)
