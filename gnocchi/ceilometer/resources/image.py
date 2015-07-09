@@ -11,25 +11,6 @@
 # under the License.
 import sqlalchemy
 
-from gnocchi.ceilometer.resources import base
-
-
-class Image(base.ResourceBase):
-    @staticmethod
-    def get_resource_extra_attributes(sample):
-        metadata = sample['resource_metadata']
-        params = {
-            "name": metadata['name'],
-            "container_format": metadata["container_format"],
-            "disk_format": metadata["disk_format"]
-        }
-        return params
-
-    @staticmethod
-    def get_metrics_names():
-        return ['image',
-                'image.size']
-
 
 class ImageSQLAlchemy(object):
     name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)

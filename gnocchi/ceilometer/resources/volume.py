@@ -14,30 +14,5 @@
 # under the License.
 import sqlalchemy
 
-from gnocchi.ceilometer.resources import base
-
-
-class Volume(base.ResourceBase):
-    @staticmethod
-    def get_resource_extra_attributes(sample):
-        metadata = sample['resource_metadata']
-        params = {
-            "display_name": metadata['display_name'],
-        }
-        return params
-
-    @staticmethod
-    def get_metrics_names():
-        return ['volume',
-                'volume.size',
-                'volume.create',
-                'volume.delete',
-                'volume.update',
-                'volume.resize',
-                'volume.attach',
-                'volume.detach',
-                ]
-
-
 class VolumeSQLAlchemy(object):
     display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
