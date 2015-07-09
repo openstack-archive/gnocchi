@@ -17,43 +17,6 @@
 # under the License.
 import sqlalchemy
 
-from gnocchi.ceilometer.resources import base
-
-
-class Instance(base.ResourceBase):
-    @staticmethod
-    def get_resource_extra_attributes(sample):
-        metadata = sample['resource_metadata']
-        params = {
-            "host": metadata['host'],
-            "image_ref": metadata['image_ref_url'],
-            "display_name": metadata['display_name'],
-        }
-        if "instance_flavor_id" in metadata:
-            params["flavor_id"] = metadata['instance_flavor_id']
-        else:
-            # NOTE(sileht): instance.exists have the flavor here
-            params["flavor_id"] = metadata["flavor"]["id"]
-
-        server_group = metadata.get('user_metadata', {}).get('server_group')
-        if server_group:
-            params["server_group"] = server_group
-
-        return params
-
-    @staticmethod
-    def get_metrics_names():
-        # NOTE(sileht): Can we generate the list by loading ceilometer
-        # plugin ?
-        return ['instance',
-                'disk.root.size',
-                'disk.ephemeral.size',
-                'memory',
-                'memory.usage',
-                'vcpus',
-                'cpu',
-                'cpu_util']
-
 
 class InstanceSQLAlchemy(object):
     flavor_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
