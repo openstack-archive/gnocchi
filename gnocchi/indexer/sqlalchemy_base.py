@@ -335,3 +335,22 @@ class ArchivePolicyRule(Base, GnocchiBase):
             "archive_policy_name_archive_policy_name"),
         nullable=False)
     metric_pattern = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+
+
+class ImageSQLAlchemy(object):
+    name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    container_format = sqlalchemy.Column(sqlalchemy.String(255),
+                                         nullable=False)
+    disk_format = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+
+
+class InstanceSQLAlchemy(object):
+    flavor_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    image_ref = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    host = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    server_group = sqlalchemy.Column(sqlalchemy.String(255))
+
+
+class VolumeSQLAlchemy(object):
+    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
