@@ -210,20 +210,23 @@ function configure_gnocchi {
     configure_auth_token_middleware $GNOCCHI_CONF gnocchi $GNOCCHI_AUTH_CACHE_DIR
 
     # Configure the storage driver
-    if is_service_enabled ceph; then
+    if is_service_enabled ceph && [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
         iniset $GNOCCHI_CONF storage driver ceph
         iniset $GNOCCHI_CONF storage ceph_username ${GNOCCHI_CEPH_USER}
         iniset $GNOCCHI_CONF storage ceph_keyring ${CEPH_CONF_DIR}/ceph.client.${GNOCCHI_CEPH_USER}.keyring
-    elif is_service_enabled swift; then
+    elif is_service_enabled swift && [[ "$GNOCCHI_STORAGE_BACKEND" = 'swift' ]] ; then
         iniset $GNOCCHI_CONF storage driver swift
         iniset $GNOCCHI_CONF storage swift_user gnocchi_swift
         iniset $GNOCCHI_CONF storage swift_key $SERVICE_PASSWORD
         iniset $GNOCCHI_CONF storage swift_tenant_name "gnocchi_swift"
         iniset $GNOCCHI_CONF storage swift_auth_version 2
         iniset $GNOCCHI_CONF storage swift_authurl $KEYSTONE_SERVICE_URI/v2.0/
-    else
+    elif [[ "$GNOCCHI_STORAGE_BACKEND" = 'file' ]] ; then
         iniset $GNOCCHI_CONF storage driver file
         iniset $GNOCCHI_CONF storage file_basepath $GNOCCHI_DATA_DIR/
+    else
+        echo "ERROR: could not configure storage driver"
+        exit 1
     fi
 
     if [ "$GNOCCHI_STORAGE_BACKEND" ]; then
