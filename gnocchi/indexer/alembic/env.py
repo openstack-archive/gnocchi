@@ -71,16 +71,17 @@ def run_migrations_online():
     conf = config.conf
     indexer = sqlalchemy.SQLAlchemyIndexer(conf)
     indexer.connect()
-    connectable = indexer.engine_facade.get_engine()
+    with indexer._transaction_context.writer.connection.using(
+            sqlalchemy.context) as connectable:
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata
-        )
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata
+            )
 
-        with context.begin_transaction():
-            context.run_migrations()
+            with context.begin_transaction():
+                context.run_migrations()
 
     indexer.disconnect()
 
