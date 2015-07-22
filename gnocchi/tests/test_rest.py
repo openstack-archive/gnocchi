@@ -761,10 +761,12 @@ class ResourceTest(RestTest):
     def setUp(self):
         super(ResourceTest, self).setUp()
         # Copy attributes so we can modify them in each test :)
+
         self.attributes = self.attributes.copy()
         # Set an id in the attribute
         self.attributes['id'] = str(uuid.uuid4())
         self.resource = self.attributes.copy()
+
         if self.middlewares:
             self.resource['created_by_user_id'] = FakeMemcache.USER_ID
             self.resource['created_by_project_id'] = FakeMemcache.PROJECT_ID
