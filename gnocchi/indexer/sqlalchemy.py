@@ -19,8 +19,8 @@ import operator
 import os.path
 
 from oslo_db import exception
+from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import models
-from oslo_db.sqlalchemy import session
 import six
 import sqlalchemy
 from stevedore import extension
@@ -68,12 +68,6 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         conf.set_override("connection", conf.indexer.url, "database")
         self.conf = conf
 
-    def connect(self):
-        self.engine_facade = session.EngineFacade.from_config(self.conf)
-
-    def disconnect(self):
-        self.engine_facade.get_engine().dispose()
-
     def _get_alembic_config(self):
         from alembic import config
 
@@ -83,7 +77,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             self.conf.database.connection)
         return cfg
 
-    def upgrade(self, nocreate=False):
+    @enginefacade.writer
+    def upgrade(self, context, nocreate=False):
         from alembic import command
         from alembic import migration
 
@@ -92,11 +87,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if nocreate:
             command.upgrade(cfg, "head")
         else:
-            engine = self.engine_facade.get_engine()
-            ctxt = migration.MigrationContext.configure(engine.connect())
+            ctxt = migration.MigrationContext.configure(context.connection)
             current_version = ctxt.get_current_revision()
             if current_version is None:
-                Base.metadata.create_all(engine)
+                Base.metadata.create_all(context.engine)
                 command.stamp(cfg, "head")
             else:
                 command.upgrade(cfg, "head")
@@ -106,18 +100,18 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             raise indexer.UnknownResourceType(resource_type)
         return self._RESOURCE_CLASS_MAPPER[resource_type][purpose]
 
-    def list_archive_policies(self):
-        session = self.engine_facade.get_session()
-        return session.query(ArchivePolicy).all()
+    @enginefacade.reader
+    def list_archive_policies(self, context):
+        return context.session.query(ArchivePolicy).all()
 
-    def get_archive_policy(self, name):
-        session = self.engine_facade.get_session()
-        return session.query(ArchivePolicy).get(name)
+    @enginefacade.reader
+    def get_archive_policy(self, context, name):
+        return context.session.query(ArchivePolicy).get(name)
 
-    def delete_archive_policy(self, name):
-        session = self.engine_facade.get_session()
+    @enginefacade.writer
+    def delete_archive_policy(self, context, name):
         try:
-            if session.query(ArchivePolicy).filter(
+            if context.session.query(ArchivePolicy).filter(
                     ArchivePolicy.name == name).delete() == 0:
                 raise indexer.NoSuchArchivePolicy(name)
         except exception.DBError as e:
@@ -126,44 +120,45 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
                 raise indexer.ArchivePolicyInUse(name)
 
-    def get_metrics(self, uuids):
+    @enginefacade.reader
+    def get_metrics(self, context, uuids):
         if not uuids:
             return []
-        session = self.engine_facade.get_session()
-        query = session.query(Metric).filter(Metric.id.in_(uuids)).options(
-            sqlalchemy.orm.joinedload(
-                'archive_policy')).options(
-                    sqlalchemy.orm.joinedload('resource'))
+        query = context.session.query(Metric).filter(
+            Metric.id.in_(uuids)).options(
+                sqlalchemy.orm.joinedload(
+                    'archive_policy')).options(
+                        sqlalchemy.orm.joinedload('resource'))
 
         return list(query.all())
 
-    def create_archive_policy(self, archive_policy):
+    @enginefacade.writer
+    def create_archive_policy(self, context, archive_policy):
         ap = ArchivePolicy(
             name=archive_policy.name,
             back_window=archive_policy.back_window,
             definition=archive_policy.definition,
             aggregation_methods=list(archive_policy.aggregation_methods),
         )
-        session = self.engine_facade.get_session()
-        session.add(ap)
+        context.session.add(ap)
         try:
-            session.flush()
+            context.session.flush()
         except exception.DBDuplicateEntry:
             raise indexer.ArchivePolicyAlreadyExists(archive_policy.name)
         return ap
 
-    def list_archive_policy_rules(self):
-        session = self.engine_facade.get_session()
-        return session.query(ArchivePolicyRule).all()
+    @enginefacade.reader
+    def list_archive_policy_rules(self, context):
+        return context.session.query(ArchivePolicyRule).all()
 
-    def get_archive_policy_rule(self, name):
-        session = self.engine_facade.get_session()
-        return session.query(ArchivePolicyRule).get(name)
+    @enginefacade.reader
+    def get_archive_policy_rule(self, context, name):
+        return context.session.query(ArchivePolicyRule).get(name)
 
-    def delete_archive_policy_rule(self, name):
-        session = self.engine_facade.get_session()
+    @enginefacade.writer
+    def delete_archive_policy_rule(self, context, name):
         try:
-            if session.query(ArchivePolicyRule).filter(
+            if context.session.query(ArchivePolicyRule).filter(
                     ArchivePolicyRule.name == name).delete() == 0:
                 raise indexer.NoSuchArchivePolicyRule(name)
         except exception.DBError as e:
@@ -171,22 +166,23 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
                 raise indexer.ArchivePolicyRuleInUse(name)
 
-    def create_archive_policy_rule(self, name, metric_pattern,
+    @enginefacade.writer
+    def create_archive_policy_rule(self, context, name, metric_pattern,
                                    archive_policy_name):
         apr = ArchivePolicyRule(
             name=name,
             archive_policy_name=archive_policy_name,
             metric_pattern=metric_pattern
         )
-        session = self.engine_facade.get_session()
-        session.add(apr)
+        context.session.add(apr)
         try:
-            session.flush()
+            context.session.flush()
         except exception.DBDuplicateEntry:
             raise indexer.ArchivePolicyRuleAlreadyExists(name)
         return apr
 
-    def create_metric(self, id, created_by_user_id, created_by_project_id,
+    @enginefacade.writer
+    def create_metric(self, context, id, created_by_user_id, created_by_project_id,
                       archive_policy_name,
                       name=None, resource_id=None,
                       details=False):
@@ -196,18 +192,17 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                    archive_policy_name=archive_policy_name,
                    name=name,
                    resource_id=resource_id)
-        session = self.engine_facade.get_session()
-        session.add(m)
-        session.flush()
+        context.session.add(m)
+        context.session.flush()
         if details:
             # Fetch archive policy
             m.archive_policy
         return m
 
-    def list_metrics(self, user_id=None, project_id=None, details=False,
+    @enginefacade.writer
+    def list_metrics(self, context, user_id=None, project_id=None, details=False,
                      **kwargs):
-        session = self.engine_facade.get_session()
-        q = session.query(Metric)
+        q = context.session.query(Metric)
         if user_id is not None:
             q = q.filter(Metric.created_by_user_id == user_id)
         if project_id is not None:
@@ -221,7 +216,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
         return q.all()
 
-    def create_resource(self, resource_type, id,
+    @enginefacade.writer
+    def create_resource(self, context, resource_type, id,
                         created_by_user_id, created_by_project_id,
                         user_id=None, project_id=None,
                         started_at=None, ended_at=None, metrics=None,
@@ -241,11 +237,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             started_at=started_at,
             ended_at=ended_at,
             **kwargs)
-        session = self.engine_facade.get_session()
-        with session.begin():
-            session.add(r)
+        with context.session.begin():
+            context.session.add(r)
             try:
-                session.flush()
+                context.session.flush()
             except exception.DBDuplicateEntry:
                 raise indexer.ResourceAlreadyExists(id)
             except exception.DBReferenceError as ex:
@@ -253,14 +248,15 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                                                  ex.key,
                                                  getattr(r, ex.key))
             if metrics is not None:
-                self._set_metrics_for_resource(session, r, metrics)
+                self._set_metrics_for_resource(context.session, r, metrics)
 
         # NOTE(jd) Force load of metrics :)
         r.metrics
 
         return r
 
-    def update_resource(self, resource_type,
+    @enginefacade.writer
+    def update_resource(self, context, resource_type,
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
                         **kwargs):
@@ -270,14 +266,13 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         resource_cls = self._resource_type_to_class(resource_type)
         resource_history_cls = self._resource_type_to_class(resource_type,
                                                             "history")
-        session = self.engine_facade.get_session()
         try:
-            with session.begin():
+            with context.session.begin():
                 # NOTE(sileht): We use FOR UPDATE that is not galera friendly,
                 # but they are no other way to cleanly patch a resource and
                 # store the history that safe when two concurrent calls are
                 # done.
-                q = session.query(resource_cls).filter(
+                q = context.session.query(resource_cls).filter(
                     resource_cls.id == resource_id).with_for_update()
 
                 r = q.first()
@@ -289,7 +284,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 for col in sqlalchemy.inspect(resource_cls).columns:
                     setattr(rh, col.name, getattr(r, col.name))
                 rh.revision_end = now
-                session.add(rh)
+                context.session.add(rh)
 
                 # Update the resource
                 if ended_at is not _marker:
@@ -314,10 +309,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
                 if metrics is not _marker:
                     if not append_metrics:
-                        session.query(Metric).filter(
+                        context.session.query(Metric).filter(
                             Metric.resource_id == resource_id).update(
                                 {"resource_id": None})
-                    self._set_metrics_for_resource(session, r, metrics)
+                    self._set_metrics_for_resource(context.session, r, metrics)
         except exception.DBConstraintError as e:
             if e.check_name == "ck_started_before_ended":
                 raise indexer.ResourceValueError(
@@ -329,8 +324,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
         return r
 
-    @staticmethod
-    def _set_metrics_for_resource(session, r, metrics):
+    def _set_metrics_for_resource(self, session, r, metrics):
         for name, metric_id in six.iteritems(metrics):
             try:
                 update = session.query(Metric).filter(
@@ -344,10 +338,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 raise indexer.NoSuchMetric(metric_id)
         session.expire(r, ['metrics'])
 
-    def delete_resource(self, resource_id, delete_metrics=None):
-        session = self.engine_facade.get_session()
-        with session.begin():
-            q = session.query(Resource).filter(
+    @enginefacade.writer
+    def delete_resource(self, context, resource_id, delete_metrics=None):
+        with context.session.begin():
+            q = context.session.query(Resource).filter(
                 Resource.id == resource_id).options(
                     sqlalchemy.orm.joinedload('metrics'))
             r = q.first()
@@ -357,10 +351,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 delete_metrics(self.get_metrics([m.id for m in r.metrics]))
             q.delete()
 
-    def get_resource(self, resource_type, resource_id, with_metrics=False):
+    @enginefacade.reader
+    def get_resource(self, context, resource_type, resource_id, with_metrics=False):
         resource_cls = self._resource_type_to_class(resource_type)
-        session = self.engine_facade.get_session()
-        q = session.query(
+        q = context.session.query(
             resource_cls).filter(
                 resource_cls.id == resource_id)
         if with_metrics:
@@ -404,19 +398,18 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
         return Result
 
-    def list_resources(self, resource_type='generic',
+    @enginefacade.reader
+    def list_resources(self, context, resource_type='generic',
                        attribute_filter=None,
                        details=False,
                        history=False):
-
-        session = self.engine_facade.get_session()
 
         if history:
             target_cls = self._get_history_result_mapper(resource_type)
         else:
             target_cls = self._resource_type_to_class(resource_type)
 
-        q = session.query(target_cls)
+        q = context.session.query(target_cls)
 
         if attribute_filter:
             engine = self.engine_facade.get_engine()
@@ -455,16 +448,15 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         target_cls = self._resource_type_to_class(type)
                         f = target_cls.id.in_([r.id for r in resources])
 
-                    q = session.query(target_cls).filter(f)
+                    q = context.session.query(target_cls).filter(f)
                     # Always include metrics
                     q = q.options(sqlalchemy.orm.joinedload('metrics'))
                     all_resources.extend(q.all())
         return all_resources
 
-    def delete_metric(self, id):
-        session = self.engine_facade.get_session()
-        session.query(Metric).filter(Metric.id == id).delete()
-        session.flush()
+    @enginefacade.writer
+    def delete_metric(self, context, id):
+        context.session.query(Metric).filter(Metric.id == id).delete()
 
 
 class QueryTransformer(object):
