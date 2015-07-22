@@ -17,10 +17,11 @@ from __future__ import absolute_import
 import itertools
 import operator
 import os.path
+import threading
 
 from oslo_db import exception
+from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import models
-from oslo_db.sqlalchemy import session
 import six
 import sqlalchemy
 from stevedore import extension
@@ -58,6 +59,44 @@ def get_resource_mappers(ext):
             'history': resource_history_ext}
 
 
+class PerInstanceFacade(object):
+    def __init__(self, conf):
+        self.trans = enginefacade.transaction_context()
+        self.trans.configure(
+            **dict(conf.database.iteritems())
+        )
+        self._context = threading.local()
+
+    def independent_writer(self):
+        return self.trans.independent.writer.using(self._context)
+
+    def independent_reader(self):
+        return self.trans.independent.reader.using(self._context)
+
+    def writer_connection(self):
+        return self.trans.connection.writer.using(self._context)
+
+    def reader_connection(self):
+        return self.trans.connection.reader.using(self._context)
+
+    def writer(self):
+        return self.trans.writer.using(self._context)
+
+    def reader(self):
+        return self.trans.reader.using(self._context)
+
+    def get_engine(self):
+        # TODO: add get_engine() to enginefacade
+        if not self.trans._factory._started:
+            self.trans._factory._start()
+        return self.trans._factory._writer_engine
+
+    def dispose(self):
+        # TODO: add dispose() to enginefacade
+        if self.trans._factory._started:
+            self.trans._factory._writer_engine.dispose()
+
+
 class SQLAlchemyIndexer(indexer.IndexerDriver):
     resources = extension.ExtensionManager('gnocchi.indexer.resources')
 
@@ -67,12 +106,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def __init__(self, conf):
         conf.set_override("connection", conf.indexer.url, "database")
         self.conf = conf
-
-    def connect(self):
-        self.engine_facade = session.EngineFacade.from_config(self.conf)
-
-    def disconnect(self):
-        self.engine_facade.get_engine().dispose()
+        self.facade = PerInstanceFacade(conf)
 
     def _get_alembic_config(self):
         from alembic import config
@@ -83,6 +117,12 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             self.conf.database.connection)
         return cfg
 
+    def get_engine(self):
+        return self.facade.get_engine()
+
+    def disconnect(self):
+        self.facade.dispose()
+
     def upgrade(self, nocreate=False):
         from alembic import command
         from alembic import migration
@@ -92,14 +132,14 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if nocreate:
             command.upgrade(cfg, "head")
         else:
-            engine = self.engine_facade.get_engine()
-            ctxt = migration.MigrationContext.configure(engine.connect())
-            current_version = ctxt.get_current_revision()
-            if current_version is None:
-                Base.metadata.create_all(engine)
-                command.stamp(cfg, "head")
-            else:
-                command.upgrade(cfg, "head")
+            with self.facade.writer_connection() as connection:
+                ctxt = migration.MigrationContext.configure(connection)
+                current_version = ctxt.get_current_revision()
+                if current_version is None:
+                    Base.metadata.create_all(connection)
+                    command.stamp(cfg, "head")
+                else:
+                    command.upgrade(cfg, "head")
 
     def _resource_type_to_class(self, resource_type, purpose="resource"):
         if resource_type not in self._RESOURCE_CLASS_MAPPER:
@@ -107,157 +147,151 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         return self._RESOURCE_CLASS_MAPPER[resource_type][purpose]
 
     def list_archive_policies(self):
-        session = self.engine_facade.get_session()
-        aps = list(session.query(ArchivePolicy).all())
-        session.expunge_all()
-        return aps
+        with self.facade.independent_reader() as session:
+            aps = list(session.query(ArchivePolicy).all())
+            return aps
 
     def get_archive_policy(self, name):
-        session = self.engine_facade.get_session()
-        ap = session.query(ArchivePolicy).get(name)
-        session.expunge_all()
-        return ap
+        with self.facade.independent_reader() as session:
+            ap = session.query(ArchivePolicy).get(name)
+            return ap
 
     def delete_archive_policy(self, name):
-        session = self.engine_facade.get_session()
-        try:
-            if session.query(ArchivePolicy).filter(
-                    ArchivePolicy.name == name).delete() == 0:
-                raise indexer.NoSuchArchivePolicy(name)
-        except exception.DBError as e:
-            # TODO(jd) Add an exception in oslo.db to match foreign key
-            # violations
-            if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
-                raise indexer.ArchivePolicyInUse(name)
+        with self.facade.writer() as session:
+            try:
+                if session.query(ArchivePolicy).filter(
+                        ArchivePolicy.name == name).delete() == 0:
+                    raise indexer.NoSuchArchivePolicy(name)
+            except exception.DBError as e:
+                # TODO(jd) Add an exception in oslo.db to match foreign key
+                # violations
+                if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
+                    raise indexer.ArchivePolicyInUse(name)
 
     def get_metrics(self, uuids):
         if not uuids:
             return []
-        session = self.engine_facade.get_session()
-        query = session.query(Metric).filter(Metric.id.in_(uuids)).options(
-            sqlalchemy.orm.joinedload(
-                'archive_policy')).options(
-                    sqlalchemy.orm.joinedload('resource'))
+        with self.facade.independent_reader() as session:
+            query = session.query(Metric).filter(
+                Metric.id.in_(uuids)).options(
+                    sqlalchemy.orm.joinedload(
+                        'archive_policy')).options(
+                            sqlalchemy.orm.joinedload('resource'))
 
-        metrics = list(query.all())
-        session.expunge_all()
-        return metrics
+            metrics = list(query.all())
+            return metrics
 
     def create_archive_policy(self, archive_policy):
-        ap = ArchivePolicy(
-            name=archive_policy.name,
-            back_window=archive_policy.back_window,
-            definition=archive_policy.definition,
-            aggregation_methods=list(archive_policy.aggregation_methods),
-        )
-        session = self.engine_facade.get_session()
-        session.add(ap)
-        try:
-            session.flush()
-        except exception.DBDuplicateEntry:
-            raise indexer.ArchivePolicyAlreadyExists(archive_policy.name)
-        session.expunge_all()
-        return ap
+        with self.facade.independent_writer() as session:
+            ap = ArchivePolicy(
+                name=archive_policy.name,
+                back_window=archive_policy.back_window,
+                definition=archive_policy.definition,
+                aggregation_methods=list(archive_policy.aggregation_methods),
+            )
+            session.add(ap)
+            try:
+                session.flush()
+            except exception.DBDuplicateEntry:
+                raise indexer.ArchivePolicyAlreadyExists(archive_policy.name)
+            return ap
 
     def list_archive_policy_rules(self):
-        session = self.engine_facade.get_session()
-        aps = session.query(ArchivePolicyRule).all()
-        session.expunge_all()
-        return aps
+        with self.facade.independent_reader() as session:
+            aps = session.query(ArchivePolicyRule).all()
+            return aps
 
     def get_archive_policy_rule(self, name):
-        session = self.engine_facade.get_session()
-        ap = session.query(ArchivePolicyRule).get(name)
-        session.expunge_all()
-        return ap
+        with self.facade.independent_reader() as session:
+            ap = session.query(ArchivePolicyRule).get(name)
+            return ap
 
     def delete_archive_policy_rule(self, name):
-        session = self.engine_facade.get_session()
-        try:
-            if session.query(ArchivePolicyRule).filter(
-                    ArchivePolicyRule.name == name).delete() == 0:
-                raise indexer.NoSuchArchivePolicyRule(name)
-        except exception.DBError as e:
-            # TODO(prad): fix foreign key violations when oslo.db supports it
-            if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
-                raise indexer.ArchivePolicyRuleInUse(name)
+        with self.facade.writer() as session:
+            try:
+                if session.query(ArchivePolicyRule).filter(
+                        ArchivePolicyRule.name == name).delete() == 0:
+                    raise indexer.NoSuchArchivePolicyRule(name)
+            except exception.DBError as e:
+                # TODO(prad): fix foreign key violations when oslo.db supports it
+                if isinstance(e.inner_exception, sqlalchemy.exc.IntegrityError):
+                    raise indexer.ArchivePolicyRuleInUse(name)
 
     def create_archive_policy_rule(self, name, metric_pattern,
                                    archive_policy_name):
-        apr = ArchivePolicyRule(
-            name=name,
-            archive_policy_name=archive_policy_name,
-            metric_pattern=metric_pattern
-        )
-        session = self.engine_facade.get_session()
-        session.add(apr)
-        try:
+        with self.facade.independent_writer() as session:
+            apr = ArchivePolicyRule(
+                name=name,
+                archive_policy_name=archive_policy_name,
+                metric_pattern=metric_pattern
+            )
+            session.add(apr)
+            try:
+                session.flush()
+            except exception.DBDuplicateEntry:
+                raise indexer.ArchivePolicyRuleAlreadyExists(name)
+            return apr
+
+    def create_metric(
+            self, id, created_by_user_id, created_by_project_id,
+            archive_policy_name,
+            name=None, resource_id=None,
+            details=False):
+        with self.facade.independent_writer() as session:
+            m = Metric(id=id,
+                       created_by_user_id=created_by_user_id,
+                       created_by_project_id=created_by_project_id,
+                       archive_policy_name=archive_policy_name,
+                       name=name,
+                       resource_id=resource_id)
+            session.add(m)
             session.flush()
-        except exception.DBDuplicateEntry:
-            raise indexer.ArchivePolicyRuleAlreadyExists(name)
-        session.expunge_all()
-        return apr
+            if details:
+                # Fetch archive policy
+                m.archive_policy
+            return m
 
-    def create_metric(self, id, created_by_user_id, created_by_project_id,
-                      archive_policy_name,
-                      name=None, resource_id=None,
-                      details=False):
-        m = Metric(id=id,
-                   created_by_user_id=created_by_user_id,
-                   created_by_project_id=created_by_project_id,
-                   archive_policy_name=archive_policy_name,
-                   name=name,
-                   resource_id=resource_id)
-        session = self.engine_facade.get_session()
-        session.add(m)
-        session.flush()
-        if details:
-            # Fetch archive policy
-            m.archive_policy
-        session.expunge_all()
-        return m
+    def list_metrics(
+            self, user_id=None,
+            project_id=None, details=False, **kwargs):
+        with self.facade.independent_writer() as session:
+            q = session.query(Metric)
+            if user_id is not None:
+                q = q.filter(Metric.created_by_user_id == user_id)
+            if project_id is not None:
+                q = q.filter(Metric.created_by_project_id == project_id)
+            for attr in kwargs:
+                q = q.filter(getattr(Metric, attr) == kwargs[attr])
+            if details:
+                q = q.options(sqlalchemy.orm.joinedload(
+                    'archive_policy')).options(
+                        sqlalchemy.orm.joinedload('resource'))
 
-    def list_metrics(self, user_id=None, project_id=None, details=False,
-                     **kwargs):
-        session = self.engine_facade.get_session()
-        q = session.query(Metric)
-        if user_id is not None:
-            q = q.filter(Metric.created_by_user_id == user_id)
-        if project_id is not None:
-            q = q.filter(Metric.created_by_project_id == project_id)
-        for attr in kwargs:
-            q = q.filter(getattr(Metric, attr) == kwargs[attr])
-        if details:
-            q = q.options(sqlalchemy.orm.joinedload(
-                'archive_policy')).options(
-                    sqlalchemy.orm.joinedload('resource'))
-
-        metrics = list(q.all())
-        session.expunge_all()
-        return metrics
+            metrics = list(q.all())
+            return metrics
 
     def create_resource(self, resource_type, id,
                         created_by_user_id, created_by_project_id,
                         user_id=None, project_id=None,
                         started_at=None, ended_at=None, metrics=None,
                         **kwargs):
-        resource_cls = self._resource_type_to_class(resource_type)
-        if (started_at is not None
-           and ended_at is not None
-           and started_at > ended_at):
-            raise ValueError("Start timestamp cannot be after end timestamp")
-        r = resource_cls(
-            id=id,
-            type=resource_type,
-            created_by_user_id=created_by_user_id,
-            created_by_project_id=created_by_project_id,
-            user_id=user_id,
-            project_id=project_id,
-            started_at=started_at,
-            ended_at=ended_at,
-            **kwargs)
-        session = self.engine_facade.get_session()
-        with session.begin():
+        with self.facade.independent_writer() as session:
+            resource_cls = self._resource_type_to_class(resource_type)
+            if (started_at is not None
+               and ended_at is not None
+               and started_at > ended_at):
+                raise ValueError(
+                    "Start timestamp cannot be after end timestamp")
+            r = resource_cls(
+                id=id,
+                type=resource_type,
+                created_by_user_id=created_by_user_id,
+                created_by_project_id=created_by_project_id,
+                user_id=user_id,
+                project_id=project_id,
+                started_at=started_at,
+                ended_at=ended_at,
+                **kwargs)
             session.add(r)
             try:
                 session.flush()
@@ -270,25 +304,23 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             if metrics is not None:
                 self._set_metrics_for_resource(session, r, metrics)
 
-        # NOTE(jd) Force load of metrics :)
-        r.metrics
+            # NOTE(jd) Force load of metrics :)
+            r.metrics
 
-        session.expunge_all()
-        return r
+            return r
 
     def update_resource(self, resource_type,
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
                         **kwargs):
 
-        now = utils.utcnow()
+        with self.facade.independent_writer() as session:
+            now = utils.utcnow()
+            resource_cls = self._resource_type_to_class(resource_type)
+            resource_history_cls = self._resource_type_to_class(resource_type,
+                                                                "history")
+            try:
 
-        resource_cls = self._resource_type_to_class(resource_type)
-        resource_history_cls = self._resource_type_to_class(resource_type,
-                                                            "history")
-        session = self.engine_facade.get_session()
-        try:
-            with session.begin():
                 # NOTE(sileht): We use FOR UPDATE that is not galera friendly,
                 # but they are no other way to cleanly patch a resource and
                 # store the history that safe when two concurrent calls are
@@ -302,6 +334,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
                 # Build history
                 rh = resource_history_cls()
+
                 for col in sqlalchemy.inspect(resource_cls).columns:
                     setattr(rh, col.name, getattr(r, col.name))
                 rh.revision_end = now
@@ -310,7 +343,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 # Update the resource
                 if ended_at is not _marker:
                     # NOTE(jd) MySQL does not honor checks. I hate it.
-                    engine = self.engine_facade.get_engine()
+                    engine = session.connection()
                     if engine.dialect.name == "mysql":
                         if r.started_at is not None and ended_at is not None:
                             if r.started_at > ended_at:
@@ -334,20 +367,21 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             Metric.resource_id == resource_id).update(
                                 {"resource_id": None})
                     self._set_metrics_for_resource(session, r, metrics)
-        except exception.DBConstraintError as e:
-            if e.check_name == "ck_started_before_ended":
-                raise indexer.ResourceValueError(
-                    resource_type, "ended_at", ended_at)
-            raise
 
-        # NOTE(jd) Force load of metrics – do it outside the session!
-        r.metrics
+                session.flush()
+            except exception.DBConstraintError as e:
+                if e.check_name == "ck_started_before_ended":
+                    raise indexer.ResourceValueError(
+                        resource_type, "ended_at", ended_at)
+                raise
 
-        session.expunge_all()
-        return r
+            # NOTE(jd) Force load of metrics – do it outside the session!
+            # NOTE(zzzeek) Session is in play now, and you need one to "load",
+            # so not sure the above NOTE is accurate
+            r.metrics
+            return r
 
-    @staticmethod
-    def _set_metrics_for_resource(session, r, metrics):
+    def _set_metrics_for_resource(self, session, r, metrics):
         for name, metric_id in six.iteritems(metrics):
             try:
                 update = session.query(Metric).filter(
@@ -362,8 +396,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         session.expire(r, ['metrics'])
 
     def delete_resource(self, resource_id, delete_metrics=None):
-        session = self.engine_facade.get_session()
-        with session.begin():
+        with self.facade.independent_writer() as session:
             q = session.query(Resource).filter(
                 Resource.id == resource_id).options(
                     sqlalchemy.orm.joinedload('metrics'))
@@ -374,17 +407,17 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 delete_metrics(self.get_metrics([m.id for m in r.metrics]))
             q.delete()
 
-    def get_resource(self, resource_type, resource_id, with_metrics=False):
-        resource_cls = self._resource_type_to_class(resource_type)
-        session = self.engine_facade.get_session()
-        q = session.query(
-            resource_cls).filter(
-                resource_cls.id == resource_id)
-        if with_metrics:
-            q = q.options(sqlalchemy.orm.joinedload('metrics'))
-        r = q.first()
-        session.expunge_all()
-        return r
+    def get_resource(
+            self, resource_type, resource_id, with_metrics=False):
+        with self.facade.independent_reader() as session:
+            resource_cls = self._resource_type_to_class(resource_type)
+            q = session.query(
+                resource_cls).filter(
+                    resource_cls.id == resource_id)
+            if with_metrics:
+                q = q.options(sqlalchemy.orm.joinedload('metrics'))
+            r = q.first()
+            return r
 
     def _get_history_result_mapper(self, resource_type):
         resource_cls = self._resource_type_to_class(resource_type)
@@ -428,63 +461,61 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                        details=False,
                        history=False):
 
-        session = self.engine_facade.get_session()
+        with self.facade.independent_reader() as session:
 
-        if history:
-            target_cls = self._get_history_result_mapper(resource_type)
-        else:
-            target_cls = self._resource_type_to_class(resource_type)
+            if history:
+                target_cls = self._get_history_result_mapper(resource_type)
+            else:
+                target_cls = self._resource_type_to_class(resource_type)
 
-        q = session.query(target_cls)
+            q = session.query(target_cls)
 
-        if attribute_filter:
-            engine = self.engine_facade.get_engine()
-            try:
-                f = QueryTransformer.build_filter(engine.dialect.name,
-                                                  target_cls,
-                                                  attribute_filter)
-            except indexer.QueryAttributeError as e:
-                # NOTE(jd) The QueryAttributeError does not know about
-                # resource_type, so convert it
-                raise indexer.ResourceAttributeError(resource_type,
-                                                     e.attribute)
+            if attribute_filter:
+                try:
+                    f = QueryTransformer.build_filter(
+                        session.connection().dialect.name,
+                        target_cls,
+                        attribute_filter)
+                except indexer.QueryAttributeError as e:
+                    # NOTE(jd) The QueryAttributeError does not know about
+                    # resource_type, so convert it
+                    raise indexer.ResourceAttributeError(resource_type,
+                                                         e.attribute)
 
-            q = q.filter(f)
+                q = q.filter(f)
 
-        # Always include metrics
-        q = q.options(sqlalchemy.orm.joinedload("metrics"))
-        q = q.order_by(target_cls.revision_start)
-        all_resources = q.all()
+            # Always include metrics
+            q = q.options(sqlalchemy.orm.joinedload("metrics"))
+            q = q.order_by(target_cls.revision_start)
+            all_resources = q.all()
 
-        if details:
-            grouped_by_type = itertools.groupby(
-                all_resources, lambda r: (r.revision != -1, r.type))
-            all_resources = []
-            for (is_history, type), resources in grouped_by_type:
-                if type == 'generic':
-                    # No need for a second query
-                    all_resources.extend(resources)
-                else:
-                    if is_history:
-                        target_cls = self._resource_type_to_class(type,
-                                                                  "history")
-                        f = target_cls.revision.in_(
-                            [r.revision for r in resources])
+            if details:
+                grouped_by_type = itertools.groupby(
+                    all_resources, lambda r: (r.revision != -1, r.type))
+                all_resources = []
+                for (is_history, type), resources in grouped_by_type:
+                    if type == 'generic':
+                        # No need for a second query
+                        all_resources.extend(resources)
                     else:
-                        target_cls = self._resource_type_to_class(type)
-                        f = target_cls.id.in_([r.id for r in resources])
+                        if is_history:
+                            target_cls = self._resource_type_to_class(
+                                type, "history")
+                            f = target_cls.revision.in_(
+                                [r.revision for r in resources])
+                        else:
+                            target_cls = self._resource_type_to_class(type)
+                            f = target_cls.id.in_([r.id for r in resources])
 
-                    q = session.query(target_cls).filter(f)
-                    # Always include metrics
-                    q = q.options(sqlalchemy.orm.joinedload('metrics'))
-                    all_resources.extend(q.all())
-        session.expunge_all()
-        return all_resources
+                        q = session.query(target_cls).filter(f)
+                        # Always include metrics
+                        q = q.options(sqlalchemy.orm.joinedload('metrics'))
+                        all_resources.extend(q.all())
+            return all_resources
 
     def delete_metric(self, id):
-        session = self.engine_facade.get_session()
-        session.query(Metric).filter(Metric.id == id).delete()
-        session.flush()
+        with self.facade.writer() as session:
+            session.query(Metric).filter(Metric.id == id).delete()
 
 
 class QueryTransformer(object):
