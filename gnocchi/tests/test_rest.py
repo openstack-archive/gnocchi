@@ -1046,6 +1046,14 @@ class ResourceTest(RestTest):
                      + self.attributes['id']
                      + "/metric/foo/measures",
                      status=200)
+        result = self.app.get("/v1/resource/"
+                     + self.resource_type
+                     + "/"
+                     + self.attributes['id']
+                     + "/metric/non-existent/measures",
+                              headers={"Accept": "application/json"},
+                              status=404)
+        self.assertEqual("No such metric", result.json['description'])
 
     def test_delete_resource_named_metric(self):
         self.attributes['metrics'] = {'foo': {'archive_policy_name': "high"}}
