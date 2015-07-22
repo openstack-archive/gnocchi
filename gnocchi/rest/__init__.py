@@ -601,7 +601,7 @@ class NamedMetricController(rest.RestController):
         if m:
             return MetricController(m[0]), remainder
 
-        abort(404)
+        abort(404, "No such metric")
 
     @pecan.expose()
     def post(self):
