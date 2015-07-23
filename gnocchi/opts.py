@@ -16,7 +16,6 @@
 import itertools
 
 from oslo_config import cfg
-from oslo_config import types
 
 import gnocchi.archive_policy
 import gnocchi.indexer
@@ -30,7 +29,7 @@ def list_opts():
     return [
         ("indexer", gnocchi.indexer.OPTS),
         ("metricd", (
-            cfg.Opt('workers', type=types.Integer(min=1),
+            cfg.IntOpt('workers', min=1,
                     help='Number of workers for Gnocchi metric daemons. '
                     'By default the available number of CPU is used.'),
         )),
@@ -48,7 +47,7 @@ def list_opts():
                 'middlewares',
                 default=['keystonemiddleware.auth_token.AuthProtocol'],
                 help='Middlewares to use',),
-            cfg.Opt('workers', type=types.Integer(min=1),
+            cfg.IntOpt('workers', min=1,
                     help='Number of workers for Gnocchi API server. '
                     'By default the available number of CPU is used.'),
         )),
