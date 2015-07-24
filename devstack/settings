@@ -1,6 +1,8 @@
 enable_service gnocchi-api
 enable_service gnocchi-metricd
 
+USE_CONSTRAINTS=False
+
 # Set up default directories
 GNOCCHI_DIR=$DEST/gnocchi
 GNOCCHI_CONF_DIR=/etc/gnocchi
