@@ -2,6 +2,13 @@
 # Confirmation tests to run against a live web server.
 #
 # These act as a very basic sanity check.
+#
+fixtures:
+    - CeilometerSamplesInjection
+
+defaults:
+    request_headers:
+        x-auth-token: $ENVIRON['GNOCCHI_SERVICE_TOKEN']
 
 defaults:
     request_headers:
@@ -52,5 +59,43 @@ tests:
 
     - name: delete unicode archive policy
       url: /v1/archive_policy/%E2%9C%94%C3%A9%C3%B1%E2%98%83
+      method: DELETE
+      status: 204
+
+    - name: check if the ceilometer sample have been ingested by gnocchi - resource
+      url: /v1/resource/instance/992a4076-24d1-4c70-aa0f-33ad5dd5fc72
+      status: 200
+      poll:
+          count: 5
+          delay: 0.5
+      response_json_paths:
+          $.project_id: '7cd1dc39-637f-4c61-beda-070819eca00d'
+          $.host: 'compute01'
+          $.image_ref: 'http://glance/somewhere'
+          $.display_name: 'my_wonderful_vm'
+          $.flavor_id: 'sobig'
+          $.server_group: 'frontend_stack'
+
+    - name: check if the ceilometer sample have been ingested by gnocchi - metric
+      url: /v1/resource/instance/992a4076-24d1-4c70-aa0f-33ad5dd5fc72/metric/cpu_util
+      status: 200
+      response_json_paths:
+          $.name: cpu_util
+          $.resource.project_id: '7cd1dc39-637f-4c61-beda-070819eca00d'
+          $.archive_policy.name: low
+
+    - name: check if the ceilometer sample have been ingested by gnocchi - measure
+      url: /v1/resource/instance/992a4076-24d1-4c70-aa0f-33ad5dd5fc72/metric/cpu_util/measures
+      status: 200
+      response_json_paths:
+          $[0][1]: 86400.0
+          $[0][2]: 5.0
+          $[1][1]: 3600.0
+          $[1][2]: 5.0
+          $[2][1]: 300.0
+          $[2][2]: 5.0
+
+    - name: delete the created metric
+      url: /v1/resource/instance/992a4076-24d1-4c70-aa0f-33ad5dd5fc72
       method: DELETE
       status: 204
