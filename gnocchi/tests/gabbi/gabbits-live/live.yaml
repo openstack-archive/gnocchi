@@ -3,6 +3,10 @@
 #
 # These act as a very basic sanity check.
 
+defaults:
+    request_headers:
+        x-auth-token: $ENVIRON['GNOCCHI_SERVICE_TOKEN']
+
 tests:
 
     - name: check /
@@ -37,7 +41,8 @@ tests:
                 points: 20
       status: 201
       response_headers:
-          location: $SCHEME://$NETLOC/v1/archive_policy/%E2%9C%94%C3%A9%C3%B1%E2%98%83
+          # FIXME(sileht): Can't use $NETLOC because it doesn't strip the port when it's 80
+          location: $SCHEME://127.0.0.1/v1/archive_policy/%E2%9C%94%C3%A9%C3%B1%E2%98%83
       response_json_paths:
           name: ✔éñ☃
 
@@ -45,3 +50,8 @@ tests:
       url:  $LOCATION
       response_json_paths:
           $.name: ✔éñ☃
+
+    - name: delete unicode archive policy
+      url: /v1/archive_policy/%E2%9C%94%C3%A9%C3%B1%E2%98%83
+      method: DELETE
+      status: 204
