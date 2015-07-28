@@ -14,6 +14,7 @@
 
 # This script is executed inside post_test_hook function in devstack gate.
 
+source $BASE/new/devstack/lib/rpc_backend
 source $BASE/new/devstack/openrc admin admin
 
 function generate_testr_results {
@@ -41,6 +42,7 @@ curl -X GET ${gnocchi_url}/v1/archive_policy -H "Content-Type: application/json"
 
 export GNOCCHI_SERVICE_TOKEN=$(openstack token issue -c id -f value)
 export GNOCCHI_SERVICE_URL=${gnocchi_url}
+export CEILOMETER_OSLO_MESSAGING_URL="$(get_transport_url)"
 
 # Run tests
 echo "Running gnocchi functional test suite"

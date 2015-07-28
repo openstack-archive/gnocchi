@@ -23,6 +23,8 @@ from unittest import case
 import uuid
 import warnings
 
+from oslo_config import cfg
+import oslo_messaging
 from gabbi import fixture
 import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
@@ -172,3 +174,41 @@ class MetricdThread(threading.Thread):
 
     def stop(self):
         self.flag = False
+
+
+class CeilometerSamplesInjection(fixture.GabbiFixture):
+    def start_fixture(self):
+        url = os.getenv('CEILOMETER_OSLO_MESSAGING_URL')
+        if not url:
+            raise case.SkipTest("oslo.messaging url of ceilometer not "
+                                "configured")
+        conf = cfg.ConfigOpts()
+        conf([], project='ceilometer-injector')
+        self.transport = oslo_messaging.get_transport(conf, url)
+
+        notifier = oslo_messaging.Notifier(
+            self.transport, topic="metering",
+            publisher_id='telemetry.publisher.gnocchi-inject')
+
+        samples = [{
+            'name': 'cpu_util',
+            'type': 'gauge',
+            'unit': None,
+            'volume': 5,
+            'user_id': '43f4a2d3-0acb-44e7-9bf6-3a4dc9276022',
+            'project_id': '7cd1dc39-637f-4c61-beda-070819eca00d',
+            'resource_id': '992a4076-24d1-4c70-aa0f-33ad5dd5fc72',
+            'timestamp': '2014-01-01T12:00:00',
+            'resource_metadata': {'host': 'compute01',
+                                  'image_ref_url': 'http://glance/somewhere',
+                                  'display_name': 'my_wonderful_vm',
+                                  'flavor_id': 'sobig',
+                                  'server_group': 'frontend_stack'},
+
+            'source': 'blackhole',
+            'message_signature': '',
+        }]
+        notifier.sample({}, event_type='metering', payload=samples)
+
+    def stop_fixture(self):
+        self.transport.cleanup()

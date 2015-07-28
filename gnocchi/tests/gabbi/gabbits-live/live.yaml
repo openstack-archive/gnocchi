@@ -2,6 +2,13 @@
 # Confirmation tests to run against a live web server.
 #
 # These act as a very basic sanity check.
+#
+fixtures:
+    - CeilometerSamplesInjection
+
+defaults:
+    request_headers:
+        x-auth-token: $ENVIRON['GNOCCHI_SERVICE_TOKEN']
 
 defaults:
     request_headers:
