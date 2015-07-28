@@ -233,6 +233,7 @@ function configure_ceph_gnocchi {
 function configure_ceilometer_gnocchi {
     gnocchi_url=$(gnocchi_service_url)
     iniset $CEILOMETER_CONF DEFAULT dispatcher gnocchi
+    iniset $CEILOMETER_CONF publisher telemetry_secret ''
     iniset $CEILOMETER_CONF alarms gnocchi_url $gnocchi_url
     iniset $CEILOMETER_CONF dispatcher_gnocchi url $gnocchi_url
     iniset $CEILOMETER_CONF dispatcher_gnocchi archive_policy ${GNOCCHI_ARCHIVE_POLICY}
