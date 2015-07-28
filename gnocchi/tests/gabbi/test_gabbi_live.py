@@ -20,6 +20,7 @@ import os
 from gabbi import driver
 import six.moves.urllib.parse as urlparse
 
+from gnocchi.tests.gabbi import fixtures
 
 TESTS_DIR = 'gabbits-live'
 
@@ -43,4 +44,5 @@ def load_tests(loader, tests, pattern):
         return driver.build_tests(test_dir, loader,
                                   host=parsed_url.hostname,
                                   port=port,
-                                  prefix=prefix)
+                                  prefix=prefix,
+                                  fixture_module=fixtures)

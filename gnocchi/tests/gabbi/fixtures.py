@@ -14,6 +14,7 @@
 # under the License.
 """Fixtures for use with gabbi tests."""
 
+import datetime
 import os
 import shutil
 import tempfile
@@ -23,6 +24,8 @@ from unittest import case
 import uuid
 import warnings
 
+from oslo_config import cfg
+import oslo_messaging
 from gabbi import fixture
 import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
@@ -172,3 +175,42 @@ class MetricdThread(threading.Thread):
 
     def stop(self):
         self.flag = False
+
+
+class CeilometerSamplesInjection(fixture.GabbiFixture):
+    def start_fixture(self):
+        url = os.getenv('CEILOMETER_OSLO_MESSAGING_URL')
+        if not url:
+            raise case.SkipTest("oslo.messaging url of ceilometer not "
+                                "configured")
+        conf = cfg.ConfigOpts()
+        conf([], project='ceilometer-injector')
+        self.transport = oslo_messaging.get_transport(conf, url)
+
+        notifier = oslo_messaging.Notifier(
+            self.transport, driver="messagingv2", topic="metering",
+            publisher_id='telemetry.publisher.gnocchi-inject')
+
+        samples = [{
+            'source': 'blackhole',
+            'counter_name': 'cpu_util',
+            'counter_type': 'gauge',
+            'counter_unit': None,
+            'counter_volume': 5,
+            'user_id': '43f4a2d3-0acb-44e7-9bf6-3a4dc9276022',
+            'project_id': '7cd1dc39-637f-4c61-beda-070819eca00d',
+            'resource_id': '992a4076-24d1-4c70-aa0f-33ad5dd5fc72',
+            'timestamp': datetime.datetime(2014, 1, 1, 12, 0, 0).isoformat(),
+            'resource_metadata': {'host': 'compute01',
+                                  'image_ref_url': 'http://glance/somewhere',
+                                  'display_name': 'my_wonderful_vm',
+                                  'instance_flavor_id': 'sobig',
+                                  'user_metadata': {
+                                      'server_group': 'frontend_stack'}},
+            'message_id': 'f9b64f66-6290-4736-b488-13ecf65d4556',
+            'message_signature': '',
+        }]
+        notifier.sample({}, event_type='metering', payload=samples)
+
+    def stop_fixture(self):
+        self.transport.cleanup()
