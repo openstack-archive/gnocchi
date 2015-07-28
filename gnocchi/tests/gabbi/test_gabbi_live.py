@@ -46,3 +46,5 @@ def load_tests(loader, tests, pattern):
                                   port=port,
                                   prefix=prefix,
                                   fixture_module=fixtures)
+    else:
+        raise RuntimeError('"GNOCCHI_SERVICE_URL" is not set')
