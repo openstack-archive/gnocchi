@@ -44,3 +44,5 @@ def load_tests(loader, tests, pattern):
                                   host=parsed_url.hostname,
                                   port=port,
                                   prefix=prefix)
+    else:
+        raise RuntimeError('"GNOCCHI_SERVICE_URL" is not set')
