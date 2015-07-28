@@ -39,6 +39,7 @@ gnocchi_url = $(openstack endpoint show metric -c publicurl -f value)
 
 curl -X GET ${gnocchi_url}/v1/archive_policy -H "Content-Type: application/json"
 
+export GNOCCHI_SERVICE_TOKEN=$(openstack token issue -c id -f value)
 export GNOCCHI_SERVICE_URL=${gnocchi_url}
 
 # Run tests
