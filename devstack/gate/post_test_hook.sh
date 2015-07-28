@@ -14,6 +14,7 @@
 
 # This script is executed inside post_test_hook function in devstack gate.
 
+source $BASE/new/devstack/lib/rpc_backend
 source $BASE/new/devstack/openrc admin admin
 
 set -e
@@ -40,6 +41,7 @@ openstack catalog list
 
 export GNOCCHI_SERVICE_TOKEN=$(openstack token issue -c id -f value)
 export GNOCCHI_SERVICE_URL=$(openstack catalog show metric -c endpoints -f value | awk '/publicURL/{print $2}')
+export CEILOMETER_OSLO_MESSAGING_URL="$(get_transport_url)"
 
 curl -X GET ${GNOCCHI_SERVICE_URL}/v1/archive_policy -H "Content-Type: application/json"
 
