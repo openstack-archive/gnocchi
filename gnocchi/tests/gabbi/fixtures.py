@@ -87,6 +87,10 @@ class ConfigFixture(fixture.GabbiFixture):
             conf.set_override('url',
                               os.environ.get("GNOCCHI_TEST_INDEXER_URL"),
                               'indexer')
+        if 'GNOCCHI_TEST_CACHE' in os.environ:
+            conf.set_override('cache',
+                              os.environ.get("GNOCCHI_TEST_CACHE"),
+                              'api')
 
         # TODO(jd) It would be cool if Gabbi was able to use the null://
         # indexer, but this makes the API returns a lot of 501 error, which

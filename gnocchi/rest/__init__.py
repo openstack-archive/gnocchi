@@ -601,8 +601,8 @@ class NamedMetricController(rest.RestController):
         if m:
             return MetricController(m[0]), remainder
 
-        resource = pecan.request.indexer.get_resource(self.resource_type,
-                                                      self.resource_id)
+        resource = pecan.request.cache.get_resource(self.resource_type,
+                                                    self.resource_id)
         if resource:
             abort(404, indexer.NoSuchMetric(name))
         else:
@@ -610,7 +610,7 @@ class NamedMetricController(rest.RestController):
 
     @pecan.expose()
     def post(self):
-        resource = pecan.request.indexer.get_resource(
+        resource = pecan.request.cache.get_resource(
             self.resource_type, self.resource_id)
         if not resource:
             abort(404)
@@ -621,6 +621,7 @@ class NamedMetricController(rest.RestController):
             pecan.request.indexer.update_resource(
                 self.resource_type, self.resource_id, metrics=metrics,
                 append_metrics=True)
+            pecan.request.cache.invalidate_resource(self.resource_id)
         except (indexer.NoSuchMetric, ValueError) as e:
             abort(400, e)
         except indexer.NamedMetricAlreadyExists as e:
@@ -688,7 +689,7 @@ class GenericResourceController(rest.RestController):
     @pecan.expose('json')
     @pecan.expose('resources.j2')
     def get(self):
-        resource = pecan.request.indexer.get_resource(
+        resource = pecan.request.cache.get_resource(
             self._resource_type, self.id, with_metrics=True)
         if resource:
             enforce("get resource", resource)
@@ -700,7 +701,7 @@ class GenericResourceController(rest.RestController):
     @pecan.expose('json')
     @pecan.expose('resources.j2')
     def patch(self):
-        resource = pecan.request.indexer.get_resource(
+        resource = pecan.request.cache.get_resource(
             self._resource_type, self.id)
         if not resource:
             abort(404)
@@ -720,6 +721,7 @@ class GenericResourceController(rest.RestController):
             resource = pecan.request.indexer.update_resource(
                 self._resource_type,
                 self.id, **body)
+            pecan.request.cache.invalidate_resource(self.id)
         except (indexer.NoSuchMetric, ValueError) as e:
             abort(400, e)
         except indexer.NoSuchResource as e:
@@ -742,7 +744,7 @@ class GenericResourceController(rest.RestController):
 
     @pecan.expose()
     def delete(self):
-        resource = pecan.request.indexer.get_resource(
+        resource = pecan.request.cache.get_resource(
             self._resource_type, self.id)
         if not resource:
             abort(404, indexer.NoSuchResource(self.id))
@@ -837,6 +839,7 @@ class GenericResourcesController(rest.RestController):
             resource = pecan.request.indexer.create_resource(
                 self._resource_type, rid, user, project,
                 **body)
+            pecan.request.cache.update_resource(resource)
         except (ValueError, indexer.NoSuchMetric) as e:
             abort(400, e)
         except indexer.ResourceAlreadyExists as e:

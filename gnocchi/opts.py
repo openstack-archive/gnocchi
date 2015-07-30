@@ -50,6 +50,11 @@ def list_opts():
             cfg.IntOpt('workers', min=1,
                        help='Number of workers for Gnocchi API server. '
                        'By default the available number of CPU is used.'),
+            cfg.StrOpt('cache',
+                       default='dogpile.cache.null',
+                       help=('The dogpile backend configuration used to cache '
+                             'resources. Example: dogpile.cache.redis?host='
+                             'localhost&distributed_lock=1')),
         )),
         ("storage", itertools.chain(gnocchi.storage._carbonara.OPTS,
                                     gnocchi.storage.OPTS,
