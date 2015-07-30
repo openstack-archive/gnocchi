@@ -15,12 +15,15 @@
 # under the License.
 import os
 
+from dogpile.cache import make_region
+from dogpile.cache import api as cache_api
 import keystonemiddleware.auth_token
 from oslo_log import log
 from oslo_policy import policy
 from oslo_utils import importutils
 import pecan
 from pecan import templating
+import six.moves.urllib.parse as urlparse
 import webob.exc
 from werkzeug import serving
 from werkzeug import wsgi
@@ -35,6 +38,56 @@ from gnocchi import storage
 LOG = log.getLogger(__name__)
 
 
+class GnocchiAPICache(object):
+    GENERIC_ATTRIBUTES = ["created_by_project_id", "created_by_user_id",
+                          "id", "user_id",  "project_id", "metrics",
+                          "started_at", "ended_at", "revision_end",
+                          "revision_start"]
+
+    def __init__(self, conf):
+        # configuration looks like:
+        # dogpile.cache.redis?host=localhost&port=6379&
+        #  redis_expiration_time=123&distributed_lock=True
+        parsed = urlparse.urlsplit(conf.api.cache)
+        config = {'key_mangler': lambda key: "gnocchi:resources:",
+                  'backend': parsed.path}
+        config.update(dict([("arguments.%s" % key, value)
+                            for key, value in
+                            urlparse.parse_qsl(parsed.query)]))
+
+        self._region = make_region().configure_from_config(config, "")
+
+    def get_resource(self, resource_type, resource_id,
+                     with_metrics=False):
+        resource = self._region.get(resource_id)
+
+        # Do we have the requested information about this resource
+        if (resource is cache_api.NO_VALUE
+                or (with_metrics and 'metrics' not in resource)
+                or resource_type not in ["generic", resource['type']]):
+
+            resource = pecan.request.indexer.get_resource(
+                resource_type, resource_id, with_metrics)
+            if resource is not None:
+                self.update_resource(resource)
+
+        else:
+            # Remove useless stuff
+            if resource_type == 'generic' and resource['type'] != "generic":
+                resource = dict((k, v) for k, v in resource.iteritems()
+                                if k in self.GENERIC_ATTRIBUTES)
+            if not with_metrics and 'metrics' in resource:
+                del resource['metrics']
+
+        return resource
+
+    def update_resource(self, resource):
+        self._region.set(resource['id'], resource)
+
+    def invalidate_resource(self, resource_id):
+        self._region.delete(resource_id)
+
+
 class GnocchiHook(pecan.hooks.PecanHook):
 
     def __init__(self, storage, indexer, conf):
@@ -42,8 +95,10 @@ class GnocchiHook(pecan.hooks.PecanHook):
         self.indexer = indexer
         self.conf = conf
         self.policy_enforcer = policy.Enforcer(conf)
+        self.cache = GnocchiAPICache(conf)
 
     def on_route(self, state):
+        state.request.cache = self.cache
         state.request.storage = self.storage
         state.request.indexer = self.indexer
         state.request.conf = self.conf

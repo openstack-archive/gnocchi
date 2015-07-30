@@ -10,6 +10,7 @@ pandas
 pecan>=0.9
 python-swiftclient
 pytimeparse>=1.1.5
+dogpile.cache>=0.5.4
 futures
 requests
 six
