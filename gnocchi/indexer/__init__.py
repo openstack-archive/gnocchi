@@ -206,6 +206,14 @@ class QueryAttributeError(QueryError, ResourceAttributeError):
         ResourceAttributeError.__init__(self, resource, attribute)
 
 
+class InvalidPagination(IndexerException):
+    """Error raised when a resource does not exist."""
+    def __init__(self, reason):
+        self.reason = reason
+        super(InvalidPagination, self).__init__(
+            "Invalid pagination: `%s'" % reason)
+
+
 class IndexerDriver(object):
     @staticmethod
     def __init__(conf):
@@ -237,7 +245,11 @@ class IndexerDriver(object):
     def list_resources(resource_type='generic',
                        attribute_filter=None,
                        details=False,
-                       history=False):
+                       history=False,
+                       limit=None,
+                       marker=None,
+                       sort_keys=None,
+                       sort_dirs=None):
         raise exceptions.NotImplementedError
 
     @staticmethod
