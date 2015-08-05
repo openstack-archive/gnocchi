@@ -21,6 +21,7 @@ import os.path
 from oslo_db import exception
 from oslo_db.sqlalchemy import models
 from oslo_db.sqlalchemy import session
+from oslo_db.sqlalchemy import utils as oslo_db_utils
 import six
 import sqlalchemy
 from stevedore import extension
@@ -426,7 +427,13 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def list_resources(self, resource_type='generic',
                        attribute_filter=None,
                        details=False,
-                       history=False):
+                       history=False,
+                       limit=None,
+                       marker=None,
+                       sort_keys=None,
+                       sort_dirs=None):
+        sort_keys = sort_keys or []
+        sort_dirs = sort_dirs or []
 
         session = self.engine_facade.get_session()
 
@@ -451,9 +458,29 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
             q = q.filter(f)
 
+        # paginate_query require at list one uniq column
+        if 'id' not in sort_keys:
+            sort_keys.append('id')
+            sort_dirs.append('asc')
+
+        if marker:
+            resource_marker = self.get_resource(resource_type, marker)
+            if resource_marker is None:
+                raise indexer.InvalidPagination()
+        else:
+            resource_marker = None
+
+        try:
+            q = oslo_db_utils.paginate_query(q, target_cls, limit=limit,
+                                             sort_keys=sort_keys,
+                                             marker=resource_marker,
+                                             sort_dirs=sort_dirs)
+        except exception.InvalidSortKey:
+            raise indexer.InvalidPagination()
+
         # Always include metrics
         q = q.options(sqlalchemy.orm.joinedload("metrics"))
-        q = q.order_by(target_cls.revision_start)
+        raise Exception(str(q))
         all_resources = q.all()
 
         if details:
