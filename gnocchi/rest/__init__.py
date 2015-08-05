@@ -199,6 +199,47 @@ def get_details(params):
     return get_header_option('details', params)
 
 
+def _get_list_options(params, key, default):
+    data = []
+    if key in params:
+        data = params[key]
+        if not isinstance(data, list):
+            data = [data]
+        data = [datum.strip() for datum in data]
+    if len(data) == 0 and default:
+        data = default
+    return data
+
+
+def get_pagination_options(params, default_keys, default_dirs):
+    max_limit = pecan.request.conf.api.max_limit
+    limit = params.get('limit', max_limit)
+    marker = params.get('marker')
+    sort_keys = _get_list_options(params, 'sort_key', default_keys)
+    sort_dirs = _get_list_options(params, 'sort_dir', default_dirs)
+
+    try:
+        limit = int(limit)
+        if limit <= 0:
+            raise ValueError
+    except ValueError:
+        abort(400, "Invalid 'limit' value: %s" % params.get('limit'))
+
+    limit = min(limit, max_limit)
+
+    for sort_dir in sort_dirs:
+        if sort_dir not in ['asc', 'desc']:
+            abort(400, "Invalid 'sort_dir' value: %s" % sort_dir)
+
+    if len(sort_dirs) != len(sort_keys):
+        abort(400, "Same number of sort_dir and sort_key is required")
+
+    return {'limit': limit,
+            'marker': marker,
+            'sort_keys': sort_keys,
+            'sort_dirs': sort_dirs}
+
+
 def ValidAggMethod(value):
     value = six.text_type(value)
     if value in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS_VALUES:
@@ -852,6 +893,8 @@ class GenericResourcesController(rest.RestController):
     def get_all(self, **kwargs):
         details = get_details(kwargs)
         history = get_history(kwargs)
+        pagination_opts = get_pagination_options(
+            kwargs, ['revision_start', 'started_at'], ['asc', 'asc'])
 
         try:
             enforce("list all resource", {
@@ -872,7 +915,9 @@ class GenericResourcesController(rest.RestController):
                 self._resource_type,
                 attribute_filter=attr_filter,
                 details=details,
-                history=history)
+                history=history,
+                **pagination_opts
+            )
         except indexer.IndexerException as e:
             abort(400, e)
 
@@ -991,6 +1036,8 @@ class SearchResourceTypeController(rest.RestController):
 
         details = get_details(kwargs)
         history = get_history(kwargs)
+        pagination_opts = get_pagination_options(
+            kwargs, ['revision_start', 'started_at'], ['asc', 'asc'])
 
         try:
             enforce("search all resource", {
@@ -1017,7 +1064,8 @@ class SearchResourceTypeController(rest.RestController):
                 self._resource_type,
                 attribute_filter=attr_filter,
                 details=details,
-                history=history)
+                history=history,
+                **pagination_opts)
         except indexer.IndexerException as e:
             abort(400, e)
 
