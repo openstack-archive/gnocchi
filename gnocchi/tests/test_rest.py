@@ -602,6 +602,40 @@ class MetricTest(RestTest):
              metric2: []},
             result)
 
+    def test_search_value_wrong_start_stop(self):
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy_name": "high"})
+        metric = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:00',
+                                    "value": 1234.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 456}])
+        metric1 = metric['id']
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy_name": "high"})
+        metric = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
+                           params=[{"timestamp": '2013-01-01 12:30:00',
+                                    "value": 1234.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 456}])
+        metric2 = metric['id']
+
+        ret = self.app.post_json(
+            "/v1/search/metric?metric_id=%s&metric_id=%s"
+            "&start=foobar" % (metric1, metric2),
+            params={u"∧": [{u"≥": 1000}]},
+            status=400)
+        self.assertIn("Invalid value for start", ret.text)
+
+        ret = self.app.post_json(
+            "/v1/search/metric?metric_id=%s&metric_id=%s"
+            "&stop=foobar" % (metric1, metric2),
+            params={u"∧": [{u"≥": 1000}]},
+            status=400)
+        self.assertIn("Invalid value for stop", ret.text)
+
 
 class ResourceTest(RestTest):
 
