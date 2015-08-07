@@ -1182,6 +1182,23 @@ class V1Controller(object):
     aggregation = Aggregation()
     capabilities = CapabilityController()
 
+    @staticmethod
+    @pecan.expose('json')
+    def index():
+        return {
+            "version": "1.0",
+            "links": [
+                {"rel": "self",
+                 "href": pecan.request.application_url + "/v1"}
+            ] + [
+                {"rel": sub,
+                 "href": pecan.request.application_url + "/v1/" + sub}
+                for sub in ['search', 'archive_policy', 'archive_policy_rule',
+                            'metric', 'resource', 'aggregation',
+                            'capabilities']
+            ]
+        }
+
 
 class RootController(object):
     v1 = V1Controller()
