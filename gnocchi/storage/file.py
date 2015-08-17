@@ -65,7 +65,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
             return os.path.join(path, random_id)
         return path
 
-    def _create_metric_container(self, metric):
+    def _create_metric(self, metric):
         path = self._build_metric_path(metric)
         try:
             os.mkdir(path, 0o750)
@@ -96,16 +96,24 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
     def _list_metric_with_measures_to_process(self):
         return os.listdir(self.measure_path)
 
-    @contextlib.contextmanager
-    def _process_measure_for_metric(self, metric):
+    def _list_measures_container_for_metric(self, metric):
         try:
-            files = os.listdir(self._build_measure_path(metric.id))
+            return os.listdir(self._build_measure_path(metric.id))
         except OSError as e:
             # Some other process treated this one, then do nothing
             if e.errno == errno.ENOENT:
-                yield []
-                return
+                return []
             raise
+
+    def _delete_unprocessed_measures_for_metric(self, metric):
+        files = self._list_measures_container_for_metric(metric)
+        for f in files:
+            os.unlink(self._build_measure_path(metric.id, f))
+        os.rmdir(self._build_measure_path(metric.id))
+
+    @contextlib.contextmanager
+    def _process_measure_for_metric(self, metric):
+        files = self._list_measures_container_for_metric(metric)
         measures = []
         for f in files:
             abspath = self._build_measure_path(metric.id, f)
@@ -137,9 +145,10 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         try:
             shutil.rmtree(path)
         except OSError as e:
-            if e.errno == errno.ENOENT:
-                raise storage.MetricDoesNotExist(metric)
-            raise
+            if e.errno != errno.ENOENT:
+                # NOTE(jd) Maybe the metric has never been created (no
+                # measures)
+                raise
         try:
             shutil.rmtree(os.path.join(self.measure_path,
                                        six.text_type(metric.id)))
