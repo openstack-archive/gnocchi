@@ -696,3 +696,71 @@ tests:
           x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
       method: DELETE
       status: 404
+
+# Special ids
+
+    - name: post new generic non uuid
+      url: /v1/resource/generic
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: contemplate my navel
+          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          metrics:
+              cpu.util:
+                  archive_policy_name: medium
+      status: 201
+      response_json_paths:
+          created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+      response_headers:
+          # is a UUID
+          location: /v1/resource/generic/[a-f0-9-]{36}/
+
+    - name: delete generic non uuid
+      url: /v1/resource/generic/contemplate%20my%20navel
+      method: DELETE
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      status: 204
+
+    - name: fail to post too long non uuid resource id
+      url: /v1/resource/generic
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: four score and seven years ago we the people of the united states of america i have a dream it is the courage to continue that counts four score and seven years ago we the people of the united states of america i have a dream it is the courage to continue that counts four score and seven years ago we the people of the united states of america i have a dream it is the courage to continue that counts
+          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          metrics:
+              cpu.util:
+                  archive_policy_name: medium
+      status: 400
+      response_strings:
+          - not a valid value for
+
+    - name: post long non uuid resource id
+      url: /v1/resource/generic
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      data:
+          # 255 char string
+          id: four score and seven years ago we the people of the united states of america i have a dream it is the courage to continue that counts four score and seven years ago we the people of the united states of america i have a dream it is the courage to continue
+          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          metrics:
+              cpu.util:
+                  archive_policy_name: medium
+      status: 201
