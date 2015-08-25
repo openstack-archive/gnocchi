@@ -1,0 +1,9 @@
+Verified+2: Jenkins
+Code-Review+1: Igor Degtiarov <idegtiarov@mirantis.com>
+Code-Review+2: Chris Dent <chdent@redhat.com>
+Workflow+1: Chris Dent <chdent@redhat.com>
+Submitted-by: Jenkins
+Submitted-at: Tue, 25 Aug 2015 16:10:02 +0000
+Reviewed-on: https://review.openstack.org/216722
+Project: openstack/gnocchi
+Branch: refs/heads/master
