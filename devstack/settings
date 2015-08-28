@@ -17,6 +17,7 @@ GNOCCHI_USE_MOD_WSGI=${GNOCCHI_USE_MOD_WSGI:-${ENABLE_HTTPD_MOD_WSGI_SERVICES}}
 # Support potential entry-points console scripts and venvs
 if [[ ${USE_VENV} = True ]]; then
     PROJECT_VENV["gnocchi"]=${GNOCCHI_DIR}.venv
+    PROJECT_VENV_ARGS["gnocchi"]="--system-site-packages"
     GNOCCHI_BIN_DIR=${PROJECT_VENV["gnocchi"]}/bin
 else
     GNOCCHI_BIN_DIR=$(get_python_exec_prefix)
