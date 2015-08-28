@@ -89,9 +89,19 @@ def metricd():
         LOG.debug("This storage driver does not need metricd to run, exiting")
         return 0
 
-    p = multiprocessing.Pool(conf.metricd.workers)
+    s = s(conf.storage)
+    i = indexer.get_driver(conf)
+    i.connect()
 
     signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))
 
-    p.map_async(_wrap_metricd, range(conf.metricd.workers))
-    signal.pause()
+    # Run in single-process mode
+    while True:
+        LOG.debug("XXX Processing new measures")
+        s.process_measures(i)
+        time.sleep(conf.storage.metric_processing_delay)
+
+    # p = multiprocessing.Pool(conf.metricd.workers)
+
+    # p.map_async(_wrap_metricd, range(conf.metricd.workers))
+    # signal.pause()

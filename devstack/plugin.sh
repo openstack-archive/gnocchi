@@ -85,6 +85,12 @@ function gnocchi_service_url {
     fi
 }
 
+# We need to the ceph rados client, from packages, it is not on
+# PyPI.
+function _gnocchi_install_ceph {
+    install_package python-rados
+}
+
 # install redis
 # NOTE(chdent): We shouldn't rely on ceilometer being present so cannot
 # use its install_redis. There are enough packages now using redis
@@ -302,6 +308,10 @@ function install_gnocchi {
     if [[ "${GNOCCHI_STORAGE_BACKEND}" == 'influxdb' ]] ; then
         _gnocchi_install_influxdb
         pip_install influxdb
+    fi
+
+    if [[ "${GNOCCHI_STORAGE_BACKEND}" == 'ceph' ]] ; then
+        _gnocchi_install_ceph
     fi
 
     # NOTE(sileht): requirements are not merged with the global-requirement repo
