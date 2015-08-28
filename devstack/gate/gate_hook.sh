@@ -50,7 +50,8 @@ case $SQL_DRIVER in
         ;;
 esac
 
-DEVSTACK_LOCAL_CONFIG+=$'\nexport USE_VENV=True'
+# NOTE(chdent): see if things work with this not set
+#DEVSTACK_LOCAL_CONFIG+=$'\nexport USE_VENV=True'
 DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_USE_KEYSTONE=False'
 export ENABLED_SERVICES
 export DEVSTACK_LOCAL_CONFIG
