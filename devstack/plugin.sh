@@ -233,7 +233,7 @@ function configure_gnocchi {
         exit 1
     fi
 
-    if [ "$GNOCCHI_USE_KEYSTONE" != "True" ]; then
+    if is_service_enabled key; then
         iniset $GNOCCHI_CONF api middlewares ""
     else
         inicomment $GNOCCHI_CONF api middlewares
@@ -350,7 +350,7 @@ function start_gnocchi {
 
     # Create a default policy
     archive_policy_url="$(gnocchi_service_url)/v1/archive_policy"
-    if [ "$GNOCCHI_USE_KEYSTONE" == "True" ]; then
+    if is_service_enabled key; then
         token=$(openstack token issue -f value -c id)
         create_archive_policy() { curl -X POST -H "X-Auth-Token: $token" -H "Content-Type: application/json" -d "$1" $archive_policy_url ; }
     else
