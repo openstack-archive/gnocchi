@@ -36,10 +36,13 @@ export GNOCCHI_DIR="$BASE/new/gnocchi"
 sudo chown -R stack:stack $GNOCCHI_DIR
 cd $GNOCCHI_DIR
 
-openstack catalog list
-
-export GNOCCHI_SERVICE_TOKEN=$(openstack token issue -c id -f value)
-export GNOCCHI_SERVICE_URL=$(openstack catalog show metric -c endpoints -f value | awk '/publicURL/{print $2}')
+if is_service_enabled key
+then
+    export GNOCCHI_SERVICE_URL=$(openstack catalog show metric -c endpoints -f value | awk '/publicURL/{print $2}')
+else
+    source ${GNOCCHI_DIR}/devstack/settings
+    export GNOCCHI_SERVICE_URL=${GNOCCHI_SERVICE_PROTOCOL}://${GNOCCHI_SERVICE_HOST}:${GNOCCHI_SERVICE_PORT:-80}${GNOCCHI_SERVICE_PREFIX}
+fi
 
 curl -X GET ${GNOCCHI_SERVICE_URL}/v1/archive_policy -H "Content-Type: application/json"
 
