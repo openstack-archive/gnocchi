@@ -17,7 +17,7 @@
 STORAGE_DRIVER="$1"
 SQL_DRIVER="$2"
 
-ENABLED_SERVICES="key,gnocchi-api,gnocchi-metricd,"
+ENABLED_SERVICES="gnocchi-api,gnocchi-metricd,"
 
 export DEVSTACK_GATE_INSTALL_TESTONLY=1
 export DEVSTACK_GATE_NO_SERVICES=1
@@ -51,7 +51,6 @@ case $SQL_DRIVER in
 esac
 
 DEVSTACK_LOCAL_CONFIG+=$'\nexport USE_VENV=True'
-DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_USE_KEYSTONE=False'
 export ENABLED_SERVICES
 export DEVSTACK_LOCAL_CONFIG
 
