@@ -130,6 +130,20 @@ function _gnocchi_install_influxdb {
     sudo /opt/influxdb/init.sh restart
 }
 
+function _gnocchi_install_grafana {
+    if is_ubuntu; then
+        local file=$(mktemp /tmp/grafanapkg-XXXXX)
+        wget -O "$file" "$GNOCCHI_GRAFANA_DEB_PKG"
+        sudo dpkg -i "$file"
+        rm $file
+    elif is_fedora; then
+        sudo yum install "$GNOCCHI_GRAFANA_RPM_PKG"
+    fi
+    curl "${GNOCCHI_GRAFANA_PLUGINS_TARBALL}" | sudo tar xz -C /usr/share/grafana/public/app/plugins/datasource/ grafana-plugins-master/datasources/gnocchi --strip-component 2
+
+    sudo service grafana-server restart
+}
+
 # remove the influxdb database
 function _gnocchi_cleanup_influxdb {
     curl -G 'http://localhost:8086/query' --data-urlencode "q=DROP DATABASE $GNOCCHI_INFLUXDB_DBNAME"
@@ -303,6 +317,11 @@ function install_gnocchi {
     if [[ "${GNOCCHI_STORAGE_BACKEND}" == 'influxdb' ]] ; then
         _gnocchi_install_influxdb
         pip_install influxdb
+    fi
+
+    if is_service_enabled gnocchi-grafana
+    then
+        _gnocchi_install_grafana
     fi
 
     # NOTE(sileht): requirements are not merged with the global-requirement repo
