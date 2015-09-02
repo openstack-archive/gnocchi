@@ -46,3 +46,8 @@ GNOCCHI_STORAGE_BACKEND=${GNOCCHI_STORAGE_BACKEND:-file}
 GNOCCHI_INFLUXDB_DBNAME=${GNOCCHI_INFLUXDB_DBNAME:-gnocchidevstack}
 GNOCCHI_INFLUXDB_RPM_PKG=${GNOCCHI_INFLUXDB_RPM_PKG:-https://s3.amazonaws.com/influxdb/influxdb-0.9.3-1.x86_64.rpm}
 GNOCCHI_INFLUXDB_DEB_PKG=${GNOCCHI_INFLUXDB_DEB_PKG:-https://s3.amazonaws.com/influxdb/influxdb_0.9.3_amd64.deb}
+
+# Grafana settings
+GNOCCHI_GRAFANA_RPM_PKG=${GNOCCHI_GRAFANA_RPM_PKG:-https://grafanarel.s3.amazonaws.com/builds/grafana-2.1.3-1.x86_64.rpm}
+GNOCCHI_GRAFANA_DEB_PKG=${GNOCCHI_GRAFANA_DEB_PKG:-https://grafanarel.s3.amazonaws.com/builds/grafana_2.1.3_amd64.deb}
+GNOCCHI_GRAFANA_PLUGINS_TARBALL=${GNOCCHI_GRAFANA_PLUGINS_TARBALL:-https://codeload.github.com/grafana/grafana-plugins/tar.gz/master}
