@@ -193,6 +193,7 @@ function configure_gnocchi {
 
     # Configure logging
     iniset $GNOCCHI_CONF DEFAULT verbose True
+    iniset $GNOCCHI_CONF DEFAULT debug "$ENABLE_DEBUG_LOG_LEVEL"
     if [ "$GNOCCHI_USE_MOD_WSGI" != "True" ]; then
         iniset $GNOCCHI_CONF DEFAULT debug "$ENABLE_DEBUG_LOG_LEVEL"
     fi
