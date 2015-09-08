@@ -59,6 +59,15 @@ def retry_if_result_empty(result):
     return len(result) == 0
 
 
+def retry_if_authentication_error(exception):
+    # NOTE(chdent): swiftclient makes it quite difficult to know
+    # when there has been a particular type of exception. Until
+    # https://bugs.launchpad.net/python-swiftclient/+bug/1493470
+    # is resolved it is necessary to inspect the exception message.
+    return (isinstance(exception, swclient.ClientException) and
+            'Authorization Failure' in exception.msg)
+
+
 class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     def __init__(self, conf):
         super(SwiftStorage, self).__init__(conf)
@@ -71,6 +80,12 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             tenant_name=conf.swift_tenant_name)
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
         self._container_prefix = conf.swift_container_prefix
+        self._create_prefix_container()
+
+    @retrying.retry(retry_on_exception=retry_if_authentication_error,
+                    wait_fixed=2000,
+                    stop_max_delay=60000)
+    def _create_prefix_container(self):
         self.swift.put_container(self.MEASURE_PREFIX)
 
     def stop(self):
