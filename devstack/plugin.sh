@@ -263,8 +263,10 @@ function configure_gnocchi {
             iniset $KEYSTONE_PASTE_INI filter:cors oslo_config_project keystone
             # This should be not required, see: https://bugs.launchpad.net/oslo.middleware/+bug/1491293
             iniset $KEYSTONE_PASTE_INI filter:cors allowed_origin ${GRAFANA_URL}
-            local ks_pipeline=$(iniget $KEYSTONE_PASTE_INI pipeline:api_v3 pipeline)
-            iniset $KEYSTONE_PASTE_INI pipeline:api_v3 pipeline "cors $ks_pipeline"
+            for pipeline in api_v3 public_api admin_api public_version_api admin_version_api; do
+                local ks_pipeline=$(iniget $KEYSTONE_PASTE_INI pipeline:$pipeline pipeline)
+                iniset $KEYSTONE_PASTE_INI pipeline:$pipeline pipeline "cors $ks_pipeline"
+            done
         else
             iniset $GNOCCHI_CONF api middlewares keystonemiddleware.auth_token.AuthProtocol
         fi
