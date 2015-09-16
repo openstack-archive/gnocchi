@@ -198,7 +198,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         with self._get_ioctx() as ioctx:
             ioctx.write_full(name, data)
 
-    def delete_metric(self, metric):
+    def _delete_metric(self, metric):
         with self._get_ioctx() as ioctx:
             name = self._get_object_name(metric, 'container')
             try:
