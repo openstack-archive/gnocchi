@@ -71,7 +71,7 @@ class MetricProcessor(multiprocessing.Process):
         while True:
             try:
                 with timeutils.StopWatch() as timer:
-                    self._process(self.store, self.index)
+                    self.store.process_background_tasks(self.index)
                     time.sleep(
                         max(0, self.conf.storage.metric_processing_delay
                             - timer.elapsed()))
@@ -80,24 +80,9 @@ class MetricProcessor(multiprocessing.Process):
                 # all children.
                 pass
 
-    @staticmethod
-    def _process(store, index):
-        LOG.debug("Processing new measures")
-        try:
-            store.process_measures(index)
-        except Exception:
-            LOG.error("Unexpected error during measures processing",
-                      exc_info=True)
-
 
 def metricd():
     conf = service.prepare_service()
-
-    # Check that the storage driver actually needs this daemon to run
-    s = storage.get_driver_class(conf)
-    if s.process_measures == storage.StorageDriver.process_measures:
-        LOG.debug("This storage driver does not need metricd to run, exiting")
-        return 0
 
     signal.signal(signal.SIGTERM, _metricd_terminate)
 
