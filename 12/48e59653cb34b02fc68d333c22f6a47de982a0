@@ -1,0 +1,10 @@
+Verified+2: Jenkins
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Code-Review+1: gordon chung <gord@live.ca>
+Code-Review+2: Ilya Tyaptin <ityaptin@mirantis.com>
+Workflow+1: Ilya Tyaptin <ityaptin@mirantis.com>
+Submitted-by: Jenkins
+Submitted-at: Fri, 18 Sep 2015 17:07:22 +0000
+Reviewed-on: https://review.openstack.org/225029
+Project: openstack/gnocchi
+Branch: refs/heads/master
