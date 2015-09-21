@@ -86,6 +86,13 @@ function gnocchi_service_url {
     fi
 }
 
+function install_gnocchiclient {
+    if use_library_from_git python-gnocchiclient; then
+        git_clone_by_name python-gnocchiclient
+        setup_dev_lib python-gnocchiclient
+    fi
+}
+
 # install redis
 # NOTE(chdent): We shouldn't rely on ceilometer being present so cannot
 # use its install_redis. There are enough packages now using redis
@@ -418,6 +425,7 @@ if is_service_enabled gnocchi-api; then
     if [[ "$1" == "stack" && "$2" == "install" ]]; then
         echo_summary "Installing Gnocchi"
         stack_install_service gnocchi
+        install_gnocchiclient
     elif [[ "$1" == "stack" && "$2" == "post-config" ]]; then
         echo_summary "Configuring Gnocchi"
         configure_gnocchi
