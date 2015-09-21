@@ -53,3 +53,5 @@ GRAFANA_DEB_PKG=${GRAFANA_DEB_PKG:-https://grafanarel.s3.amazonaws.com/builds/gr
 GRAFANA_PLUGINS_DIR=${GRAFANA_PLUGINS_DIR:-$DEST/grafana-plugins}
 GRAFANA_PLUGINS_REPO=${GRAFANA_PLUGINS_REPO:-http://github.com/grafana/grafana-plugins.git}
 GRAFANA_URL=${GRAFANA_URL:-http://$HOST_IP:3000}
+
+LIBS_FROM_GIT=$LIBS_FROM_GIT,python-gnocchiclient
