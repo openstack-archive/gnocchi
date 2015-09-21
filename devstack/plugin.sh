@@ -36,6 +36,8 @@ set -o xtrace
 
 # Defaults
 # --------
+GITDIR["python-gnocchiclient"]=$DEST/python-gnocchiclient
+GITREPO["python-gnocchiclient"]=${GNOCCHICLIENT_REPO:-${GIT_BASE}/openstack/python-gnocchiclient.git}
 
 # Functions
 # ---------
@@ -83,6 +85,13 @@ function gnocchi_service_url {
         echo "$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST:$GNOCCHI_SERVICE_PORT"
     else
         echo "$GNOCCHI_SERVICE_PROTOCOL://$GNOCCHI_SERVICE_HOST$GNOCCHI_SERVICE_PREFIX"
+    fi
+}
+
+function install_gnocchiclient {
+    if use_library_from_git python-gnocchiclient; then
+        git_clone_by_name python-gnocchiclient
+        setup_dev_lib python-gnocchiclient
     fi
 }
 
@@ -418,6 +427,7 @@ if is_service_enabled gnocchi-api; then
     if [[ "$1" == "stack" && "$2" == "install" ]]; then
         echo_summary "Installing Gnocchi"
         stack_install_service gnocchi
+        install_gnocchiclient
     elif [[ "$1" == "stack" && "$2" == "post-config" ]]; then
         echo_summary "Configuring Gnocchi"
         configure_gnocchi
