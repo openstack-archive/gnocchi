@@ -81,6 +81,32 @@ tests:
           archive_policy_name: cookies
       status: 415
 
+    - name: create generic resource
+      url: /v1/resource/generic
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          content-type: application/json
+      data:
+          id: 8266ECD2-F6DE-4F0E-B004-B99BCB52B558
+          started_at: "2014-01-03T02:02:02.000000"
+          user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+      status: 201
+
+    - name: create valid metric attached to resource
+      url: /v1/metric
+      method: POST
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: cookies
+          resource_id: $RESPONSE['$.id']
+      status: 201
+      response_json_paths:
+          $.archive_policy_name: cookies
+          $.resource_id: $RESPONSE['$.id']
+
     - name: create valid metric
       url: /v1/metric
       method: POST
