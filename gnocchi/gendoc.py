@@ -101,6 +101,31 @@ class ScenarioList(list):
         return super(ScenarioList, self).__getitem__(key)
 
 
+class OsloConfig(object):
+    # TODO(sileht): move this to oslo.config repo
+    def __init__(self):
+        groups = {'DEFAULT': []}
+        for namespace, listing in self._list_opts(conf.namespace):
+            for group, opts in listing:
+                if not opts:
+                    continue
+                namespaces = groups.setdefault(group or 'DEFAULT', [])
+                namespaces.append((namespace, opts))
+
+
+    def _list_opts(namespaces):
+        """List the options available via the given namespaces.
+        :param namespaces: a list of namespaces registered under 'oslo.config.opts'
+        :returns: a list of (namespace, [(group, [opt_1, opt_2])]) tuples
+        """
+        mgr = stevedore.named.NamedExtensionManager(
+            'oslo.config.opts',
+            names=namespaces,
+            on_load_failure_callback=on_load_failure_callback,
+            invoke_on_load=True)
+        return [(ep.name, ep.obj) for ep in mgr]
+
+
 def setup(app):
     global _RUN
     if _RUN:
