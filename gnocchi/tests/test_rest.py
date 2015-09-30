@@ -293,6 +293,25 @@ class ArchivePolicyTest(RestTest):
             self.assertIn(apj, aps)
 
 
+class ArchivePolicyRuleTest(RestTest):
+    """Test the ArchivePolicyRules REST API."""
+
+    def test_list_ap_rules_ordered(self):
+        for count, pattern in enumerate(['*', 'disk.io.*', 'disk.io']):
+            with self.app.use_admin_user():
+                self.app.post_json("/v1/archive_policy_rule",
+                                   params={"archive_policy_name": "low",
+                                           "name": "test_rule%s" % count,
+                                           "metric_pattern": pattern},
+                                   status=201)
+        result = self.app.get("/v1/archive_policy_rule")
+        rules = json.loads(result.text)
+        self.assertEqual(3, len(rules))
+        self.assertEqual('disk.io.*', rules[0]['metric_pattern'])
+        self.assertEqual('disk.io', rules[1]['metric_pattern'])
+        self.assertEqual('*', rules[2]['metric_pattern'])
+
+
 class MetricTest(RestTest):
 
     def test_get_metric_with_another_user(self):
