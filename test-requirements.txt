@@ -15,3 +15,5 @@ doc8
 sphinxcontrib-httpdomain
 influxdb>=2.4
 sysv_ipc
+# TESTING
+os-testr>=0.4.0
