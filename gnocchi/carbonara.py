@@ -51,6 +51,14 @@ class UnAggregableTimeseries(Exception):
         super(UnAggregableTimeseries, self).__init__(reason)
 
 
+class UnknownAggregationMethod(Exception):
+    """Error raised when the aggregation method is unknown."""
+    def __init__(self, agg):
+        self.aggregation_method = agg
+        super(UnknownAggregationMethod, self).__init__(
+            "Unknown aggregation method `%s'" % agg)
+
+
 class SerializableMixin(object):
 
     @classmethod
@@ -227,13 +235,6 @@ class AggregatedTimeSerie(TimeSerie):
 
     _AGG_METHOD_PCT_RE = re.compile(r"([1-9][0-9]?)pct")
 
-    @staticmethod
-    def _percentile(a, q):
-        # TODO(jd) Find a way to compute all the percentile in one pass as
-        # numpy can do numpy.percentile(a, q=[75, 90, 95])
-        if len(a) > 0:
-            return numpy.percentile(a, q)
-
     def __init__(self, timestamps=None, values=None,
                  max_size=None,
                  sampling=None, aggregation_method='mean'):
@@ -251,9 +252,14 @@ class AggregatedTimeSerie(TimeSerie):
 
         if m:
             self.aggregation_method_func = functools.partial(
-                self._percentile, q=float(m.group(1)))
+                pandas.core.groupby.SeriesGroupBy.quantile,
+                q=float(m.group(1)) / 100)
         else:
-            self.aggregation_method_func = aggregation_method
+            try:
+                self.aggregation_method_func = getattr(
+                    pandas.core.groupby.SeriesGroupBy, aggregation_method)
+            except AttributeError:
+                raise UnknownAggregationMethod(aggregation_method)
 
         self.sampling = pandas.tseries.frequencies.to_offset(sampling)
         self.max_size = max_size
@@ -295,12 +301,22 @@ class AggregatedTimeSerie(TimeSerie):
             # Remove empty points if any that could be added by aggregation
             self.ts = self.ts.dropna()[-self.max_size:]
 
+    @staticmethod
+    def _round_timestamp(ts, freq):
+        return pandas.Timestamp(
+            (ts.value / freq.delta.value) * freq.delta.value)
+
     def _resample(self, after):
         if self.sampling:
-            self.ts = self.ts[after:].resample(
-                self.sampling,
-                how=self.aggregation_method_func).dropna().combine_first(
-                    self.ts[:after][:-1])
+            # Group by the sampling, and then apply the aggregation method on
+            # the points after `after'
+            aggregated = self.aggregation_method_func(
+                self.ts[after:].groupby(
+                    functools.partial(self._round_timestamp,
+                                      freq=self.sampling)))
+            # Now combine the result with the rest of the point – everything
+            # that is before `after'
+            self.ts = aggregated.combine_first(self.ts[:after][:-1])
 
     def update(self, ts):
         index = ts.ts.index

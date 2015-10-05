@@ -105,35 +105,12 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
             [3, 5, 6])
 
-    def test_0_percentile(self):
-        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
-                                           aggregation_method='0pct')
-        self.assertRaises(AttributeError,
-                          ts.update,
-                          carbonara.TimeSerie.from_tuples(
-                              [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
-
-    def test_100_percentile(self):
-        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
-                                           aggregation_method='100pct')
-        self.assertRaises(AttributeError,
-                          ts.update,
-                          carbonara.TimeSerie.from_tuples(
-                              [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
-
-    def test_123_percentile(self):
-        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
-                                           aggregation_method='123pct')
-        self.assertRaises(AttributeError,
-                          ts.update,
-                          carbonara.TimeSerie.from_tuples(
-                              [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
+    def test_bad_percentile(self):
+        for bad_percentile in ('0pct', '100pct', '-1pct', '123pct'):
+            self.assertRaises(carbonara.UnknownAggregationMethod,
+                              carbonara.AggregatedTimeSerie,
+                              sampling='1Min',
+                              aggregation_method=bad_percentile)
 
     def test_74_percentile(self):
         ts = carbonara.AggregatedTimeSerie(sampling='1Min',
