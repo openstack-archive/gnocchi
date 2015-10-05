@@ -133,8 +133,10 @@ class InfluxDBStorage(storage.StorageDriver):
             raise utils.Retry
 
     def delete_metric(self, metric):
-        metric_id = self._get_metric_id(metric)
-        self._query(metric, "DROP MEASUREMENT \"%s\"" % metric_id)
+        # FIXME(ityaptin): In InfluxDB 0.9.4 and lesser drop measurement causes
+        # a internal blocks which break normal work.
+        # I suggest to avoid these requests until it is fixed.
+        pass
 
     def add_measures(self, metric, measures):
         metric_id = self._get_metric_id(metric)
@@ -247,16 +249,18 @@ class InfluxDBStorage(storage.StorageDriver):
     def _timestamp_to_utc(ts):
         return timeutils.normalize_time(ts).replace(tzinfo=iso8601.iso8601.UTC)
 
-    def _make_time_query(self, from_timestamp, to_timestamp, granularity):
+    @staticmethod
+    def _make_time_query(from_timestamp, to_timestamp, granularity):
         if from_timestamp:
             from_timestamp = find_nearest_stable_point(from_timestamp,
                                                        granularity)
-            left_time = self._timestamp_to_utc(from_timestamp).isoformat()
+            left_time = from_timestamp.isoformat()
         else:
             left_time = "now()"
 
         if to_timestamp and to_timestamp >= from_timestamp:
-            right_time = self._timestamp_to_utc(to_timestamp).isoformat()
+            right_time = find_nearest_stable_point(
+                to_timestamp, granularity, True).isoformat()
         else:
             right_time = None
 
