@@ -396,11 +396,10 @@ class TestCase(base.BaseTestCase):
             self.conf.set_override('influxdb_port',
                                    os.getenv("GNOCCHI_TEST_INFLUXDB_PORT",
                                              51234), 'storage')
-            # NOTE(ityaptin) Creating unique database for every test may cause
-            # tests failing by timeout, but in may be useful in some cases
+            self._influxdb_database = "gnocchi_%s" % uuid.uuid4().hex
             if os.getenv("GNOCCHI_TEST_INFLUXDB_UNIQUE_DATABASES"):
                 self.conf.set_override("influxdb_database",
-                                       "gnocchi_%s" % uuid.uuid4().hex,
+                                       self._influxdb_database,
                                        'storage')
 
         self.storage = storage.get_driver(self.conf)
@@ -412,4 +411,12 @@ class TestCase(base.BaseTestCase):
     def tearDown(self):
         self.index.disconnect()
         self.storage.stop()
+        if self.conf.storage.driver == 'influxdb':
+            database = getattr(self, "_influxdb_database", None)
+            if database:
+                try:
+                    self.storage.influx.query(
+                        "DROP DATABASE \"%s\"" % database)
+                except Exception:
+                    pass
         super(TestCase, self).tearDown()

@@ -111,7 +111,6 @@ class TestStorageDriver(tests_base.TestCase):
         ], self.storage.get_measures(
             self.metric,
             from_timestamp=datetime.datetime(2014, 1, 1, 12, 10, 0)))
-
         self.assertEqual([
             (utils.datetime_utc(2014, 1, 1), 86400.0, 39.75),
             (utils.datetime_utc(2014, 1, 1, 12), 3600.0, 39.75),
@@ -120,14 +119,12 @@ class TestStorageDriver(tests_base.TestCase):
         ], self.storage.get_measures(
             self.metric,
             to_timestamp=datetime.datetime(2014, 1, 1, 12, 6, 0)))
-
         self.assertEqual(
             [],
             self.storage.get_measures(
                 self.metric,
                 to_timestamp=datetime.datetime(2014, 1, 1, 12, 10, 10),
                 from_timestamp=datetime.datetime(2014, 1, 1, 12, 10, 10)))
-
         self.assertEqual([
             (utils.datetime_utc(2014, 1, 1, 12), 3600.0, 39.75),
             (utils.datetime_utc(2014, 1, 1, 12), 300.0, 69.0),
