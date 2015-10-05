@@ -11,6 +11,7 @@ wait_for_line () {
 
 INFLUXDB_DATA=`mktemp -d /tmp/gnocchi-influxdb-XXXXX`
 export GNOCCHI_TEST_INFLUXDB_PORT=51234
+export GNOCCHI_TEST_INFLUXDB_UNIQUE_DATABASES=True
 
 mkdir ${INFLUXDB_DATA}/{broker,data,meta,hh,wal}
 mkfifo ${INFLUXDB_DATA}/out
@@ -36,6 +37,7 @@ EOF
 PATH=$PATH:/opt/influxdb influxd -config $INFLUXDB_DATA/config > ${INFLUXDB_DATA}/out 2>&1 &
 # Wait for InfluxDB to start listening to connections
 wait_for_line "Listening on HTTP" ${INFLUXDB_DATA}/out
+
 
 $*
 

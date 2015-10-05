@@ -133,13 +133,13 @@ class InfluxDBStorage(storage.StorageDriver):
             raise utils.Retry
 
     def delete_metric(self, metric):
-        metric_id = self._get_metric_id(metric)
-        self._query(metric, "DROP MEASUREMENT \"%s\"" % metric_id)
+        pass
 
     def add_measures(self, metric, measures):
         metric_id = self._get_metric_id(metric)
+
         points = [dict(measurement=metric_id,
-                       time=self._timestamp_to_utc(m.timestamp).isoformat(),
+                       time=_datetime_to_utc(m.timestamp).isoformat(),
                        fields=dict(value=float(m.value)))
                   for m in measures]
         self.influx.write_points(points=points, time_precision='n',
@@ -156,9 +156,9 @@ class InfluxDBStorage(storage.StorageDriver):
             metric, from_timestamp, to_timestamp, aggregation)
 
         if from_timestamp:
-            from_timestamp = self._timestamp_to_utc(from_timestamp)
+            from_timestamp = _datetime_to_utc(from_timestamp)
         if to_timestamp:
-            to_timestamp = self._timestamp_to_utc(to_timestamp)
+            to_timestamp = _datetime_to_utc(to_timestamp)
 
         metric_id = self._get_metric_id(metric)
 
@@ -170,7 +170,7 @@ class InfluxDBStorage(storage.StorageDriver):
             first_measure_timestamp = from_timestamp
         else:
             if result:
-                first_measure_timestamp = self._timestamp_to_utc(
+                first_measure_timestamp = _datetime_to_utc(
                     timeutils.parse_isotime(result[0]['time']))
             else:
                 first_measure_timestamp = None
@@ -216,7 +216,7 @@ class InfluxDBStorage(storage.StorageDriver):
 
             subresults = []
             for point in result[metric_id]:
-                timestamp = self._timestamp_to_utc(
+                timestamp = _datetime_to_utc(
                     timeutils.parse_isotime(point['time']))
                 if (point[aggregation] is not None and
                     ((from_timestamp is None or timestamp >= from_timestamp)
@@ -244,19 +244,18 @@ class InfluxDBStorage(storage.StorageDriver):
         return results
 
     @staticmethod
-    def _timestamp_to_utc(ts):
-        return timeutils.normalize_time(ts).replace(tzinfo=iso8601.iso8601.UTC)
-
-    def _make_time_query(self, from_timestamp, to_timestamp, granularity):
+    def _make_time_query(from_timestamp, to_timestamp, granularity):
         if from_timestamp:
             from_timestamp = find_nearest_stable_point(from_timestamp,
                                                        granularity)
-            left_time = self._timestamp_to_utc(from_timestamp).isoformat()
+            left_time = _datetime_to_utc(from_timestamp).isoformat()
         else:
             left_time = "now()"
 
         if to_timestamp and to_timestamp >= from_timestamp:
-            right_time = self._timestamp_to_utc(to_timestamp).isoformat()
+            right_time = find_nearest_stable_point(
+                _datetime_to_utc(to_timestamp),
+                granularity, True).isoformat()
         else:
             right_time = None
 
@@ -269,6 +268,10 @@ class InfluxDBStorage(storage.StorageDriver):
         super(InfluxDBStorage, self).get_cross_metric_measures(
             metrics, from_timestamp, to_timestamp, aggregation, needed_overlap)
         raise exceptions.NotImplementedError
+
+
+def _datetime_to_utc(ts):
+    return timeutils.normalize_time(ts).replace(tzinfo=iso8601.iso8601.UTC)
 
 
 def find_nearest_stable_point(timestamp, granularity, next=False):
