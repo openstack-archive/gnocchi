@@ -347,7 +347,7 @@ function install_gnocchi {
 
     # NOTE(sileht): requirements are not merged with the global-requirement repo
     # setup_develop $GNOCCHI_DIR
-    USE_CONSTRAINTS=False setup_package $GNOCCHI_DIR -e
+    setup_package $GNOCCHI_DIR -e
 
     if [ "$GNOCCHI_USE_MOD_WSGI" == "True" ]; then
         install_apache_wsgi
