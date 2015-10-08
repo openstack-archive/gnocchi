@@ -97,3 +97,22 @@ For other WSGI setup you can refer to the `pecan deployement`_ documentation.
 
 .. _`mod_wsgi`: https://modwsgi.readthedocs.org/en/master/
 .. _`pecan deployement`: http://pecan.readthedocs.org/en/latest/deployment.html#deployment
+
+
+Drivers notes
+=============
+
+Carbonara based drivers (file, swift, ceph)
+-------------------------------------------
+
+To ensure consistency accross all workers, these drivers need a distributed
+locking mechanism. This is provided by the 'coordinator' of the `tooz_` library.
+
+By default, the configured backend for `tooz_` is 'file', that allows to
+distribute locks across workers on the same node.
+
+In case of multi-nodes deployement, the coordinator need to be changed via the
+storage/coordination_url configuration options to one of the other `tooz backends`_.
+
+.. _`tooz`: http://docs.openstack.org/developer/tooz/
+.. _`tooz backends`: http://docs.openstack.org/developer/tooz/drivers.html
