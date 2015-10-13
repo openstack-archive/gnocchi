@@ -170,7 +170,7 @@ class ArchivePolicyAlreadyExists(IndexerException):
     """Error raised when an archive policy already exists."""
     def __init__(self, name):
         super(ArchivePolicyAlreadyExists, self).__init__(
-            "Archive policy %s already exists" % name)
+            "Archive policy rule %s already exists" % name)
         self.name = name
 
 
