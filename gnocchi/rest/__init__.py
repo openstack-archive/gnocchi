@@ -124,7 +124,7 @@ def set_resp_location_hdr(location):
     pecan.response.headers['Location'] = location
 
 
-def deserialize(schema, required=True):
+def body2json():
     mime_type, options = werkzeug.http.parse_options_header(
         pecan.request.headers.get('Content-Type'))
     if mime_type != "application/json":
@@ -134,8 +134,13 @@ def deserialize(schema, required=True):
             options.get('charset', 'ascii')))
     except Exception as e:
         abort(400, "Unable to decode body: " + six.text_type(e))
+    return params
+
+
+def deserialize(schema, required=True):
     try:
-        return voluptuous.Schema(schema, required=required)(params)
+        return voluptuous.Schema(schema, required=required)(
+            body2json())
     except voluptuous.Error as e:
         abort(400, "Invalid input: %s" % e)
 
@@ -431,11 +436,22 @@ class MetricController(rest.RestController):
                                          invoke_on_load=True)
         self.custom_agg = dict((x.name, x.obj) for x in mgr)
 
-    Measures = voluptuous.Schema([{
-        voluptuous.Required("timestamp"):
-        Timestamp,
-        voluptuous.Required("value"): voluptuous.Any(float, int),
-    }])
+    @staticmethod
+    def to_measure(m):
+        # NOTE(sileht): we do the input validation
+        # during the iteration for not loop just for this
+        # and don't use voluptuous for performance reason
+        try:
+            value = float(m['value'])
+        except Exception:
+            abort(400, "Invalid input for a value")
+
+        try:
+            timestamp = utils.to_timestamp(m['timestamp'])
+        except Exception:
+            abort(400, "Invalid input for a timestamp")
+
+        return storage.Measure(timestamp, value)
 
     def enforce_metric(self, rule):
         enforce(rule, json.to_primitive(self.metric))
@@ -450,10 +466,7 @@ class MetricController(rest.RestController):
         self.enforce_metric("post measures")
         try:
             pecan.request.storage.add_measures(
-                self.metric,
-                (storage.Measure(
-                    m['timestamp'],
-                    m['value']) for m in deserialize(self.Measures)))
+                self.metric, (self.to_measure(m) for m in body2json()))
         except storage.MetricDoesNotExist as e:
             abort(404, e)
         pecan.response.status = 202
