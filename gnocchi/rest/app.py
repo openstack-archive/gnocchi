@@ -95,10 +95,11 @@ def load_app(conf, global_conf=None):
                           global_conf=global_conf)
 
 
-def setup_app(config=PECAN_CONFIG, cfg=None):
+def setup_app(config=None, cfg=None):
     if cfg is None:
         # NOTE(jd) That sucks but pecan forces us to use kwargs :(
         raise RuntimeError("Config is actually mandatory")
+    config = config or PECAN_CONFIG
     s = config.get('storage')
     if not s:
         s = storage.get_driver(cfg)
