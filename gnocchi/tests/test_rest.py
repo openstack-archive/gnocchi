@@ -25,7 +25,7 @@ import uuid
 
 import mock
 from oslo_utils import timeutils
-import pecan
+import paste.deploy
 import six
 from stevedore import extension
 import testscenarios
@@ -145,22 +145,35 @@ class TestingApp(webtest.TestApp):
             self.token = old_token
 
     def do_request(self, req, *args, **kwargs):
-        req.headers['X-Auth-Token'] = self.token
+        if self.auth:
+            req.headers['X-Auth-Token'] = self.token
         response = super(TestingApp, self).do_request(req, *args, **kwargs)
         self.storage.process_background_tasks(self.indexer)
         return response
 
 
+original_parser = paste.deploy.loadwsgi.NicerConfigParser
+
+class FakeConfigParser(original_parser):
+    def __init__(self, *args, **kwargs):
+        original_parser.__init__(
+            self, *args, **kwargs)
+        if hasattr(self, '_interpolation'):
+            self._interpolation = self._interpolation._original
+
+
 class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
 
     scenarios = [
-        ('noauth', dict(middlewares=[])),
-        ('keystone', dict(
-            middlewares=['keystonemiddleware.auth_token.AuthProtocol'])),
+        ('noauth', dict(auth=False)),
+        ('keystone', dict(auth=True)),
     ]
 
     def setUp(self):
         super(RestTest, self).setUp()
+        self.conf.set_override('paste_config',
+                               self.path_get('etc/gnocchi/api-paste.ini'),
+                               group="api")
         c = {}
         c.update(app.PECAN_CONFIG)
         c['indexer'] = self.index
@@ -176,18 +189,25 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
                                group="keystone_authtoken")
         self.conf.set_override("auth_uri", "foobar",
                                group="keystone_authtoken")
+        self.conf.set_override("delay_auth_decision",
+                               not self.auth,
+                               group="keystone_authtoken")
 
-        if hasattr(self, "middlewares"):
-            self.conf.set_override("middlewares",
-                                   self.middlewares, group="api")
+        # NOTE(jd) Override the config parser of paste.deploy so we can pass
+        # full objects around and not only strings.
+        paste.deploy.loadwsgi.NicerConfigParser = FakeConfigParser
 
         # TODO(chdent) Linting is turned off until a
         # keystonemiddleware bug is resolved.
         # See: https://bugs.launchpad.net/keystonemiddleware/+bug/1466499
-        self.app = TestingApp(pecan.load_app(c, cfg=self.conf),
+        self.app = TestingApp(app.load_app(self.conf,
+                                           {
+                                               "pecan_config": c,
+                                               "oslo_config_config": self.conf,
+                                           }),
                               storage=self.storage,
                               indexer=self.index,
-                              auth=bool(self.conf.api.middlewares),
+                              auth=self.auth,
                               lint=False)
 
     def test_deserialize_force_json(self):
@@ -805,7 +825,7 @@ class ResourceTest(RestTest):
         # Set an id in the attribute
         self.attributes['id'] = str(uuid.uuid4())
         self.resource = self.attributes.copy()
-        if self.middlewares:
+        if self.auth:
             self.resource['created_by_user_id'] = FakeMemcache.USER_ID
             self.resource['created_by_project_id'] = FakeMemcache.PROJECT_ID
         else:
