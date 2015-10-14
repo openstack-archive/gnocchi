@@ -13,11 +13,15 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import os
+
 import keystonemiddleware.auth_token
+from oslo_config import cfg
 from oslo_log import log
 from oslo_policy import policy
 from oslo_utils import importutils
 import pecan
+from paste import deploy
 import webob.exc
 from werkzeug import serving
 
@@ -75,6 +79,19 @@ class NotImplementedMiddleware(object):
             raise webob.exc.HTTPNotImplemented(
                 "Sorry, this Gnocchi server does "
                 "not implement this feature 😞")
+
+
+def load_app(conf):
+    # Build the WSGI app
+    cfg_path = conf.api.paste_config
+    if not os.path.isabs(cfg_path):
+        cfg_path = conf.find_file(cfg_path)
+
+    if cfg_path is None or not os.path.exists(cfg_path):
+        raise cfg.ConfigFilesNotFoundError([cfg_path])
+
+    LOG.info("WSGI config used: %s" % cfg_path)
+    return deploy.loadapp("config:" + cfg_path)
 
 
 def setup_app(config=PECAN_CONFIG, cfg=None):
@@ -139,7 +156,7 @@ class WerkzeugApp(object):
 
     def __call__(self, environ, start_response):
         if self.app is None:
-            self.app = setup_app(cfg=self.conf)
+            self.app = load_app(self.conf)
         return self.app(environ, start_response)
 
 
@@ -148,3 +165,8 @@ def build_server():
     serving.run_simple(conf.api.host, conf.api.port,
                        WerkzeugApp(conf),
                        processes=conf.api.workers)
+
+
+def app_factory(global_config, **local_conf):
+    conf = service.prepare_service()
+    return setup_app(cfg=conf)
