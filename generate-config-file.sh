@@ -5,4 +5,5 @@ oslo-config-generator --output-file etc/gnocchi/gnocchi.conf \
                       --namespace oslo.db \
                       --namespace oslo.log \
                       --namespace oslo.policy \
+                      --namespace oslo.middleware.cors \
                       --namespace keystonemiddleware.auth_token
