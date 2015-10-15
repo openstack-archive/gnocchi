@@ -13,6 +13,7 @@ GNOCCHI_COORDINATOR_URL=${GNOCCHI_COORDINATOR_URL:-file://${GNOCCHI_DATA_DIR}/lo
 
 # Toggle for deploying Gnocchi under HTTPD + mod_wsgi
 GNOCCHI_USE_MOD_WSGI=${GNOCCHI_USE_MOD_WSGI:-${ENABLE_HTTPD_MOD_WSGI_SERVICES}}
+GNOCCHI_USE_MOD_WSGI=False
 
 # Support potential entry-points console scripts and venvs
 if [[ ${USE_VENV} = True ]]; then
@@ -53,3 +54,9 @@ GRAFANA_DEB_PKG=${GRAFANA_DEB_PKG:-https://grafanarel.s3.amazonaws.com/builds/gr
 GRAFANA_PLUGINS_DIR=${GRAFANA_PLUGINS_DIR:-$DEST/grafana-plugins}
 GRAFANA_PLUGINS_REPO=${GRAFANA_PLUGINS_REPO:-http://github.com/grafana/grafana-plugins.git}
 GRAFANA_URL=${GRAFANA_URL:-http://$HOST_IP:3000}
+
+
+
+KEYSTONE_BRANCH=stable/liberty
+SWIFT_BRANCH=stable/liberty
+REQUIREMENTS_BRANCH=stable/liberty
