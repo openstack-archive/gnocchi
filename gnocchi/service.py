@@ -54,6 +54,7 @@ def prepare_service(args=None):
     except NotImplementedError:
         default_workers = 1
 
+    default_workers = 1
     conf.set_default("workers", default_workers, group="api")
     conf.set_default("workers", default_workers, group="metricd")
 
