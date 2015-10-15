@@ -54,6 +54,9 @@ OPTS = [
                help='Prefix to namespace metric containers.'),
 ]
 
+import logging
+LOG = logging.getLogger(__name__)
+
 
 def retry_if_result_empty(result):
     return len(result) == 0
@@ -61,7 +64,19 @@ def retry_if_result_empty(result):
 
 class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     def __init__(self, conf):
+        import requests
+        import logging
+        try:
+            import http.client as http_client
+        except ImportError:
+            # Python 2
+            import httplib as http_client
+        http_client.HTTPConnection.debuglevel = 1
+        requests_log = logging.getLogger("requests.packages.urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = True
         super(SwiftStorage, self).__init__(conf)
+        LOG.debug("init swift storage")
         self.swift = swclient.Connection(
             auth_version=conf.swift_auth_version,
             authurl=conf.swift_authurl,
@@ -69,9 +84,12 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             user=conf.swift_user,
             key=conf.swift_key,
             tenant_name=conf.swift_tenant_name)
+        LOG.debug("got swift connection")
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
         self._container_prefix = conf.swift_container_prefix
+        LOG.debug("putting swift container")
         self.swift.put_container(self.MEASURE_PREFIX)
+        LOG.debug("put swift container")
 
     def stop(self):
         self._lock.stop()
