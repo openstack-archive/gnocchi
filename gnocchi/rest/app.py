@@ -84,11 +84,14 @@ def setup_app(config=PECAN_CONFIG, cfg=None):
     s = config.get('storage')
     if not s:
         s = storage.get_driver(cfg)
+    LOG.debug("storage inited %s" % s)
     i = config.get('indexer')
     if not i:
         i = indexer.get_driver(cfg)
+        LOG.debug("index inited %s" % i)
         i.connect()
-
+        LOG.debug("index connected %s" % i)
+    LOG.debug("startup pretty good")
     # NOTE(sileht): pecan debug won't work in multi-process environment
     pecan_debug = cfg.api.pecan_debug
     if cfg.api.workers != 1 and pecan_debug:
