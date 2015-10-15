@@ -54,6 +54,9 @@ OPTS = [
                help='Prefix to namespace metric containers.'),
 ]
 
+import logging
+LOG = logging.getLogger(__name__)
+
 
 def retry_if_result_empty(result):
     return len(result) == 0
@@ -62,6 +65,7 @@ def retry_if_result_empty(result):
 class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     def __init__(self, conf):
         super(SwiftStorage, self).__init__(conf)
+        LOG.debug("init swift storage")
         self.swift = swclient.Connection(
             auth_version=conf.swift_auth_version,
             authurl=conf.swift_authurl,
@@ -69,9 +73,12 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             user=conf.swift_user,
             key=conf.swift_key,
             tenant_name=conf.swift_tenant_name)
+        LOG.debug("got swift connection")
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
         self._container_prefix = conf.swift_container_prefix
+        LOG.debug("putting swift container")
         self.swift.put_container(self.MEASURE_PREFIX)
+        LOG.debug("put swift container")
 
     def stop(self):
         self._lock.stop()
