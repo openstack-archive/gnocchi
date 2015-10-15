@@ -384,6 +384,10 @@ function start_gnocchi {
     if is_service_enabled gnocchi-api; then
         echo "Waiting for gnocchi-api to start..."
         if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl --noproxy '*' -s $(gnocchi_service_url)/v1/resource/generic >/dev/null; do sleep 1; done"; then
+            sudo netstat -nlapute
+            curl -v --noproxy '*' -s $(gnocchi_service_url)/v1 2>&1 || true
+            curl -v --noproxy '*' -s $(gnocchi_service_url)/v1/resource 2>&1 || true
+            #curl -v --noproxy '*' -s $(gnocchi_service_url)/v1/resource/generic 2>&1 || true
             die $LINENO "gnocchi-api did not start"
         fi
     fi
