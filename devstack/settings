@@ -13,6 +13,7 @@ GNOCCHI_COORDINATOR_URL=${GNOCCHI_COORDINATOR_URL:-file://${GNOCCHI_DATA_DIR}/lo
 
 # Toggle for deploying Gnocchi under HTTPD + mod_wsgi
 GNOCCHI_USE_MOD_WSGI=${GNOCCHI_USE_MOD_WSGI:-${ENABLE_HTTPD_MOD_WSGI_SERVICES}}
+GNOCCHI_USE_MOD_WSGI=False
 
 # Support potential entry-points console scripts and venvs
 if [[ ${USE_VENV} = True ]]; then
