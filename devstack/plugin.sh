@@ -357,10 +357,12 @@ function install_gnocchi {
     # Create configuration directory
     [ ! -d $GNOCCHI_CONF_DIR ] && sudo mkdir -m 755 -p $GNOCCHI_CONF_DIR
     sudo chown $STACK_USER $GNOCCHI_CONF_DIR
+    sudo -H pip install keystonemiddleware==2.3.0 oslo.middleware==2.9.0 oslo.policy==0.12.0 oslo.serialization==1.10.0 oslo.service==0.10.0 oslo.utils==2.6.0 oslosphinx==3.3.1 oslotest==1.12.0
 }
 
 # start_gnocchi() - Start running processes, including screen
 function start_gnocchi {
+    sudo -H pip install keystonemiddleware==2.3.0 oslo.middleware==2.9.0 oslo.policy==0.12.0 oslo.serialization==1.10.0 oslo.service==0.10.0 oslo.utils==2.6.0 oslosphinx==3.3.1 oslotest==1.12.0
     run_process gnocchi-metricd "$GNOCCHI_BIN_DIR/gnocchi-metricd -d -v --config-file $GNOCCHI_CONF"
 
     if [ "$GNOCCHI_USE_MOD_WSGI" == "True" ]; then
@@ -384,6 +386,10 @@ function start_gnocchi {
     if is_service_enabled gnocchi-api; then
         echo "Waiting for gnocchi-api to start..."
         if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl --noproxy '*' -s $(gnocchi_service_url)/v1/resource/generic >/dev/null; do sleep 1; done"; then
+            sudo netstat -nlapute
+            curl -v --noproxy '*' -s $(gnocchi_service_url)/v1 2>&1 || true
+            curl -v --noproxy '*' -s $(gnocchi_service_url)/v1/resource 2>&1 || true
+            #curl -v --noproxy '*' -s $(gnocchi_service_url)/v1/resource/generic 2>&1 || true
             die $LINENO "gnocchi-api did not start"
         fi
     fi
