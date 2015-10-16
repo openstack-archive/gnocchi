@@ -60,6 +60,11 @@ class ArchivePolicy(object):
                 raise ValueError(
                     "Unable to understand policy definition %s" % d)
 
+        granularities = set(d.granularity for d in self.definition)
+        if len(granularities) != len(self.definition):
+            raise ValueError(
+                "Several archive policies have the same granularity")
+
         if aggregation_methods is None:
             self.aggregation_methods = self.DEFAULT_AGGREGATION_METHODS
         else:
