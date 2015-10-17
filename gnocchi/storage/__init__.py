@@ -106,6 +106,17 @@ class AggregationDoesNotExist(Exception):
             (method, metric))
 
 
+class GranularityDoesNotExist(Exception):
+    """Error raised when the granularity doesn't exist for a metric."""
+
+    def __init__(self, metric, granularity):
+        self.metric = metric
+        self.granularity = granularity
+        super(GranularityDoesNotExist, self).__init__(
+            "Granularity '%s' for metric %s does not exist" %
+            (granularity, metric))
+
+
 class MetricAlreadyExists(Exception):
     """Error raised when this metric already exists."""
 
@@ -154,12 +165,14 @@ class StorageDriver(object):
         try:
             self.process_measures(index)
         except Exception:
+            raise
             LOG.error("Unexpected error during measures processing",
                       exc_info=True)
         LOG.debug("Expunging deleted metrics")
         try:
             self.expunge_metrics(index)
         except Exception:
+            raise
             LOG.error("Unexpected error during deleting metrics",
                       exc_info=True)
 
