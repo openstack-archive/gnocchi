@@ -65,10 +65,13 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
     def stop(self):
         self._lock.stop()
 
-    def _build_metric_path(self, metric, aggregation=None):
-        path = os.path.join(self.basepath, str(metric.id))
-        if aggregation:
-            return os.path.join(path, aggregation)
+    def _build_metric_dir(self, metric):
+        return os.path.join(self.basepath, str(metric.id))
+
+    def _build_metric_path(self, metric, aggregation, granularity=None):
+        path = os.path.join(self._build_metric_dir(metric), aggregation)
+        if granularity:
+            return os.path.join(path, granularity)
         return path
 
     def _build_measure_path(self, metric_id, random_id=None):
@@ -81,7 +84,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         return path
 
     def _create_metric(self, metric):
-        path = self._build_metric_path(metric)
+        path = self._build_metric_dir(metric)
         try:
             os.mkdir(path, 0o750)
         except OSError as e:
@@ -160,14 +163,15 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
 
         self._delete_measures_files_for_metric_id(metric.id, files)
 
-    def _store_metric_measures(self, metric, aggregation, data):
+    def _store_metric_measures(self, metric, aggregation, granularity, data):
         tmpfile = self._get_tempfile()
         tmpfile.write(data)
         tmpfile.close()
-        os.rename(tmpfile.name, self._build_metric_path(metric, aggregation))
+        os.rename(tmpfile.name, self._build_metric_path(
+            metric, aggregation, granularity))
 
     def _delete_metric(self, metric):
-        path = self._build_metric_path(metric)
+        path = self._build_metric_dir(metric)
         try:
             shutil.rmtree(path)
         except OSError as e:
@@ -176,15 +180,16 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                 # measures)
                 raise
 
-    def _get_measures(self, metric, aggregation):
-        path = self._build_metric_path(metric, aggregation)
+    def _get_measures(self, metric, aggregation, granularity):
+        path = self._build_metric_path(metric, aggregation, granularity)
         try:
             with open(path, 'rb') as aggregation_file:
                 return aggregation_file.read()
         except IOError as e:
             if e.errno == errno.ENOENT:
-                if os.path.exists(self._build_metric_path(metric)):
+                if os.path.exists(self._build_metric_path(metric, aggregation)):
+                    raise storage.GranularityDoesNotExist(metric, granularity)
+                if os.path.exists(self._build_metric_dir(metric)):
                     raise storage.AggregationDoesNotExist(metric, aggregation)
-                else:
-                    raise storage.MetricDoesNotExist(metric)
+                raise storage.MetricDoesNotExist(metric)
             raise
