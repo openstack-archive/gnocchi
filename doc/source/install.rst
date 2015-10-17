@@ -107,16 +107,51 @@ Gnocchi provides these indexer drivers:
 .. _`MySQL`: http://mysql.com
 .. _`InfluxDB`: http://influxdb.com
 
-Initialization and upgrade
-==========================
+Initialization
+==============
 
-Once you have configured Gnocchi properly, you need to initialize (or upgrade)
-the indexer and storage:
+On first deployment, once you have configured Gnocchi properly, you need to
+initialize the indexer and storage:
 
 ::
 
     gnocchi-upgrade
 
+
+Upgrading
+=========
+In order to upgrade from a previous version of Gnocchi, you need to make sure
+that your indexer and storage are properly upgraded. Run the following:
+
+1. Stop the old version of Gnocchi API server and metric daemon
+
+2. Install the new version of Gnocchi
+
+2. Run `gnocchi-upgrade`
+   This can takes several hours depending on the size of your index and
+   storage.
+
+3. Start thenew Gnocchi API server and metric daemon
+
+Rolling upgrade
+===============
+Gnocchi supports online (rolling) upgrades, which avoids interrupting Gnocchi
+for a too long time. In order to upgrade from previous versions, you need to
+follow the folling steps:
+
+1. Stop the old Gnocchi API server and metric daemon
+
+2. Run `gnocchi-upgrade --skip-storage` with the new version of Gnocchi.
+   This can takes several minutes depending on the size of your index.
+
+3. Start the new Gnocchi API server and metric daemon
+
+4. Run `gnocchi-upgrade` with the new version of Gnocchi
+   This can takes several hours depending on the size of your storage.
+
+This will upgrade the indexer and storage in two passes. While a new version of
+Gnocchi cannot run with an old version of the indexer, it can runs with an old
+version of its storage back-end.
 
 Running Gnocchi
 ===============
