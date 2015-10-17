@@ -77,7 +77,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         raise NotImplementedError
 
     @staticmethod
-    def _get_measures(metric, aggregation):
+    def _get_measures(metric, aggregation, granularity):
         raise NotImplementedError
 
     @staticmethod
@@ -88,7 +88,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                      aggregation='mean', granularity=None):
         super(CarbonaraBasedStorage, self).get_measures(
             metric, from_timestamp, to_timestamp, aggregation)
-        archive = self._get_measures_archive(metric, aggregation)
+        archive = self._get_measures_archive(metric, aggregation, granularity)
         return [(timestamp.replace(tzinfo=iso8601.iso8601.UTC), r, v)
                 for timestamp, r, v
                 in archive.fetch(from_timestamp, to_timestamp)
@@ -100,23 +100,29 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                   "%(aggregation)s, recreating an empty timeserie." %
                   dict(metric=metric.id, aggregation=aggregation))
 
-    def _get_measures_archive(self, metric, aggregation):
+    def _get_measures_archive(self, metric, aggregation, granularity):
         try:
-            contents = self._get_measures(metric, aggregation)
-        except (storage.MetricDoesNotExist, storage.AggregationDoesNotExist):
+            contents = self._get_measures(metric, aggregation, granularity)
+        except (storage.MetricDoesNotExist,
+                storage.AggregationDoesNotExist,
+                storage.GranularityDoesNotExist):
             ts = None
         else:
             try:
-                ts = carbonara.TimeSerieArchive.unserialize(contents)
+                archive = carbonara.TimeSerieArchive.unserialize(contents)
             except ValueError:
                 self._log_data_corruption(metric, aggregation)
                 ts = None
 
         if ts is None:
-            ts = carbonara.TimeSerieArchive.from_definitions(
-                [(v.granularity, v.points)
-                 for v in metric.archive_policy.definition],
-                aggregation_method=aggregation)
+            for d in metric.archive_policy.definition:
+                if d.granularity == granularity:
+                    break
+            else:
+                raise storage.GranularityDoesNotExist(granularity)
+            ts = carbonara.AggregatedTimeSerie(
+                sampling=d.granularity,
+                max_size=d.points)
         return ts
 
     def _add_measures(self, aggregation, metric, timeserie):
@@ -181,6 +187,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         try:
                             with timeutils.StopWatch() as sw:
                                 raw_measures = self._get_measures(metric,
+                                                                  'none',
                                                                   'none')
                                 LOG.debug(
                                     "Retrieve unaggregated measures "
