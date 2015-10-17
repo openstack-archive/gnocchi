@@ -77,6 +77,10 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     def _container_name(self, metric):
         return '%s.%s' % (self._container_prefix, str(metric.id))
 
+    @staticmethod
+    def _object_name(aggregation, granularity):
+        return '%s.%s' % (aggregation, granularity)
+
     def _create_metric(self, metric):
         # TODO(jd) A container per user in their account?
         resp = {}
@@ -128,8 +132,10 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         for f in files:
             self.swift.delete_object(self.MEASURE_PREFIX, f['name'])
 
-    def _store_metric_measures(self, metric, aggregation, data):
-        self.swift.put_object(self._container_name(metric), aggregation, data)
+    def _store_metric_measures(self, metric, aggregation, granularity, data):
+        self.swift.put_object(self._container_name(metric),
+                              self._object_name(aggregation, granularity),
+                              data)
 
     def _delete_metric(self, metric):
         for aggregation in metric.archive_policy.aggregation_methods:
@@ -149,10 +155,11 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     @retrying.retry(stop_max_attempt_number=4,
                     wait_fixed=500,
                     retry_on_result=retry_if_result_empty)
-    def _get_measures(self, metric, aggregation):
+    def _get_measures(self, metric, aggregation, granularity):
         try:
             headers, contents = self.swift.get_object(
-                self._container_name(metric), aggregation)
+                self._container_name(metric), self._object_name(
+                    aggregation, granularity))
         except swclient.ClientException as e:
             if e.http_status == 404:
                 try:
@@ -180,3 +187,19 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
 
     def _store_unaggregated_timeserie(self, metric, data):
         self.swift.put_object(self._container_name(metric), "none", data)
+
+    # The following methods deal with Gnocchi <= 1.3 archives
+    def _get_metric_archive(self, metric, aggregation):
+        """Retrieve data in the place we used to store TimeSerieArchive."""
+        try:
+            headers, contents = self.swift.get_object(
+                self._container_name(metric), aggregation)
+        except swclient.ClientException as e:
+            if e.http_status == 404:
+                raise storage.MetricDoesNotExist(metric)
+            raise
+        return contents
+
+    def _store_metric_archive(self, metric, aggregation, data):
+        """Stores data in the place we used to store TimeSerieArchive."""
+        self.swift.put_object(self._container_name(metric), aggregation, data)
