@@ -357,6 +357,9 @@ function install_gnocchi {
     # Create configuration directory
     [ ! -d $GNOCCHI_CONF_DIR ] && sudo mkdir -m 755 -p $GNOCCHI_CONF_DIR
     sudo chown $STACK_USER $GNOCCHI_CONF_DIR
+    #sudo -H pip install python-keystoneclient===1.7.2
+    sudo -H pip install -e git+https://github.com/sileht/python-keystoneclient.git@sileht/debug-gate#egg=python-keystoneclient
+    #sudo -H pip install -e git+https://github.com/sileht/keystonemiddleware.git@sileht/debug-gate#egg=keystonemiddleware
 }
 
 # start_gnocchi() - Start running processes, including screen
