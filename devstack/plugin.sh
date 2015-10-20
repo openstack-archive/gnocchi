@@ -201,7 +201,7 @@ function _config_gnocchi_apache_wsgi {
             s|%APACHE_NAME%|$APACHE_NAME|g;
             s|%WSGI%|$GNOCCHI_WSGI_DIR/app.wsgi|g;
             s|%USER%|$STACK_USER|g
-            s|%APIWORKERS%|$API_WORKERS|g
+            s|%APIWORKERS%|1|g
             s|%VIRTUALENV%|$venv_path|g
         " -i $gnocchi_apache_conf
 }
