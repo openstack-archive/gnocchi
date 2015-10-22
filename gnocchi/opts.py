@@ -35,9 +35,9 @@ def list_opts():
                        'By default the available number of CPU is used.'),
         )),
         ("api", (
-            cfg.IntOpt('port',
-                       default=8041,
-                       help='The port for the Gnocchi API server.'),
+            cfg.PortOpt('port',
+                        default=8041,
+                        help='The port for the Gnocchi API server.'),
             cfg.StrOpt('host',
                        default='0.0.0.0',
                        help='The listen IP for the Gnocchi API server.'),
