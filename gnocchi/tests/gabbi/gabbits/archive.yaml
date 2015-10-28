@@ -354,10 +354,40 @@ tests:
           definition:
               - granularity: 1 second
                 points: 60
-                timespan: "0:01:01"
       status: 400
       response_strings:
           - timespan ≠ granularity × points
+
+    - name: create invalid points policy
+      url: /v1/archive_policy
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: complex
+          definition:
+              - granularity: 0
+                points: 60
+                timespan: "0:01:01"
+      status: 400
+      response_strings:
+          - Granularity should be ≠ 0
+
+    - name: create invalid granularity policy
+      url: /v1/archive_policy
+      method: POST
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: complex
+          definition:
+              - granularity: 10
+                points: 0
+      status: 400
+      response_strings:
+          - Number of points should be ≠ 0
 
     - name: create identical granularities policy
       url: /v1/archive_policy
