@@ -466,13 +466,14 @@ class MetricController(rest.RestController):
     def post_measures(self):
         self.enforce_metric("post measures")
         params = deserialize()
-        if not isinstance(params, collections.Iterable):
+        if not isinstance(params, list):
             abort(400, "Invalid input for measures")
-        try:
-            pecan.request.storage.add_measures(
-                self.metric, six.moves.map(self.to_measure, params))
-        except storage.MetricDoesNotExist as e:
-            abort(404, e)
+        if params:
+            try:
+                pecan.request.storage.add_measures(
+                    self.metric, six.moves.map(self.to_measure, params))
+            except storage.MetricDoesNotExist as e:
+                abort(404, e)
         pecan.response.status = 202
 
     @pecan.expose('json')
