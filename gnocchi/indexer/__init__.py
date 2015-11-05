@@ -26,7 +26,7 @@ from gnocchi import exceptions
 OPTS = [
     cfg.StrOpt('url',
                secret=True,
-               default="null://",
+               required=True,
                help='Indexer driver to use'),
 ]
 
@@ -292,7 +292,7 @@ class IndexerDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
-    def list_metrics(user_id=None, project_id=None):
+    def list_metrics(user_id=None, project_id=None, details=False, **kwargs):
         raise exceptions.NotImplementedError
 
     @staticmethod
