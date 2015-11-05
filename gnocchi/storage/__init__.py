@@ -153,6 +153,9 @@ class StorageDriver(object):
         LOG.debug("Processing new and to delete measures")
         try:
             self.process_measures(index)
+        except exceptions.NotImplementedError:
+            # if here indexer is not setup, dont proceed to expunge
+            raise exceptions.NotImplementedError("Indexer is not configured")
         except Exception:
             LOG.error("Unexpected error during measures processing",
                       exc_info=True)
