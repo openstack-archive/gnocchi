@@ -1,4 +1,5 @@
 # Copyright (c) 2013 Mirantis Inc.
+# Copyright (c) 2015 Red Hat
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ import signal
 import sys
 import time
 
+from oslo_config import cfg
 from oslo_utils import timeutils
 import retrying
 
@@ -32,14 +34,20 @@ LOG = logging.getLogger(__name__)
 
 
 def upgrade():
-    conf = service.prepare_service()
-    index = indexer.get_driver(conf)
-    index.connect()
-    LOG.info("Upgrading indexer %s" % index)
-    index.upgrade()
-    s = storage.get_driver(conf)
-    LOG.info("Upgrading storage %s" % s)
-    s.upgrade(index)
+    conf = cfg.ConfigOpts()
+    conf.register_cli_opts(cfg.BoolOpt("index-only", default=False))
+    conf.register_cli_opts(cfg.BoolOpt("storage-only", default=False))
+    conf = service.prepare_service(conf=conf)
+    no_option_on_cmd_line = not conf.index_only and not conf.storage_only
+    if conf.index_only or no_option_on_cmd_line:
+        index = indexer.get_driver(conf)
+        index.connect()
+        LOG.info("Upgrading indexer %s" % index)
+        index.upgrade()
+    if conf.storage_only or no_option_on_cmd_line:
+        s = storage.get_driver(conf)
+        LOG.info("Upgrading storage %s" % s)
+        s.upgrade(index)
 
 
 def api():
