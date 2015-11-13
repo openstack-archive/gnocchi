@@ -33,7 +33,7 @@ LOG = log.getLogger(__name__)
 
 class Stats(object):
     def __init__(self, conf):
-        self.conf = conf
+        self.conf = self._validate_conf(conf)
         self.storage = storage.get_driver(self.conf)
         self.indexer = indexer.get_driver(self.conf)
         self.indexer.connect()
