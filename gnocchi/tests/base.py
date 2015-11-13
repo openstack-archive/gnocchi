@@ -326,7 +326,10 @@ class TestCase(base.BaseTestCase):
         super(TestCase, self).setUp()
         default_opts = [('url',
                          os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
+                         'indexer'),
+                        ('user_id', uuid.uuid4(), 'statsd'),
+                        ('project_id', uuid.uuid4(), 'statsd'),
+                        ('resource_id', uuid.uuid4(), 'statsd')]
         self.conf = service.prepare_service([], default_opts)
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),

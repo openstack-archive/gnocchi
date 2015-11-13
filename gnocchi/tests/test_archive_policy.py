@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import os
+import uuid
 
 from oslotest import base
 
@@ -32,7 +33,10 @@ class TestArchivePolicy(base.BaseTestCase):
     def test_aggregation_methods(self):
         default_opts = [('url',
                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                        'indexer')]
+                        'indexer'),
+                        ('user_id', uuid.uuid4(), 'statsd'),
+                        ('project_id', uuid.uuid4(), 'statsd'),
+                        ('resource_id', uuid.uuid4(), 'statsd')]
         conf = service.prepare_service([], default_opts)
 
         ap = archive_policy.ArchivePolicy("foobar",
