@@ -259,11 +259,15 @@ class AggregatedTimeSerie(TimeSerie):
             self.aggregation_method_func_name = aggregation_method
 
         if sampling is None:
-            self.sampling = None
+            self._sampling = None
         else:
-            self.sampling = self._to_offset(sampling)
+            self._sampling = self._to_offset(sampling)
         self.max_size = max_size
         self.aggregation_method = aggregation_method
+
+    @property
+    def sampling(self):
+        return self._sampling.nanos / 10e8
 
     def __eq__(self, other):
         return (isinstance(other, AggregatedTimeSerie)
@@ -292,7 +296,7 @@ class AggregatedTimeSerie(TimeSerie):
         d.update({
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
-            'sampling': self._serialize_time_period(self.sampling),
+            'sampling': self._serialize_time_period(self._sampling),
         })
         return d
 
@@ -308,12 +312,12 @@ class AggregatedTimeSerie(TimeSerie):
             (ts.value // freq.delta.value) * freq.delta.value)
 
     def _resample(self, after):
-        if self.sampling:
+        if self._sampling:
             # Group by the sampling, and then apply the aggregation method on
             # the points after `after'
             groupedby = self.ts[after:].groupby(
                 functools.partial(self._round_timestamp,
-                                  freq=self.sampling))
+                                  freq=self._sampling))
             agg_func = getattr(groupedby, self.aggregation_method_func_name)
             if self.aggregation_method_func_name == 'quantile':
                 aggregated = agg_func(self.q)
