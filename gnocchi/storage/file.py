@@ -45,6 +45,12 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         self.basepath = conf.file_basepath
         self.basepath_tmp = conf.file_basepath_tmp
         self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
+        if not os.path.exists(self.basepath):
+            try:
+                os.mkdir(self.basepath)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
         self.measure_path = os.path.join(self.basepath, self.MEASURE_PREFIX)
         try:
             os.mkdir(self.measure_path)
