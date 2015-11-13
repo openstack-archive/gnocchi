@@ -67,6 +67,12 @@ def list_opts():
                                     gnocchi.storage.swift.OPTS,
                                     gnocchi.storage.influxdb.OPTS)),
         ("statsd", (
+            cfg.StrOpt('host',
+                       default='0.0.0.0',
+                       help='The listen IP for statsd'),
+            cfg.IntOpt('port',
+                       default=8125,
+                       help='The port for statsd'),
             cfg.StrOpt(
                 'resource_id',
                 required=True,
