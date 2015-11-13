@@ -19,6 +19,7 @@ try:
     import asyncio
 except ImportError:
     import trollius as asyncio
+from oslo_config import cfg
 from oslo_log import log
 import six
 
@@ -30,10 +31,19 @@ from gnocchi import utils
 
 LOG = log.getLogger(__name__)
 
+OPTS = [
+    cfg.IntOpt('flush_delay',
+               default=5,
+               help='flush delay in seconds'),
+    cfg.StrOpt('archive_policy_name',
+               default="low",
+               help='archive policy name'),
+]
+
 
 class Stats(object):
     def __init__(self, conf):
-        self.conf = conf
+        self.conf = self._validate_conf(conf)
         self.storage = storage.get_driver(self.conf)
         self.indexer = indexer.get_driver(self.conf)
         self.indexer.connect()
@@ -55,6 +65,16 @@ class Stats(object):
         self.gauges.clear()
         self.counters.clear()
         self.times.clear()
+
+    @staticmethod
+    def _validate_conf(conf):
+        if not conf.statsd.resource_id:
+            raise ValueError("ConfigError: resource_id is not specified")
+        if not conf.statsd.user_id:
+            raise ValueError("ConfigError: user_id not specified")
+        if not conf.statsd.project_id:
+            raise ValueError("ConfigError: project_id not specified")
+        return conf
 
     def treat_metric(self, metric_name, metric_type, value, sampling):
         metric_name += "|" + metric_type
