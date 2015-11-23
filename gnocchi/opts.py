@@ -75,18 +75,22 @@ def list_opts():
                         help='The port for statsd'),
             cfg.StrOpt(
                 'resource_id',
+                required=True,
                 help='Resource UUID to use to identify statsd in Gnocchi'),
             cfg.StrOpt(
                 'user_id',
+                required=True,
                 help='User UUID to use to identify statsd in Gnocchi'),
             cfg.StrOpt(
                 'project_id',
+                required=True,
                 help='Project UUID to use to identify statsd in Gnocchi'),
             cfg.StrOpt(
                 'archive_policy_name',
                 help='Archive policy name to use when creating metrics'),
             cfg.FloatOpt(
                 'flush_delay',
+                required=True,
                 help='Delay between flushes'),
         )),
         ("archive_policy", gnocchi.archive_policy.OPTS),
