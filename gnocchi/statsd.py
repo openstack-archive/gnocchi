@@ -158,6 +158,13 @@ class StatsdServer(object):
 
 def start():
     conf = service.prepare_service()
+    try:
+        uuid.UUID(conf.statsd.resource_id)
+    except TypeError:
+        LOG.error('Configuration value "%s" for statsd.resource_id is '
+                  'invalid, gnocchi-statsd can\'t start.',
+                  conf.statsd.resource_id)
+        return
 
     stats = Stats(conf)
 

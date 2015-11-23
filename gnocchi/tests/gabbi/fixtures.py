@@ -81,6 +81,7 @@ class ConfigFixture(fixture.GabbiFixture):
                          'indexer')]
 
         conf = service.prepare_service([], default_opts)
+        conf.set_override("resource_id", uuid.uuid4(), group="statsd")
 
         CONF = self.conf = conf
         self.tmp_dir = data_tmp_dir
