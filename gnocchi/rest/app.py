@@ -162,12 +162,12 @@ class WerkzeugApp(object):
 
 
 def build_server():
-    conf = service.prepare_service()
+    conf = service.prepare_service(name="api")
     serving.run_simple(conf.api.host, conf.api.port,
                        WerkzeugApp(conf),
                        processes=conf.api.workers)
 
 
 def app_factory(global_config, **local_conf):
-    cfg = service.prepare_service()
+    cfg = service.prepare_service(name="api")
     return setup_app(None, cfg=cfg)

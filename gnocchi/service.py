@@ -30,7 +30,7 @@ from gnocchi import opts
 LOG = log.getLogger(__name__)
 
 
-def prepare_service(args=None, default_opts=None, conf=None):
+def prepare_service(args=None, default_opts=None, conf=None, name=None):
     if conf is None:
         conf = cfg.ConfigOpts()
     # FIXME(jd) Use the pkg_entry info to register the options of these libs
@@ -41,7 +41,7 @@ def prepare_service(args=None, default_opts=None, conf=None):
     policy_opts.set_defaults(conf)
 
     # Register our own Gnocchi options
-    for group, options in opts.list_opts():
+    for group, options in opts.list_opts(daemon=name):
         conf.register_opts(list(options),
                            group=None if group == "DEFAULT" else group)
 
@@ -55,8 +55,8 @@ def prepare_service(args=None, default_opts=None, conf=None):
     except NotImplementedError:
         default_workers = 1
 
-    conf.set_default("workers", default_workers, group="api")
-    conf.set_default("workers", default_workers, group="metricd")
+    if name in ["api", "metricd"]:
+        conf.set_default("workers", default_workers, group=name)
 
     for opt, value, group in default_opts or []:
         conf.set_default(opt, value, group)

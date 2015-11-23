@@ -78,7 +78,8 @@ class ConfigFixture(fixture.GabbiFixture):
 
         default_opts = [('url',
                          os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
+                         'indexer'),
+                        ('resource_id', uuid.uuid4(), "statsd")]
 
         conf = service.prepare_service([], default_opts)
 

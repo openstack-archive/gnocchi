@@ -1,7 +1,5 @@
 # -*- encoding: utf-8 -*-
 #
-# Copyright © 2014-2015 eNovance
-#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -16,6 +14,7 @@
 import itertools
 
 from oslo_config import cfg
+import uuid
 
 import gnocchi.archive_policy
 import gnocchi.indexer
@@ -26,8 +25,13 @@ import gnocchi.storage.influxdb
 import gnocchi.storage.swift
 
 
-def list_opts():
-    return [
+def oslocfg_uuid(opt, s):
+    return str(uuid.UUID(s))
+
+
+def list_opts(daemon=None):
+    daemon_sections = ["metricd", "api", "statsd"]
+    options = [
         ("indexer", gnocchi.indexer.OPTS),
         ("metricd", (
             cfg.IntOpt('workers', min=1,
@@ -73,21 +77,30 @@ def list_opts():
             cfg.PortOpt('port',
                         default=8125,
                         help='The port for statsd'),
-            cfg.StrOpt(
+            cfg.Opt(
                 'resource_id',
+                required=True,
+                type=oslocfg_uuid,
                 help='Resource UUID to use to identify statsd in Gnocchi'),
-            cfg.StrOpt(
+            cfg.Opt(
                 'user_id',
+                type=oslocfg_uuid,
                 help='User UUID to use to identify statsd in Gnocchi'),
-            cfg.StrOpt(
+            cfg.Opt(
                 'project_id',
+                type=oslocfg_uuid,
                 help='Project UUID to use to identify statsd in Gnocchi'),
             cfg.StrOpt(
                 'archive_policy_name',
                 help='Archive policy name to use when creating metrics'),
             cfg.FloatOpt(
                 'flush_delay',
+                default=10,
                 help='Delay between flushes'),
         )),
         ("archive_policy", gnocchi.archive_policy.OPTS),
     ]
+    return [(section, opts) for section, opts in options
+            if not daemon
+            or daemon == section
+            or section not in daemon_sections]

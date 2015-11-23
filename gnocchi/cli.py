@@ -116,7 +116,7 @@ class MetricProcessor(MetricProcessBase):
 
 
 def metricd():
-    conf = service.prepare_service()
+    conf = service.prepare_service(name="metricd")
 
     signal.signal(signal.SIGTERM, _metricd_terminate)
 

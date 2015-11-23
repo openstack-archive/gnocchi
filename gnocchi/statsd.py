@@ -157,8 +157,7 @@ class StatsdServer(object):
 
 
 def start():
-    conf = service.prepare_service()
-
+    conf = service.prepare_service(name="statsd")
     stats = Stats(conf)
 
     loop = asyncio.get_event_loop()

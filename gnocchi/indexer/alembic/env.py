@@ -87,7 +87,7 @@ def run_migrations_online():
 # If `alembic' was used directly from the CLI
 if not hasattr(config, "conf"):
     from gnocchi import service
-    config.conf = service.prepare_service([])
+    config.conf = service.prepare_service([], name="alembic")
 
 if context.is_offline_mode():
     run_migrations_offline()
