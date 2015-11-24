@@ -5,7 +5,7 @@ wait_for_line () {
         echo "$line" | grep -q "$1" && break
     done < "$2"
     # Read the fifo for ever otherwise process would block
-    cat "$2" >/dev/null &
+    cat "$2" &
 }
 
 # Start MySQL process for tests
