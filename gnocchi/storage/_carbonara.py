@@ -241,7 +241,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # Do not block if we cannot acquire the lock, that means some other
             # worker is doing the job. We'll just ignore this metric and may
             # get back later to it if needed.
-            if lock.acquire(blocking=False):
+            if lock.acquire(blocking=True):
                 try:
                     LOG.debug("Processing measures for %s" % metric)
                     with self._process_measure_for_metric(metric) as measures:
