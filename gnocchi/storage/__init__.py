@@ -153,10 +153,10 @@ class StorageDriver(object):
     def upgrade(index):
         pass
 
-    def process_background_tasks(self, index):
+    def process_background_tasks(self, index, blocking=False):
         LOG.debug("Processing new and to delete measures")
         try:
-            self.process_measures(index)
+            self.process_measures(index, blocking)
         except Exception:
             LOG.error("Unexpected error during measures processing",
                       exc_info=True)
