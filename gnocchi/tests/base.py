@@ -240,6 +240,9 @@ class FakeSwiftClient(object):
                                         http_status=404)
 
     def delete_container(self, container):
+        if self.kvs[container]:
+            raise swexc.ClientException("Container not empty",
+                                        http_status=409)
         if container not in self.kvs:
             raise swexc.ClientException("No such container",
                                         http_status=404)
