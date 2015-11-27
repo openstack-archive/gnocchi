@@ -44,7 +44,6 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         super(FileStorage, self).__init__(conf)
         self.basepath = conf.file_basepath
         self.basepath_tmp = conf.file_basepath_tmp
-        self._lock = _carbonara.CarbonaraBasedStorageToozLock(conf)
         try:
             os.mkdir(self.basepath)
         except OSError as e:
@@ -67,8 +66,11 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                                            dir=self.basepath_tmp,
                                            delete=False)
 
-    def stop(self):
-        self._lock.stop()
+    def _store_data_atomic(self, dest, data):
+        tmpfile = self._get_tempfile()
+        tmpfile.write(data)
+        tmpfile.close()
+        os.rename(tmpfile.name, dest)
 
     def _atomic_file_store(self, dest, data):
         tmpfile = self._get_tempfile()
