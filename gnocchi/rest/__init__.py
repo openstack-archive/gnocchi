@@ -16,6 +16,7 @@
 import fnmatch
 import uuid
 
+from oslo_log import log
 from oslo_utils import strutils
 import pecan
 from pecan import rest
@@ -32,6 +33,9 @@ from gnocchi import indexer
 from gnocchi import json
 from gnocchi import storage
 from gnocchi import utils
+
+
+LOG = log.getLogger(__name__)
 
 
 def arg_to_list(value):
@@ -388,11 +392,12 @@ class AggregatedMetricController(rest.RestController):
 
         if (aggregation
            not in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS):
-            abort(
-                400,
-                'Invalid aggregation value %s, must be one of %s'
-                % (aggregation,
-                   archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS))
+            LOG.warning('Invalid aggregation value %s, using the first '
+                        'available from %s' % (aggregation,
+                                               archive_policy.ArchivePolicy
+                                               .VALID_AGGREGATION_METHODS))
+            aggregation = \
+                archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS[0]
 
         for metric in metrics:
             enforce("get metric", metric)
@@ -475,12 +480,12 @@ class MetricController(rest.RestController):
         if not (aggregation
                 in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS
                 or aggregation in self.custom_agg):
-            msg = '''Invalid aggregation value %(agg)s, must be one of %(std)s
-                     or %(custom)s'''
-            abort(400, msg % dict(
-                agg=aggregation,
-                std=archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS,
-                custom=str(self.custom_agg.keys())))
+            LOG.info('Invalid aggregation value %s, using the first '
+                     'available from %s' % (aggregation,
+                                            archive_policy.ArchivePolicy
+                                            .VALID_AGGREGATION_METHODS))
+            aggregation = \
+                archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS[0]
 
         if start is not None:
             try:
