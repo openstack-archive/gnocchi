@@ -65,15 +65,4 @@ def prepare_service(args=None, default_opts=None, conf=None):
     log.setup(conf, 'gnocchi')
     conf.log_opt_values(LOG, logging.DEBUG)
 
-    # NOTE(sileht): keystonemiddleware assume we use the global CONF object
-    # (LP#1428317). In gnocchi, this is not the case, so we have to register
-    # some keystoneclient options ourself. Missing options are hidden into
-    # private area of keystonemiddleware and keystoneclient, so we
-    # create a keystoneclient AuthPlugin object, that will register the options
-    # into our configuration object. This have to be done after the
-    # configuration files have been loaded because the authplugin options
-    # depends of the authplugin present in the configuration file.
-    keystoneclient.auth.register_conf_options(conf, 'keystone_authtoken')
-    keystoneclient.auth.load_from_conf_options(conf, 'keystone_authtoken')
-
     return conf
