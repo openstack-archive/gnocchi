@@ -728,6 +728,34 @@ class TestTimeSerieArchive(base.BaseTestCase):
         self.assertEqual([(pandas.Timestamp('2014-01-01 12:03:00'),
                            60.0, 4.0)], res)
 
+    def test_aggregated_partial_overlap(self):
+        tsc1 = carbonara.TimeSerieArchive.from_definitions([(1, 86400)])
+        tsb1 = carbonara.BoundTimeSerie(block_size=tsc1.max_block_size)
+        tsc2 = carbonara.TimeSerieArchive.from_definitions([(1, 86400)])
+        tsb2 = carbonara.BoundTimeSerie(block_size=tsc2.max_block_size)
+
+        tsb1.set_values([
+            (datetime.datetime(2015, 12, 03, 13, 19, 15), 1),
+            (datetime.datetime(2015, 12, 03, 13, 20, 15), 1),
+            (datetime.datetime(2015, 12, 03, 13, 21, 15), 1),
+            (datetime.datetime(2015, 12, 03, 13, 22, 15), 1),
+        ], before_truncate_callback=tsc1.update)
+
+        tsb2.set_values([
+            (datetime.datetime(2015, 12, 03, 13, 21, 15), 10),
+            (datetime.datetime(2015, 12, 03, 13, 22, 15), 10),
+            (datetime.datetime(2015, 12, 03, 13, 23, 15), 10),
+            (datetime.datetime(2015, 12, 03, 13, 24, 15), 10),
+        ], before_truncate_callback=tsc2.update)
+
+        output = carbonara.TimeSerieArchive.aggregated(
+            [tsc1, tsc2], aggregation="sum")
+
+        self.assertEqual([
+            (pandas.Timestamp('2015-12-03 13:21:15'), 1.0, 11.0),
+            (pandas.Timestamp('2015-12-03 13:22:15'), 1.0, 11.0),
+        ], output)
+
     def test_aggregated_different_archive_overlap(self):
         tsc1 = carbonara.TimeSerieArchive.from_definitions(
             [(60, 10),
