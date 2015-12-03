@@ -781,6 +781,29 @@ class TestTimeSerieArchive(base.BaseTestCase):
                           carbonara.TimeSerieArchive.aggregated,
                           [tsc1, tsc2], from_timestamp=dtfrom)
 
+        # Retry with 50% and it works
+        output = carbonara.TimeSerieArchive.aggregated([
+            tsc1, tsc2], from_timestamp=dtfrom,
+            aggregation="sum",
+            needed_percent_of_overlap=50.0)
+        self.assertEqual([
+            (pandas.Timestamp('2015-12-03 13:19:15'), 1.0, 1.0),
+            (pandas.Timestamp('2015-12-03 13:20:15'), 1.0, 1.0),
+            (pandas.Timestamp('2015-12-03 13:21:15'), 1.0, 11.0),
+            (pandas.Timestamp('2015-12-03 13:22:15'), 1.0, 11.0),
+        ], output)
+
+        output = carbonara.TimeSerieArchive.aggregated([
+            tsc1, tsc2], to_timestamp=dtto,
+            aggregation="sum",
+            needed_percent_of_overlap=50.0)
+        self.assertEqual([
+            (pandas.Timestamp('2015-12-03 13:21:15'), 1.0, 11.0),
+            (pandas.Timestamp('2015-12-03 13:22:15'), 1.0, 11.0),
+            (pandas.Timestamp('2015-12-03 13:23:15'), 1.0, 10.0),
+            (pandas.Timestamp('2015-12-03 13:24:15'), 1.0, 10.0),
+        ], output)
+
     def test_aggregated_different_archive_overlap(self):
         tsc1 = carbonara.TimeSerieArchive.from_definitions(
             [(60, 10),

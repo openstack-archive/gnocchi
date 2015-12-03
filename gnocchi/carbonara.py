@@ -466,16 +466,29 @@ class TimeSerieArchive(SerializableMixin):
         left_boundary_ts = None
         right_boundary_ts = None
         maybe_next_timestamp_is_left_boundary = False
+
+        left_holes = 0
+        right_holes = 0
         holes = 0
         for (timestamp, __), group in grouped:
             if group.count()['value'] != len(timeseries):
                 maybe_next_timestamp_is_left_boundary = True
-                holes += 1
+                if left_boundary_ts is not None:
+                    right_holes += 1
+                else:
+                    left_holes += 1
             elif maybe_next_timestamp_is_left_boundary:
                 left_boundary_ts = timestamp
                 maybe_next_timestamp_is_left_boundary = False
             else:
                 right_boundary_ts = timestamp
+                holes += right_holes
+                right_holes = 0
+
+        if to_timestamp is not None:
+            holes += left_holes
+        if from_timestamp is not None:
+            holes += right_holes
 
         if to_timestamp is not None or from_timestamp is not None:
             maximum = len(grouped)
