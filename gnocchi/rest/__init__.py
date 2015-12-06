@@ -622,8 +622,7 @@ class MetricsController(rest.RestController):
         else:
             user_id = kwargs.get('user_id')
             project_id = kwargs.get('project_id')
-        return pecan.request.indexer.list_metrics(
-            user_id, project_id)
+        return pecan.request.indexer.list_metrics(project_id=project_id)
 
 
 _MetricsSchema = voluptuous.Schema({
@@ -978,8 +977,7 @@ class GenericResourcesController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
-            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                   {"=": {"created_by_project_id": project}}]}
+            attr_filter = {"=": {"project_id": project}}
         else:
             attr_filter = None
 
