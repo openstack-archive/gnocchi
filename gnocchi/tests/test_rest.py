@@ -61,6 +61,12 @@ class FakeMemcache(object):
     USER_ID_2 = str(uuid.uuid4()).replace("-", "")
     PROJECT_ID_2 = str(uuid.uuid4()).replace("-", "")
 
+    # The third user has the same project id with the fistr user
+    VALID_TOKEN_3 = '4562138218392833'
+    TOKEN_HASH = hashlib.sha256(VALID_TOKEN_3.encode('utf-8')).hexdigest()
+    USER_ID_3 = str(uuid.uuid4())
+    PROJECT_ID_3 = PROJECT_ID
+
     def get(self, key):
         dt = "2100-01-01T23:59:59"
         if (key == "tokens/%s" % self.ADMIN_TOKEN_HASH or
@@ -140,6 +146,17 @@ class TestingApp(webtest.TestApp):
             raise testcase.TestSkipped("No auth enabled")
         old_token = self.token
         self.token = FakeMemcache.VALID_TOKEN_2
+        try:
+            yield
+        finally:
+            self.token = old_token
+
+    @contextlib.contextmanager
+    def use_another_user_same_project(self):
+        if not self.auth:
+            raise testcase.TestSkipped("No auth enabled")
+        old_token = self.token
+        self.token = FakeMemcache.VALID_TOKEN_3
         try:
             yield
         finally:
@@ -1616,7 +1633,8 @@ class ResourceTest(RestTest):
             "/v1/resource/" + self.resource_type,
             params=self.attributes)
         i = json.loads(result.text)
-        result = request()
+        with self.app.use_admin_user():
+            result = request()
         self.assertEqual(200, result.status_code)
         resources = json.loads(result.text)
         self.assertGreaterEqual(len(resources), 2)
@@ -1655,6 +1673,69 @@ class ResourceTest(RestTest):
             lambda: self.app.get(
                 "/v1/resource/generic",
                 headers={"Accept": "application/json; details=true"}))
+
+    def test_list_resources_with_another_project_id(self):
+        self.app.post_json(
+            "/v1/resource/generic",
+            params={
+                "id": str(uuid.uuid4()),
+                "started_at": "2014-01-01 02:02:02",
+                "user_id": FakeMemcache.USER_ID,
+                "project_id": FakeMemcache.PROJECT_ID,
+            })
+        self.app.post_json(
+            "/v1/resource/generic",
+            params={
+                "id": str(uuid.uuid4()),
+                "started_at": "2014-01-01 03:02:02",
+                "user_id": FakeMemcache.USER_ID,
+                "project_id": FakeMemcache.PROJECT_ID,
+            })
+
+        with self.app.use_another_user():
+            result = self.app.get("/v1/resource/generic")
+            self.assertEqual(200, result.status_code)
+            resources = json.loads(result.text)
+            self.assertGreaterEqual(len(resources), 0)
+
+    def test_list_resources_with_same_project_id(self):
+        result = self.app.post_json(
+            "/v1/resource/generic",
+            params={
+                "id": str(uuid.uuid4()),
+                "started_at": "2014-01-01 02:02:02",
+                "user_id": FakeMemcache.USER_ID,
+                "project_id": FakeMemcache.PROJECT_ID,
+            })
+        g = json.loads(result.text)
+        result = self.app.post_json(
+            "/v1/resource/generic",
+            params={
+                "id": str(uuid.uuid4()),
+                "started_at": "2014-01-01 03:02:02",
+                "user_id": FakeMemcache.USER_ID,
+                "project_id": FakeMemcache.PROJECT_ID,
+            })
+        j = json.loads(result.text)
+
+        g_found = False
+        j_found = False
+        with self.app.use_another_user_same_project():
+            result = self.app.get("/v1/resource/generic")
+            self.assertEqual(200, result.status_code)
+            resources = json.loads(result.text)
+            self.assertGreaterEqual(len(resources), 2)
+            for r in resources:
+                if r['id'] == str(g['id']):
+                    self.assertEqual(g, r)
+                    g_found = True
+                elif r['id'] == str(j['id']):
+                    j_found = True
+
+                if j_found and g_found:
+                    break
+            else:
+                self.fail("Some resources were not found")
 
     def test_search_resources_with_details(self):
         self._do_test_list_resources_with_detail(

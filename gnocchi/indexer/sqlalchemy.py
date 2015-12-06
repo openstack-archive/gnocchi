@@ -225,15 +225,19 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                      status='active', **kwargs):
         session = self.engine_facade.get_session()
         q = session.query(Metric).filter(Metric.status == status)
-        if user_id is not None:
-            q = q.filter(Metric.created_by_user_id == user_id)
-        if project_id is not None:
-            q = q.filter(Metric.created_by_project_id == project_id)
+
         for attr in kwargs:
             q = q.filter(getattr(Metric, attr) == kwargs[attr])
-        if details:
-            q = q.options(sqlalchemy.orm.joinedload('resource'))
+        if user_id or project_id:
+            q = q.join(Resource,
+                       Resource.id == Metric.resource_id)
+            q = q.filter(Resource.project_id == project_id) \
+                if project_id is not None else q
+            q = q.filter(Resource.user_id == user_id) \
+                if user_id is not None else q
 
+        if details:
+            q.options(sqlalchemy.orm.joinedload('resource'))
         metrics = list(q.all())
         session.expunge_all()
         return metrics

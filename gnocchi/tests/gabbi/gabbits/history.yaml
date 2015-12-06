@@ -29,6 +29,7 @@ tests:
           $.created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
           $.created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
           $.user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          $.project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
 
 # Update it twice
     - name: patch resource user_id
@@ -65,7 +66,7 @@ tests:
       url: /v1/resource/generic
       request_headers:
           x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          x-project-id: fe20a931-1012-4cc6-addc-39556ec60907
       response_json_paths:
           $[0].user_id: f53c58a4-fdea-4c09-aac4-02135900be67
           $[0].project_id: fe20a931-1012-4cc6-addc-39556ec60907
@@ -75,7 +76,7 @@ tests:
       request_headers:
           accept: application/json; details=True; history=True
           x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          x-project-id: fe20a931-1012-4cc6-addc-39556ec60907
       response_json_paths:
           $[0].id: f93450f2-d8a5-4d67-9985-02511241e7d1
           $[0].user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
