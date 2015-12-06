@@ -609,6 +609,7 @@ class MetricsController(rest.RestController):
     @pecan.expose('json')
     def get_all(**kwargs):
         try:
+            params = {}
             enforce("list all metric", {})
         except webob.exc.HTTPForbidden:
             enforce("list metric", {})
@@ -619,11 +620,13 @@ class MetricsController(rest.RestController):
                or (provided_project_id and project_id != provided_project_id)):
                 abort(
                     403, "Insufficient privileges to filter by user/project")
+            else:
+                params['project_id'] = project_id
+                params['user_id'] = provided_user_id
         else:
-            user_id = kwargs.get('user_id')
-            project_id = kwargs.get('project_id')
-        return pecan.request.indexer.list_metrics(
-            user_id, project_id)
+            params['user_id'] = kwargs.get('user_id')
+            params['project_id'] = kwargs.get('project_id')
+        return pecan.request.indexer.list_metrics(**params)
 
 
 _MetricsSchema = voluptuous.Schema({
@@ -979,8 +982,7 @@ class GenericResourcesController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
-            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                   {"=": {"created_by_project_id": project}}]}
+            attr_filter = {"=": {"project_id": project}}
         else:
             attr_filter = None
 
@@ -1141,12 +1143,12 @@ class SearchResourceTypeController(rest.RestController):
             if attr_filter:
                 attr_filter = {"and": [
                     {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
+                    {"=": {"project_id": project}},
                     attr_filter]}
             else:
                 attr_filter = {"and": [
                     {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
+                    {"=": {"project_id": project}},
                 ]}
 
         try:
