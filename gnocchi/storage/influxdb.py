@@ -251,11 +251,8 @@ class InfluxDBStorage(storage.StorageDriver):
         return timeutils.normalize_time(ts).replace(tzinfo=iso8601.iso8601.UTC)
 
     def _make_time_query(self, from_timestamp, to_timestamp, granularity):
-        if from_timestamp:
-            left_time = utils.round_timestamp(
-                from_timestamp, granularity).isoformat()
-        else:
-            left_time = "now()"
+        left_time = utils.round_timestamp(
+            from_timestamp, granularity).isoformat()
 
         if to_timestamp and to_timestamp >= from_timestamp:
             right_time = self._timestamp_to_utc(to_timestamp).isoformat()
