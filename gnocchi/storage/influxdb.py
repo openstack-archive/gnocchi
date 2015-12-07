@@ -252,9 +252,8 @@ class InfluxDBStorage(storage.StorageDriver):
 
     def _make_time_query(self, from_timestamp, to_timestamp, granularity):
         if from_timestamp:
-            from_timestamp = find_nearest_stable_point(from_timestamp,
-                                                       granularity)
-            left_time = self._timestamp_to_utc(from_timestamp).isoformat()
+            left_time = utils.round_timestamp(
+                from_timestamp, granularity).isoformat()
         else:
             left_time = "now()"
 
@@ -272,22 +271,3 @@ class InfluxDBStorage(storage.StorageDriver):
         super(InfluxDBStorage, self).get_cross_metric_measures(
             metrics, from_timestamp, to_timestamp, aggregation, needed_overlap)
         raise exceptions.NotImplementedError
-
-
-def find_nearest_stable_point(timestamp, granularity, next=False):
-    """Find the timetamp before another one for a particular granularity.
-
-    e.g. the nearest timestamp for 14:23:45
-    with a granularity of 60 is 14:23:00
-
-    :param timestamp: The timestamp to use as a reference point
-    :param granularity: Granularity to use to look for the nearest timestamp
-    :param next: Whatever to run the next timestamp
-                 rather than the previous one
-    """
-    seconds = timeutils.delta_seconds(START_EPOCH, timestamp)
-    seconds = int(seconds - seconds % granularity)
-    stable_point = START_EPOCH + datetime.timedelta(seconds=seconds)
-    if next:
-        stable_point += datetime.timedelta(seconds=granularity)
-    return stable_point

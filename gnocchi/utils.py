@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+import time
 
 import iso8601
 from oslo_utils import timeutils
@@ -93,3 +94,14 @@ def utcnow():
 
 def datetime_utc(*args):
     return datetime.datetime(*args, tzinfo=iso8601.iso8601.UTC)
+
+
+def datetime_to_unix(timestamp):
+    return time.mktime(timestamp.utctimetuple()) + timestamp.microsecond / 10e5
+
+
+def round_timestamp(timestamp, granularity):
+    """Round a timestamp by a frequency."""
+    return datetime.datetime.fromtimestamp(
+        (datetime_to_unix(timestamp) // granularity) * granularity).replace(
+            tzinfo=iso8601.iso8601.UTC)
