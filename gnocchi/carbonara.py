@@ -28,9 +28,6 @@ import six
 
 LOG = logging.getLogger(__name__)
 
-AGGREGATION_METHODS = set(('mean', 'sum', 'last', 'max', 'min',
-                           'std', 'median', 'first', 'count'))
-
 
 class NoDeloreanAvailable(Exception):
     """Error raised when trying to insert a value that is too old."""
