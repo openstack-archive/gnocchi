@@ -738,6 +738,18 @@ class ResourceTest(RestTest):
                 "display_name": "myvolume",
             },
             resource_type='volume')),
+        ('volume_none_display_name', dict(
+            attributes={
+                "started_at": "2014-01-03T02:02:02+00:00",
+                "user_id": str(uuid.uuid4()),
+                "project_id": str(uuid.uuid4()),
+                "display_name": None,
+            },
+            patchable_attributes={
+                "ended_at": "2014-01-03T02:02:02+00:00",
+                "display_name": "myvolume",
+            },
+            resource_type='volume')),
         ('ceph_account', dict(
             attributes={
                 "started_at": "2014-01-03T02:02:02+00:00",
