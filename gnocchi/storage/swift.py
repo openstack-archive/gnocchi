@@ -15,6 +15,7 @@
 # under the License.
 import contextlib
 import datetime
+import itertools
 import uuid
 
 from oslo_config import cfg
@@ -140,15 +141,16 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
 
     def _delete_metric(self, metric):
         self._delete_unaggregated_timeserie(metric)
-        for aggregation in metric.archive_policy.aggregation_methods:
-            for d in metric.archive_policy.definition:
-                try:
-                    self.swift.delete_object(
-                        self._container_name(metric),
-                        self._object_name(aggregation, d.granularity))
-                except swclient.ClientException as e:
-                    if e.http_status != 404:
-                        raise
+        for aggregation, d in itertools.product(
+                metric.archive_policy.aggregation_methods,
+                metric.archive_policy.definition):
+            try:
+                self.swift.delete_object(
+                    self._container_name(metric),
+                    self._object_name(aggregation, d.granularity))
+            except swclient.ClientException as e:
+                if e.http_status != 404:
+                    raise
         try:
             self.swift.delete_container(self._container_name(metric))
         except swclient.ClientException as e:

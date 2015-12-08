@@ -16,6 +16,7 @@
 
 import contextlib
 import datetime
+import itertools
 import uuid
 
 from oslo_config import cfg
@@ -163,14 +164,15 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 except rados.ObjectNotFound:
                     # Maybe it never got measures
                     pass
-            for aggregation in metric.archive_policy.aggregation_methods:
-                for d in metric.archive_policy.definition:
-                    name = self._get_object_name(
-                        metric, aggregation, d.granularity)
-                    try:
-                        ioctx.remove_object(name)
-                    except rados.ObjectNotFound:
-                        pass
+            for aggregation, d in itertools.product(
+                    metric.archive_policy.aggregation_methods,
+                    metric.archive_policy.definition):
+                name = self._get_object_name(
+                    metric, aggregation, d.granularity)
+                try:
+                    ioctx.remove_object(name)
+                except rados.ObjectNotFound:
+                    pass
 
     def _get_measures(self, metric, aggregation, granularity):
         try:

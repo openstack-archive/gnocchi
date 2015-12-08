@@ -53,10 +53,15 @@ class MovingAverage(aggregates.CustomAggregator):
                    "you specified.")
             raise aggregates.CustomAggFailure(msg)
 
-        return min_grain, pandas.Series([r[2] for r in all_data
-                                         if r[1] == min_grain],
-                                        [r[0] for r in all_data
-                                         if r[1] == min_grain])
+        data = []
+        index = []
+        for row in all_data:
+            if row[1] == min_grain:
+                data.append(row[2])
+            if row[1] == min_grain:
+                index.append(row[0])
+
+        return min_grain, pandas.Series(data, index)
 
     @staticmethod
     def aggregate_data(data, func, window, min_grain, center=False,

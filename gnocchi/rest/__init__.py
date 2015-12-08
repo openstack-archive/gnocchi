@@ -651,7 +651,7 @@ class NamedMetricController(rest.RestController):
 
     @pecan.expose()
     def _lookup(self, name, *remainder):
-        details = True if pecan.request.method == 'GET' else False
+        details = pecan.request.method == 'GET'
         m = pecan.request.indexer.list_metrics(details=details,
                                                name=name,
                                                resource_id=self.resource_id)

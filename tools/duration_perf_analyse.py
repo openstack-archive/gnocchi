@@ -32,6 +32,7 @@
 
 
 import argparse
+import itertools
 import os
 
 import pandas
@@ -50,14 +51,13 @@ def main():
     }
     args = parser.parse_args()
     for root, dirs, files in os.walk(args.result):
-        for name in files:
-            for method in data:
-                if name.endswith('_%s.csv' % method):
-                    datum = data[method]
-                    filepath = os.path.join(root, name)
-                    datum.append(pandas.read_csv(filepath))
-                    cname = name.replace('_%s.csv' % method, '')
-                    datum[-1].rename(columns={'Duration': cname}, inplace=True)
+        for name, method in itertools.product(files, data):
+            if name.endswith('_%s.csv' % method):
+                datum = data[method]
+                filepath = os.path.join(root, name)
+                datum.append(pandas.read_csv(filepath))
+                cname = name.replace('_%s.csv' % method, '')
+                datum[-1].rename(columns={'Duration': cname}, inplace=True)
 
     for method in data:
         merged = pandas.DataFrame(columns=['Index', 'Duration'])

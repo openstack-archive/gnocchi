@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import collections
+import itertools
 import logging
 import multiprocessing
 import uuid
@@ -278,8 +279,9 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                                 self._add_measures,
                                 ((aggregation, d.granularity,
                                  metric, bound_timeserie)
-                                 for aggregation in agg_methods
-                                 for d in metric.archive_policy.definition))
+                                 for aggregation, d in itertools.product(
+                                     agg_methods,
+                                     metric.archive_policy.definition)))
 
                         with timeutils.StopWatch() as sw:
                             ts.set_values(
@@ -323,8 +325,9 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
         tss = self._map_in_thread(self._get_measures_timeserie,
                                   [(metric, aggregation, granularity)
-                                   for metric in metrics
-                                   for granularity in granularities_in_common])
+                                   for metric, granularity in
+                                   itertools.product(metrics,
+                                                     granularities_in_common)])
         try:
             return [(timestamp.replace(tzinfo=iso8601.iso8601.UTC), r, v)
                     for timestamp, r, v
