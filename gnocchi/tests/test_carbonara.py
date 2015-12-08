@@ -2,8 +2,6 @@
 #
 # Copyright © 2014-2015 eNovance
 #
-# Authors: Julien Danjou <julien@danjou.info>
-#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -16,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+import math
 import subprocess
 import tempfile
 
@@ -814,6 +813,67 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (pandas.Timestamp('2015-12-03 13:23:15'), 1.0, 10.0),
             (pandas.Timestamp('2015-12-03 13:24:15'), 1.0, 10.0),
         ], output)
+
+    def test_split_key(self):
+        self.assertEqual(
+            "1420128000.0",
+            carbonara.AggregatedTimeSerie.get_split_key(
+                datetime.datetime(2015, 1, 1, 23, 34), 5))
+        self.assertEqual(
+            "1420056000.0",
+            carbonara.AggregatedTimeSerie.get_split_key(
+                datetime.datetime(2015, 1, 1, 15, 3), 5))
+
+    def test_split_key_datetime(self):
+        self.assertEqual(
+            datetime.datetime(2014, 5, 10),
+            carbonara.AggregatedTimeSerie.get_split_key_datetime(
+                datetime.datetime(2015, 1, 1, 15, 3), 3600))
+        self.assertEqual(
+            datetime.datetime(2014, 12, 29, 8),
+            carbonara.AggregatedTimeSerie.get_split_key_datetime(
+                datetime.datetime(2015, 1, 1, 15, 3), 58))
+
+    def test_split(self):
+        sampling = 5
+        points = 100000
+        ts = carbonara.TimeSerie.from_data(
+            timestamps=map(datetime.datetime.utcfromtimestamp, xrange(points)),
+            values=xrange(points))
+        agg = carbonara.AggregatedTimeSerie(sampling=sampling)
+        agg.update(ts)
+
+        grouped_points = list(agg.split())
+
+        self.assertEqual(
+            math.ceil((points / float(sampling))
+                      / carbonara.AggregatedTimeSerie.POINTS_PER_SPLIT),
+            len(grouped_points))
+        self.assertEqual("0.0",
+                         grouped_points[0][0])
+        # 14400 × 5s = 20 hours
+        self.assertEqual("72000.0",
+                         grouped_points[1][0])
+        self.assertEqual(carbonara.AggregatedTimeSerie.POINTS_PER_SPLIT,
+                         len(grouped_points[0][1]))
+
+    def test_from_timeseries(self):
+        sampling = 5
+        points = 100000
+        ts = carbonara.TimeSerie.from_data(
+            timestamps=map(datetime.datetime.utcfromtimestamp, xrange(points)),
+            values=xrange(points))
+        agg = carbonara.AggregatedTimeSerie(sampling=sampling)
+        agg.update(ts)
+
+        split = [t[1] for t in list(agg.split())]
+
+        self.assertEqual(agg,
+                         carbonara.AggregatedTimeSerie.from_timeseries(
+                             split,
+                             sampling=agg.sampling,
+                             max_size=agg.max_size,
+                             aggregation_method=agg.aggregation_method))
 
 
 class CarbonaraCmd(base.BaseTestCase):
