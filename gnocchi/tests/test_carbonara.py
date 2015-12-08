@@ -31,13 +31,14 @@ from gnocchi import carbonara
 class TestBoundTimeSerie(base.BaseTestCase):
     @staticmethod
     def test_base():
-        carbonara.BoundTimeSerie([datetime.datetime(2014, 1, 1, 12, 0, 0),
-                                  datetime.datetime(2014, 1, 1, 12, 0, 4),
-                                  datetime.datetime(2014, 1, 1, 12, 0, 9)],
-                                 [3, 5, 6])
+        carbonara.BoundTimeSerie.from_data(
+            [datetime.datetime(2014, 1, 1, 12, 0, 0),
+             datetime.datetime(2014, 1, 1, 12, 0, 4),
+             datetime.datetime(2014, 1, 1, 12, 0, 9)],
+            [3, 5, 6])
 
     def test_block_size(self):
-        ts = carbonara.BoundTimeSerie(
+        ts = carbonara.BoundTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -49,7 +50,7 @@ class TestBoundTimeSerie(base.BaseTestCase):
         self.assertEqual(2, len(ts))
 
     def test_block_size_back_window(self):
-        ts = carbonara.BoundTimeSerie(
+        ts = carbonara.BoundTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -62,7 +63,7 @@ class TestBoundTimeSerie(base.BaseTestCase):
         self.assertEqual(3, len(ts))
 
     def test_block_size_unordered(self):
-        ts = carbonara.BoundTimeSerie(
+        ts = carbonara.BoundTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 9),
              datetime.datetime(2014, 1, 1, 12, 0, 5)],
@@ -74,7 +75,7 @@ class TestBoundTimeSerie(base.BaseTestCase):
         self.assertEqual(2, len(ts))
 
     def test_duplicate_timestamps(self):
-        ts = carbonara.BoundTimeSerie(
+        ts = carbonara.BoundTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 9),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -98,17 +99,17 @@ class TestBoundTimeSerie(base.BaseTestCase):
 class TestAggregatedTimeSerie(base.BaseTestCase):
     @staticmethod
     def test_base():
-        carbonara.AggregatedTimeSerie(
+        carbonara.AggregatedTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
             [3, 5, 6])
-        carbonara.AggregatedTimeSerie(
+        carbonara.AggregatedTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
             [3, 5, 6], sampling=3)
-        carbonara.AggregatedTimeSerie(
+        carbonara.AggregatedTimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -157,7 +158,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
 
     def test_different_length_in_timestamps_and_data(self):
         self.assertRaises(ValueError,
-                          carbonara.AggregatedTimeSerie,
+                          carbonara.AggregatedTimeSerie.from_data,
                           [datetime.datetime(2014, 1, 1, 12, 0, 0),
                            datetime.datetime(2014, 1, 1, 12, 0, 4),
                            datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -166,7 +167,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
     def test_max_size(self):
         ts = carbonara.AggregatedTimeSerie(
             max_size=2)
-        ts.update(carbonara.TimeSerie(
+        ts.update(carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -177,7 +178,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
 
     def test_down_sampling(self):
         ts = carbonara.AggregatedTimeSerie(sampling='5Min')
-        ts.update(carbonara.TimeSerie(
+        ts.update(carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
@@ -189,7 +190,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
         ts = carbonara.AggregatedTimeSerie(
             sampling='1Min',
             max_size=2)
-        ts.update(carbonara.TimeSerie(
+        ts.update(carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 1, 4),
              datetime.datetime(2014, 1, 1, 12, 1, 9),
@@ -204,7 +205,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             sampling='1Min',
             max_size=2,
             aggregation_method='max')
-        ts.update(carbonara.TimeSerie(
+        ts.update(carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 1, 4),
              datetime.datetime(2014, 1, 1, 12, 1, 9),
@@ -219,7 +220,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             sampling='1Min',
             max_size=2,
             aggregation_method='max')
-        ts.update(carbonara.TimeSerie(
+        ts.update(carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 1, 4),
              datetime.datetime(2014, 1, 1, 12, 1, 9),
