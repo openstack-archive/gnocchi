@@ -1,0 +1,12 @@
+Verified+2: Jenkins
+Code-Review+2: gordon chung <gord@live.ca>
+Code-Review+1: zhangguoqing <zhang.guoqing@99cloud.net>
+Code-Review+1: lvdongbing <dongbing.lv@kylin-cloud.com>
+Code-Review+2: Chris Dent <cdent@anticdent.org>
+Workflow+1: Chris Dent <cdent@anticdent.org>
+Code-Review+1: Luo Gangyi <luogangyi@chinamobile.com>
+Submitted-by: Jenkins
+Submitted-at: Sun, 13 Dec 2015 04:31:20 +0000
+Reviewed-on: https://review.openstack.org/254665
+Project: openstack/gnocchi
+Branch: refs/heads/master
