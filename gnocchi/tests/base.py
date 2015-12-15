@@ -196,7 +196,7 @@ class FakeSwiftClient(object):
 
         files = []
         directories = set()
-        for k, v in six.iteritems(container):
+        for k, v in six.iteritems(container.copy()):
             if path and not k.startswith(path):
                 continue
 
