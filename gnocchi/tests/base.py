@@ -126,7 +126,7 @@ class FakeRadosModule(object):
             if key not in self.kvs:
                 raise FakeRadosModule.ObjectNotFound
             return iter((k, v) for k, v in
-                        self.kvs_xattrs.get(key, {}).items())
+                        self.kvs_xattrs.copy().get(key, {}).items())
 
         def set_xattr(self, key, attr, value):
             self._ensure_key_exists(key)
@@ -199,7 +199,7 @@ class FakeSwiftClient(object):
 
         files = []
         directories = set()
-        for k, v in six.iteritems(container):
+        for k, v in six.iteritems(container.copy()):
             if path and not k.startswith(path):
                 continue
 
