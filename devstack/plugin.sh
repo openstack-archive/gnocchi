@@ -360,8 +360,10 @@ function install_gnocchi {
 
     install_gnocchiclient
 
+    is_service_enabled key && EXTRA_FLAVOR=,keystonmiddleware
+
     # We don't use setup_package because we don't follow openstack/requirements
-    sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,$DATABASE_TYPE]
+    sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
 
     if [ "$GNOCCHI_USE_MOD_WSGI" == "True" ]; then
         install_apache_wsgi
