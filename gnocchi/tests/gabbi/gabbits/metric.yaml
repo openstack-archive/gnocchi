@@ -197,15 +197,36 @@ tests:
       url: /v1/metric/$RESPONSE['$[0].id']/measures
       status: 200
 
+    - name: get metric list for push measures
+      url: /v1/metric
+
+    - name: push measurements to metric for measurements by start
+      url: /v1/metric/$RESPONSE['$[0].id']/measures
+      request_headers:
+           content-type: application/json
+      method: post
+      data:
+          - timestamp: "2015-03-06T14:33:57"
+            value: 43.1
+      status: 202
+
     - name: get metric list for start test
       url: /v1/metric
-      status: 200
-      response_json_paths:
-          $[0].archive_policy.name: cookies
 
     - name: get measurements by start
       url: /v1/metric/$RESPONSE['$[0].id']/measures?start=2015-03-06T14:33:57
       status: 200
+      response_json_paths:
+        $[0]: ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
+
+    - name: get metric list for start test with timezone
+      url: /v1/metric
+
+    - name: get measurements by start with timezone
+      url: /v1/metric/$RESPONSE['$[0].id']/measures?start=2015-03-06T15:33:57%2B01:00
+      status: 200
+      response_json_paths:
+        $[0]: ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
 
     - name: get measures unknown metric
       url: /v1/metric/fake/measures
