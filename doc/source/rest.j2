@@ -71,6 +71,14 @@ method. It is possible to request for any other method by specifying the
 The list of aggregation method available is: *mean*, *sum*, *last*, *max*,
 *min*, *std*, *median*, *first*, *count* and *Npct* (with 0 < N < 100).
 
+Measures batching
+=================
+It is also possible to batch measures sending, i.e. send several measures for
+different metrics in a simple call:
+
+{{ scenarios['post-measures-batch']['doc'] }}
+
+
 Archive Policy
 ==============
 
