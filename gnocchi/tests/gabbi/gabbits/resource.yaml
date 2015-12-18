@@ -56,7 +56,7 @@ tests:
           $.version: "1.0"
           $.links.`len`: 9
           $.links[0].href: $SCHEME://$NETLOC/v1
-          $.links[7].href: $SCHEME://$NETLOC/v1/search
+          $.links[7].href: $SCHEME://$NETLOC/v1/resource
 
     - name: root of resource
       url: /v1/resource
