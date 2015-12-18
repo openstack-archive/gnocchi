@@ -40,6 +40,9 @@ Then, you can start devstack:
 
     ./stack.sh
 
+
+.. _installation:
+
 Installation
 ============
 
@@ -47,21 +50,35 @@ To install Gnocchi using `pip`, just type::
 
   pip install gnocchi
 
-Depending on the drivers you want to use, you need to install extra flavors
-using, for example::
+Depending on the drivers and features you want to use, you need to install
+extra flavors using, for example::
 
-  pip install gnocchi[postgresql,ceph]
+  pip install gnocchi[postgresql,ceph,keystone]
+
+This would install PostgreSQL support for the indexer, Ceph support for
+storage, and Keystone support for authentication and authorization.
+
+The list of flavors available is:
+
+* keystone – provides Keystone authentication support
+* mysql - provides MySQL indexer support
+* postgresql – provides PostgreSQL indexer support
+* influxdb – provides InfluxDB storage support
+* swift – provides OpenStack Swift storage support
+* ceph – provides Ceph storage support
+* file – provides file driver support
+* doc – documentation building support
+* test – unit and functional tests support
 
 To install Gnocchi from source, run the standard Python installation
 procedure::
 
   pip install -e .
 
-Again, sepending on the drivers you want to use, you need to install extra
-flavors using, for example::
+Again, depending on the drivers and features you want to use, you need to
+install extra flavors using, for example::
 
   pip install -e .[postgresql,ceph]
-
 
 Configuration
 =============
@@ -118,6 +135,34 @@ Gnocchi provides these indexer drivers:
 .. _`PostgreSQL`: http://postgresql.org
 .. _`MySQL`: http://mysql.com
 .. _`InfluxDB`: http://influxdb.com
+
+Configuring the WSGI pipeline
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The API server leverages `Paste Deployment`_ to manage its configuration. You
+can edit the `/etc/gnocchi/api-paste.ini` to tweak the WSGI pipeline of the
+Gnocchi REST HTTP server. By default, no authentication middleware is enabled,
+meaning your request will have to provides the authentication headers.
+
+Gnocchi is easily connectable with `OpenStack Keystone`_. If you successfully
+installed the `keystone` flavor using `pip` (see :ref:`installation`), you can
+edit the `api-paste.ini` file to add the Keystone authentication middleware::
+
+  [pipeline:main]
+  pipeline = keystone_authtoken gnocchi
+
+Also, if you're planning on using `CORS`_ (e.g. to use `Grafana`_), you an also
+add the CORS middleware in the server pipeline::
+
+  [pipeline:main]
+  pipeline = keystone_authtoken cors gnocchi
+
+With or without Keystone support.
+
+.. _`Paste Deployment`: http://pythonpaste.org/deploy/
+.. _`OpenStack Keystone`: http://launchpad.net/keystone
+.. _`CORS`: https://en.wikipedia.org/wiki/Cross-origin_resource_sharing
+.. _`Grafana`: http://grafana.org/
 
 Initialization and upgrade
 ==========================
