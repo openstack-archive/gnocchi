@@ -204,8 +204,22 @@ tests:
           $[0].archive_policy.name: cookies
 
     - name: get measurements by start
-      url: /v1/metric/$RESPONSE['$[0].id']/measures?start=2015-03-06T14:33:57
+      url: /v1/metric/$RESPONSE['$[2].id']/measures?start=2015-03-06T14:33:57
       status: 200
+      response_json_paths:
+        $[0]: ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
+
+    - name: get metric list for start test with timezone
+      url: /v1/metric
+      status: 200
+      response_json_paths:
+          $[0].archive_policy.name: cookies
+
+    - name: get measurements by start with timezone
+      url: /v1/metric/$RESPONSE['$[2].id']/measures?start=2015-03-06T15:33:57%2B01:00
+      status: 200
+      response_json_paths:
+        $[0]: ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
 
     - name: get measures unknown metric
       url: /v1/metric/fake/measures
