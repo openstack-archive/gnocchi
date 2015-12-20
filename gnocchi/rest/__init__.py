@@ -974,8 +974,10 @@ class GenericResourcesController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
-            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                   {"=": {"created_by_project_id": project}}]}
+            attr_filter = {"or": [
+                {"=": {"project_id": project}},
+                {"=": {"created_by_project_id": project}},
+            ]}
         else:
             attr_filter = None
 
@@ -1119,6 +1121,7 @@ class SearchResourceTypeController(rest.RestController):
         else:
             attr_filter = None
 
+        limited_attr_filter = None
         details = get_details(kwargs)
         history = get_history(kwargs)
         pagination_opts = get_pagination_options(
@@ -1133,21 +1136,19 @@ class SearchResourceTypeController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
+            limited_attr_filter = {"or": [
+                {"=": {"project_id": project}},
+                {"=": {"created_by_project_id": project}},
+            ]}
             if attr_filter:
-                attr_filter = {"and": [
-                    {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
-                    attr_filter]}
-            else:
-                attr_filter = {"and": [
-                    {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
+                limited_attr_filter = {"and": [
+                    limited_attr_filter,
+                    attr_filter,
                 ]}
-
         try:
             return pecan.request.indexer.list_resources(
                 self._resource_type,
-                attribute_filter=attr_filter,
+                attribute_filter=limited_attr_filter,
                 details=details,
                 history=history,
                 **pagination_opts)
