@@ -967,6 +967,8 @@ class GenericResourcesController(rest.RestController):
         history = get_history(kwargs)
         pagination_opts = get_pagination_options(
             kwargs, RESOURCE_DEFAULT_PAGINATION)
+        provided_user = kwargs.get("user_id", None)
+        provided_project = kwargs.get("project_id", None)
 
         try:
             enforce("list all resource", {
@@ -977,10 +979,28 @@ class GenericResourcesController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
-            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                   {"=": {"created_by_project_id": project}}]}
+            if ((provided_user and user != provided_user)
+               or (provided_project and project != provided_project)):
+                abort(
+                    403, "Insufficient privileges to filter by user/project")
+
+            attr_filter = \
+                {"and": [{"=": {"created_by_user_id": user}},
+                         {"=": {"created_by_project_id": project}}]}
+            attr_filter = {"and": [
+                {"or": [{"=": {"project_id": project}},
+                        attr_filter]},
+            ]}
         else:
-            attr_filter = None
+            if provided_user or provided_project:
+                attr_filter = {"and": []}
+            else:
+                attr_filter = None
+
+        if provided_user:
+            attr_filter["and"].append({"=": {"user_id": provided_user}})
+        if provided_project:
+            attr_filter["and"].append({"=": {"project_id": provided_project}})
 
         try:
             # FIXME(sileht): next API version should returns
@@ -1138,13 +1158,22 @@ class SearchResourceTypeController(rest.RestController):
             user, project = get_user_and_project()
             if attr_filter:
                 attr_filter = {"and": [
-                    {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
-                    attr_filter]}
+                    {"or": [
+                        {"and": [
+                              {"=": {"created_by_user_id": user}},
+                              {"=": {"created_by_project_id": project}}]},
+                        {"=": {"project_id": project}},
+                    ]},
+                    attr_filter,
+                ]}
             else:
                 attr_filter = {"and": [
-                    {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
+                    {"or": [
+                        {"and": [
+                              {"=": {"created_by_user_id": user}},
+                              {"=": {"created_by_project_id": project}}]},
+                        {"=": {"project_id": project}},
+                    ]},
                 ]}
 
         try:
