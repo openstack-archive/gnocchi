@@ -979,8 +979,11 @@ class GenericResourcesController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
-            attr_filter = {"and": [{"=": {"created_by_user_id": user}},
-                                   {"=": {"created_by_project_id": project}}]}
+            created_filter = \
+                {"and": [{"=": {"created_by_user_id": user}},
+                         {"=": {"created_by_project_id": project}}]}
+            attr_filter = {"or": [{"=": {"project_id": project}},
+                                  created_filter]}
         else:
             attr_filter = None
 
@@ -1138,15 +1141,19 @@ class SearchResourceTypeController(rest.RestController):
                 "resource_type": self._resource_type,
             })
             user, project = get_user_and_project()
+            created_filter = \
+                {"and": [{"=": {"created_by_user_id": user}},
+                         {"=": {"created_by_project_id": project}}]}
             if attr_filter:
                 attr_filter = {"and": [
-                    {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
-                    attr_filter]}
+                    {"or": [created_filter,
+                            {"=": {"project_id": project}}]},
+                    attr_filter,
+                ]}
             else:
                 attr_filter = {"and": [
-                    {"=": {"created_by_user_id": user}},
-                    {"=": {"created_by_project_id": project}},
+                    {"or": [created_filter,
+                            {"=": {"project_id": project}}]},
                 ]}
 
         try:
