@@ -43,3 +43,14 @@ Again, sepending on the drivers you want to use, you need to install extra
 flavors using, for example::
 
   pip install -e .[postgresql,ceph]
+
+
+Initialization and upgrade
+==========================
+
+Once you have configured Gnocchi properly (see :doc:`configuration`), you need
+to initialize (or upgrade) the indexer and storage:
+
+::
+
+    gnocchi-upgrade
