@@ -11,12 +11,9 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-import os
-
 from oslotest import base
 
 from gnocchi import archive_policy
-from gnocchi import service
 
 
 class TestArchivePolicy(base.BaseTestCase):
@@ -30,12 +27,6 @@ class TestArchivePolicy(base.BaseTestCase):
                           ["*"])
 
     def test_aggregation_methods(self):
-        default_opts = [('url',
-                        os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                        'indexer')]
-        conf = service.prepare_service([], default_opts,
-                                       default_config_files=[])
-
         ap = archive_policy.ArchivePolicy("foobar",
                                           0,
                                           [],
@@ -66,8 +57,7 @@ class TestArchivePolicy(base.BaseTestCase):
                                           [],
                                           ["-mean", "-last"])
         self.assertEqual(
-            (set(conf.archive_policy.default_aggregation_methods)
-             - set(["mean", "last"])),
+            (set(archive_policy.DEFAULT_AGG_METHODS) - set(["mean", "last"])),
             ap.aggregation_methods)
 
         ap = archive_policy.ArchivePolicy("foobar",
@@ -75,8 +65,7 @@ class TestArchivePolicy(base.BaseTestCase):
                                           [],
                                           ["+12pct"])
         self.assertEqual(
-            (set(conf.archive_policy.default_aggregation_methods)
-             .union(set(["12pct"]))),
+            (set(archive_policy.DEFAULT_AGG_METHODS).union(set(["12pct"]))),
             ap.aggregation_methods)
 
     def test_max_block_size(self):
