@@ -15,6 +15,7 @@
 # under the License.
 import functools
 import os
+import tempfile
 import uuid
 
 import fixtures
@@ -337,11 +338,15 @@ class TestCase(base.BaseTestCase):
 
     def setUp(self):
         super(TestCase, self).setUp()
-        default_opts = [('url',
-                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-        self.conf = service.prepare_service([], default_opts,
-                                            default_config_files=[])
+        self.tmp_cfg = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            self.tmp_cfg.writelines(
+                ['[indexer]\n', 'url = %s' %
+                 os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://")])
+        finally:
+            self.tmp_cfg.close()
+        self.conf = service.prepare_service(
+            [], default_config_files=[self.tmp_cfg.name])
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
                                group="oslo_policy")
@@ -424,6 +429,7 @@ class TestCase(base.BaseTestCase):
         self.custom_agg = dict((x.name, x.obj) for x in self.mgr)
 
     def tearDown(self):
+        os.remove(self.tmp_cfg.name)
         self.index.disconnect()
         self.storage.stop()
         super(TestCase, self).tearDown()

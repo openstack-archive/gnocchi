@@ -76,12 +76,16 @@ class ConfigFixture(fixture.GabbiFixture):
 
         data_tmp_dir = tempfile.mkdtemp(prefix='gnocchi')
 
-        default_opts = [('url',
-                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
+        self.tmp_cfg = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            self.tmp_cfg.writelines(
+                ['[indexer]\n', 'url = %s' %
+                 os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://")])
+        finally:
+            self.tmp_cfg.close()
 
-        conf = service.prepare_service([], default_opts,
-                                       default_config_files=[])
+        conf = service.prepare_service(
+            [], default_config_files=[self.tmp_cfg.name])
 
         CONF = self.conf = conf
         self.tmp_dir = data_tmp_dir
@@ -155,6 +159,7 @@ class ConfigFixture(fixture.GabbiFixture):
             shutil.rmtree(self.tmp_dir)
 
         self.conf.reset()
+        os.remove(self.tmp_cfg.name)
 
 
 class MetricdThread(threading.Thread):
