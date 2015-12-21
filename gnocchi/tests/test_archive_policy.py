@@ -30,10 +30,10 @@ class TestArchivePolicy(base.BaseTestCase):
                           ["*"])
 
     def test_aggregation_methods(self):
-        default_opts = [('url',
-                        os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                        'indexer')]
-        conf = service.prepare_service([], default_opts)
+        conf = service.prepare_service([])
+        conf.set_override(
+            'url', os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
+            group='indexer')
 
         ap = archive_policy.ArchivePolicy("foobar",
                                           0,
