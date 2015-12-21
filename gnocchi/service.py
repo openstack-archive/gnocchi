@@ -57,7 +57,8 @@ def prepare_service(args=None, default_opts=None, conf=None):
     for opt, value, group in default_opts or []:
         conf.set_default(opt, value, group)
 
-    conf(args, project='gnocchi', validate_default_values=True)
+    conf(args, project='gnocchi', validate_default_values=True,
+         default_config_files=None if default_opts is None else [])
     log.setup(conf, 'gnocchi')
     conf.log_opt_values(LOG, logging.DEBUG)
 

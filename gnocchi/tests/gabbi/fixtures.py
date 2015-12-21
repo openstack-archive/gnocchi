@@ -79,7 +79,6 @@ class ConfigFixture(fixture.GabbiFixture):
         default_opts = [('url',
                          os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
                          'indexer')]
-
         conf = service.prepare_service([], default_opts)
 
         CONF = self.conf = conf
