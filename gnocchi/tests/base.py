@@ -18,6 +18,7 @@ import os
 import uuid
 
 import fixtures
+from oslo_config import cfg
 from oslotest import base
 from oslotest import mockpatch
 import six
@@ -337,10 +338,12 @@ class TestCase(base.BaseTestCase):
 
     def setUp(self):
         super(TestCase, self).setUp()
-        default_opts = [('url',
+        conf = cfg.ConfigOpts()
+        conf.register_opts(indexer.OPTS, 'indexer')
+        conf.set_default('url',
                          os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-        self.conf = service.prepare_service([], default_opts)
+                         'indexer')
+        self.conf = service.prepare_service([], conf, use_system_conf=False)
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
                                group="oslo_policy")

@@ -24,6 +24,7 @@ import uuid
 import warnings
 
 from gabbi import fixture
+from oslo_config import cfg
 import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
 
@@ -76,11 +77,12 @@ class ConfigFixture(fixture.GabbiFixture):
 
         data_tmp_dir = tempfile.mkdtemp(prefix='gnocchi')
 
-        default_opts = [('url',
+        conf = cfg.ConfigOpts()
+        conf.register_opts(indexer.OPTS, 'indexer')
+        conf.set_default('url',
                          os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-
-        conf = service.prepare_service([], default_opts)
+                         'indexer')
+        conf = service.prepare_service([], conf, use_system_conf=False)
 
         CONF = self.conf = conf
         self.tmp_dir = data_tmp_dir
