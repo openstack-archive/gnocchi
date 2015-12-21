@@ -337,10 +337,11 @@ class TestCase(base.BaseTestCase):
 
     def setUp(self):
         super(TestCase, self).setUp()
-        default_opts = [('url',
-                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-        self.conf = service.prepare_service([], default_opts)
+
+        test_opts = [('url',
+                      os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
+                      'indexer')]
+        self.conf = service.prepare_service([], test_opts=test_opts)
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
                                group="oslo_policy")
