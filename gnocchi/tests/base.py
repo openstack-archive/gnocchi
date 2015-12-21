@@ -15,6 +15,7 @@
 # under the License.
 import functools
 import os
+import tempfile
 import uuid
 
 import fixtures
@@ -264,6 +265,17 @@ class FakeSwiftClient(object):
                                         http_status=404)
 
 
+def build_test_config():
+    tmp_cfg = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp_cfg.writelines(
+            ['[indexer]\n', 'url = %s' %
+             os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://")])
+    finally:
+        tmp_cfg.close()
+    return tmp_cfg.name
+
+
 @six.add_metaclass(SkipNotImplementedMeta)
 class TestCase(base.BaseTestCase):
 
@@ -337,11 +349,10 @@ class TestCase(base.BaseTestCase):
 
     def setUp(self):
         super(TestCase, self).setUp()
-        default_opts = [('url',
-                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-        self.conf = service.prepare_service([], default_opts,
-                                            default_config_files=[])
+        self.tmp_cfg = build_test_config()
+        self.addCleanup(os.remove, self.tmp_cfg)
+        self.conf = service.prepare_service(
+            [], default_config_files=[self.tmp_cfg])
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
                                group="oslo_policy")

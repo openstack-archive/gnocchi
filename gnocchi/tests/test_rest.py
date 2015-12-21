@@ -170,6 +170,7 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
             return keystonemiddleware.auth_token.AuthProtocol(app, {
                 "oslo_config_project": "gnocchi",
                 "oslo_config_config": cls.conf,
+                "oslo_config_file": cls.tmp_cfg
             })
         return auth_filter
 
@@ -204,6 +205,7 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
 
         RestTest.pecan_config = pecan_config
         RestTest.conf = self.conf
+        RestTest.tmp_cfg = self.tmp_cfg
 
         # TODO(chdent) Linting is turned off until a
         # keystonemiddleware bug is resolved.

@@ -136,13 +136,14 @@ class ArchivePolicy(object):
                       key=operator.attrgetter("granularity"))[-1].granularity
 
 
+DEFAULT_AGG_METHODS = ['mean', 'min', 'max', 'sum', 'std',
+                       'median', 'count', '95pct']
 OPTS = [
     cfg.ListOpt(
         'default_aggregation_methods',
         item_type=types.String(
             choices=ArchivePolicy.VALID_AGGREGATION_METHODS),
-        default=['mean', 'min', 'max', 'sum',
-                 'std', 'median', 'count', '95pct'],
+        default=DEFAULT_AGG_METHODS,
         help='Default aggregation methods to use in created archive policies'),
 ]
 

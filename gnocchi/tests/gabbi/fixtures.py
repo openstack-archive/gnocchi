@@ -31,6 +31,7 @@ from gnocchi import indexer
 from gnocchi.rest import app
 from gnocchi import service
 from gnocchi import storage
+from gnocchi.tests import base
 
 
 # NOTE(chdent): Hack to restore semblance of global configuration to
@@ -76,12 +77,8 @@ class ConfigFixture(fixture.GabbiFixture):
 
         data_tmp_dir = tempfile.mkdtemp(prefix='gnocchi')
 
-        default_opts = [('url',
-                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-
-        conf = service.prepare_service([], default_opts,
-                                       default_config_files=[])
+        self.tmp_cfg = base.build_test_config()
+        conf = service.prepare_service([], default_config_files=[self.tmp_cfg])
 
         CONF = self.conf = conf
         self.tmp_dir = data_tmp_dir
@@ -155,6 +152,7 @@ class ConfigFixture(fixture.GabbiFixture):
             shutil.rmtree(self.tmp_dir)
 
         self.conf.reset()
+        os.remove(self.tmp_cfg)
 
 
 class MetricdThread(threading.Thread):
