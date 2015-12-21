@@ -10,8 +10,13 @@ Gnocchi – Metric as a Service
 .. include:: ../../README.rst
    :start-line: 6
 
-A Brief History of Gnocchi
---------------------------
+
+Why Gnocchi?
+------------
+
+Gnocchi has been created to fulfill the need of a time series database usable
+in the context of cloud computing: providing the ability to store large
+quantities of metrics and being easily scalable.
 
 The Gnocchi project was started in 2014 as a spin-off of the `OpenStack
 Ceilometer`_ project to address the performance issues that Ceilometer
@@ -21,8 +26,15 @@ More information are available on `Julien's blog post on Gnocchi
 
 .. _`OpenStack Ceilometer`: http://launchpad.net/ceilometer
 
+
+Use cases
+---------
+Gnocchi is meant to be used to store time series and their associated resource
+metadata. It’s therefore useful as a storage brick for a billing system, an
+alarm-triggering or monitoring system or any statistical usage of such data.
+
 Key Features
-============
+------------
 
 - HTTP REST interface
 - Horizontal scalability
@@ -37,7 +49,7 @@ Key Features
 
 
 Documentation
-=============
+-------------
 
 .. toctree::
    :maxdepth: 1
