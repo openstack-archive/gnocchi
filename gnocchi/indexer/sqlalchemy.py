@@ -283,9 +283,6 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
                         **kwargs):
-
-        now = utils.utcnow()
-
         resource_cls = self._resource_type_to_class(resource_type)
         resource_history_cls = self._resource_type_to_class(resource_type,
                                                             "history")
@@ -302,13 +299,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 r = q.first()
                 if r is None:
                     raise indexer.NoSuchResource(resource_id)
-
-                # Build history
-                rh = resource_history_cls()
-                for col in sqlalchemy.inspect(resource_cls).columns:
-                    setattr(rh, col.name, getattr(r, col.name))
-                rh.revision_end = now
-                session.add(rh)
+                original_resource = dict(r)
 
                 # Update the resource
                 if ended_at is not _marker:
@@ -321,8 +312,6 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                                     resource_type, "ended_at", ended_at)
                     r.ended_at = ended_at
 
-                r.revision_start = now
-
                 if kwargs:
                     for attribute, value in six.iteritems(kwargs):
                         if hasattr(r, attribute):
@@ -330,6 +319,16 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         else:
                             raise indexer.ResourceAttributeError(
                                 r.type, attribute)
+
+                if original_resource != dict(r):
+                    # Build history
+                    rh = resource_history_cls()
+                    for col in sqlalchemy.inspect(resource_cls).columns:
+                        setattr(rh, col.name, getattr(r, col.name))
+                    now = utils.utcnow()
+                    rh.revision_end = now
+                    session.add(rh)
+                    r.revision_start = now
 
                 if metrics is not _marker:
                     if not append_metrics:
