@@ -97,8 +97,8 @@ class MetricReporting(MetricProcessBase):
     def _run_job(self):
         try:
             report = self.store.measures_report()
-            LOG.info("Metricd reporting: %d measurements bundles across %d "
-                     "metrics wait to be processed." %
+            LOG.info("Metricd reporting: %d measurements bundles across %d"
+                     " metrics wait to be processed." %
                      (sum(report.values()), len(report)))
         except Exception:
             LOG.error("Unexpected error during pending measures reporting",
