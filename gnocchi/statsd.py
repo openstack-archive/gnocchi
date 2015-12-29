@@ -114,7 +114,7 @@ class Stats(object):
                         resource_id=self.conf.statsd.resource_id)
                 self.storage.add_measures(metric, (measure,))
             except Exception as e:
-                LOG.error("Unable to add measure %s: %s"
+                LOG.error(u"Unable to add measure %s: %s"
                           % (metric_name, e))
 
         self.reset()
@@ -133,7 +133,7 @@ class StatsdServer(object):
         try:
             messages = [m for m in data.decode().split("\n") if m]
         except Exception as e:
-            LOG.error("Unable to decode datagram: %s" % e)
+            LOG.error(u"Unable to decode datagram: %s" % e)
             return
         for message in messages:
             metric = message.split("|")
@@ -154,7 +154,7 @@ class StatsdServer(object):
                 self.stats.treat_metric(metric_name, metric_type,
                                         value, sampling)
             except Exception as e:
-                LOG.error("Unable to treat metric %s: %s" % (message, str(e)))
+                LOG.error(u"Unable to treat metric %s: %s" % (message, e))
 
 
 def start():
