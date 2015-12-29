@@ -115,7 +115,7 @@ class Stats(object):
                 self.storage.add_measures(metric, (measure,))
             except Exception as e:
                 LOG.error("Unable to add measure %s: %s"
-                          % (metric_name, e))
+                          % (metric_name, six.text_type(e)))
 
         self.reset()
 
@@ -133,7 +133,7 @@ class StatsdServer(object):
         try:
             messages = [m for m in data.decode().split("\n") if m]
         except Exception as e:
-            LOG.error("Unable to decode datagram: %s" % e)
+            LOG.error("Unable to decode datagram: %s" % six.text_type(e))
             return
         for message in messages:
             metric = message.split("|")
@@ -154,7 +154,7 @@ class StatsdServer(object):
                 self.stats.treat_metric(metric_name, metric_type,
                                         value, sampling)
             except Exception as e:
-                LOG.error("Unable to treat metric %s: %s" % (message, str(e)))
+                LOG.error("Unable to treat metric %s: %s" % (message, six.text_type(e)))
 
 
 def start():
