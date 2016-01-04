@@ -47,18 +47,13 @@ To install Gnocchi using `pip`, just type::
 
   pip install gnocchi
 
-Depending on the drivers you want to use, you need to install extra flavors
-using, for example::
-
-  pip install gnocchi[postgresql,ceph]
-
 To install Gnocchi from source, run the standard Python installation
 procedure::
 
   pip install -e .
 
-Again, sepending on the drivers you want to use, you need to install extra
-flavors using, for example::
+Depending on the drivers you want to use, you need to install extra flavors
+using, for example::
 
   pip install -e .[postgresql,ceph]
 
@@ -78,6 +73,12 @@ created by running:
 This command will create an `etc/gnocchi/gnocchi.conf` file which can be used
 as a base for the default configuration file at `/etc/gnocchi/gnocchi.conf`. If
 you're using _devstack_, this file is already generated and put in place.
+
+If you installed gnocchi using pip, you can create a sample `gnocchi.conf` file
+using the following commands::
+
+    curl -O "https://raw.githubusercontent.com/openstack/gnocchi/master/etc/gnocchi/gnocchi-config-generator.conf"
+    oslo-config-generator --config-file=gnocchi-config-generator.conf --output-file=gnocchi.conf
 
 The configuration file should be pretty explicit, but here are some of the base
 options you want to change and configure:
@@ -128,6 +129,9 @@ the indexer and storage:
 ::
 
     gnocchi-upgrade
+
+.. note:: If you installed gnocchi using pip, you might have to use the
+   deprecated command `gnocchi-dbsync` instead of `gnocchi-upgrade`.
 
 
 Running Gnocchi
