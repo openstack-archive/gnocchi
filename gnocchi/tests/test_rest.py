@@ -25,7 +25,10 @@ import uuid
 
 import keystonemiddleware.auth_token
 from keystonemiddleware import opts as ks_opts
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 from oslo_utils import timeutils
 import six
 from stevedore import extension

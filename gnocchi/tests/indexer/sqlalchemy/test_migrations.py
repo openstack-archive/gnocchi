@@ -14,7 +14,10 @@
 #    under the License.
 import abc
 
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 from oslo_db.sqlalchemy import test_migrations
 import six
 

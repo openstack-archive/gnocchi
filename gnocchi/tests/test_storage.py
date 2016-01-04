@@ -16,7 +16,10 @@
 import datetime
 import uuid
 
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 from oslotest import base
 import six.moves
 
