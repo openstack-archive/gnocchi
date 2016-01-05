@@ -94,11 +94,17 @@ class ConfigFixture(fixture.GabbiFixture):
         # to signal we are not in a gate driven functional test
         # and thus should override conf settings.
         if 'DEVSTACK_GATE_TEMPEST' not in os.environ:
-            conf.set_override('driver', 'file', 'storage')
+            conf.set_override('driver', 'file', 'storage',
+                              enforce_type=True)
+            self.conf.set_override(
+                'coordination_url',
+                os.getenv("GNOCCHI_COORDINATION_URL", "ipc://"),
+                'storage')
             conf.set_override('policy_file',
                               os.path.abspath('etc/gnocchi/policy.json'),
-                              group="oslo_policy")
-            conf.set_override('file_basepath', data_tmp_dir, 'storage')
+                              group="oslo_policy", enforce_type=True)
+            conf.set_override('file_basepath', data_tmp_dir, 'storage',
+                              enforce_type=True)
 
         # NOTE(jd) All of that is still very SQL centric but we only support
         # SQL for now so let's say it's good enough.
@@ -106,17 +112,22 @@ class ConfigFixture(fixture.GabbiFixture):
 
         url.database = url.database + str(uuid.uuid4()).replace('-', '')
         db_url = str(url)
-        conf.set_override('url', db_url, 'indexer')
+        conf.set_override('url', db_url, 'indexer',
+                          enforce_type=True)
         sqlalchemy_utils.create_database(db_url)
 
         index = indexer.get_driver(conf)
         index.connect()
         index.upgrade()
 
-        conf.set_override('pecan_debug', False, 'api')
+        PECAN_CONF['indexer'] = index
+
+        conf.set_override('pecan_debug', False, 'api',
+                          enforce_type=True)
 
         # Set pagination to a testable value
-        conf.set_override('max_limit', 7, 'api')
+        conf.set_override('max_limit', 7, 'api',
+                          enforce_type=True)
 
         self.index = index
 

@@ -321,7 +321,7 @@ class TestCase(base.BaseTestCase):
                                             default_config_files=[])
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
-                               group="oslo_policy")
+                               group="oslo_policy", enforce_type=True)
 
         self.index = indexer.get_driver(self.conf)
         self.index.connect()

@@ -110,7 +110,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                               for ext in resources.extensions}
 
     def __init__(self, conf):
-        conf.set_override("connection", conf.indexer.url, "database")
+        conf.set_override("connection", conf.indexer.url, "database",
+                          enforce_type=True)
         self.conf = conf
         self.facade = PerInstanceFacade(conf)
 
