@@ -1,0 +1,11 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Code-Review-1: liusheng <liusheng2048@gmail.com>
+Code-Review-1: zhurong <aaronzhu1121@gmail.com>
+Code-Review-1: Allen <chen.qiaomin@99cloud.net>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 05 Jan 2016 01:38:50 +0000
+Reviewed-on: https://review.openstack.org/263107
+Project: openstack/gnocchi
+Branch: refs/heads/master
