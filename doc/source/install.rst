@@ -11,11 +11,11 @@ provide all the features that are needed to provide correct infrastructure
 measurement.
 
 The *storage* is responsible for storing measures of created metrics. It
-receives timestamps and values and computes aggregations according to the
-defined archive policies.
+receives timestamps and values, and pre-computes aggregations according to
+the defined archive policies.
 
 The *indexer* is responsible for storing the index of all resources, along with
-their types and their properties. Gnocchi only knows resource types from the
+their types and properties. Gnocchi only knows about resource types from the
 OpenStack project, but also provides a *generic* type so you can create basic
 resources and handle the resource properties yourself. The indexer is also
 responsible for linking resources with metrics.
@@ -47,7 +47,7 @@ To install Gnocchi using `pip`, just type::
 
   pip install gnocchi
 
-Depending on the drivers you want to use, you need to install extra flavors
+Depending on the drivers you want to use, you need to install extra variants
 using, for example::
 
   pip install gnocchi[postgresql,ceph]
@@ -57,8 +57,8 @@ procedure::
 
   pip install -e .
 
-Again, sepending on the drivers you want to use, you need to install extra
-flavors using, for example::
+Again, depending on the drivers you want to use, you need to install extra
+variants using, for example::
 
   pip install -e .[postgresql,ceph]
 
@@ -154,8 +154,8 @@ For other WSGI setup you can refer to the `pecan deployement`_ documentation.
 .. _`pecan deployement`: http://pecan.readthedocs.org/en/latest/deployment.html#deployment
 
 
-Drivers notes
-=============
+Driver notes
+============
 
 Carbonara based drivers (file, swift, ceph)
 -------------------------------------------
@@ -171,9 +171,12 @@ In a multi-nodes deployement, the coordinator needs to be changed via
 the storage/coordination_url configuration options to one of the other
 `tooz backends`_.
 
-For example::
+For example to use Redis backend::
 
     coordination_url = redis://<sentinel host>?sentinel=<master name>
+
+or alternatively, to use the Zookeeper backend::
+
     coordination_url = zookeeper:///hosts=<zookeeper_host1>&hosts=<zookeeper_host2>
 
 .. _`tooz`: http://docs.openstack.org/developer/tooz/
@@ -190,7 +193,8 @@ Also a special empty object called `measures` has the list of measures to
 process stored in its xattr attributes.
 
 Because of the asynchronous nature of how we store measurements in Gnocchi,
-`gnocchi-metricd` need to known the list of objects that wait to be processed:
+`gnocchi-metricd` needs to know the list of objects that are waiting to be
+processed:
 
 - Listing rados objects for this is not a solution since it takes too much
   time.
@@ -200,24 +204,24 @@ Because of the asynchronous nature of how we store measurements in Gnocchi,
 Instead, the xattrs of one empty rados object are used. No lock is needed to
 add/remove a xattr.
 
-But depending of the filesystem used by ceph OSDs, this xattrs can have
-limitation in term of numbers and size if Ceph if not correctly configured.
+But depending on the filesystem used by ceph OSDs, this xattrs can have a
+limitation in terms of numbers and size if Ceph is not correctly configured.
 See `Ceph extended attributes documentation`_ for more details.
 
 Then, each Carbonara generated file is stored in *one* rados object.
 So each metric has one rados object per aggregation in the archive policy.
 
-Because of this, the OSDs filling can look less balanced comparing of the RBD.
-Some other objects will be big and some others small depending on how archive
-policies are set up.
+Because of this, the filling of OSDs can look less balanced compared to RBD.
+Some objects will be big and others small, depending on how archive policies
+are set up.
 
-We can imagine an unrealisting case like 1 point per second during one year,
-the rados object size will be ~384MB.
+We can imagine an unrealistic case such as retaining 1 point per second over
+a year, in which case the rados object size will be ~384MB.
 
-And a more realistic scenario, a 4MB rados object (like rbd uses) could
-come from:
+Whereas in a more realistic scenario, a 4MB rados object (like RBD uses) could
+result from:
 
-- 20 days with 1 point every seconds
+- 20 days with 1 point every second
 - 100 days with 1 point every 5 seconds
 
 So, in realistic scenarios, the direct relation between the archive policy and
