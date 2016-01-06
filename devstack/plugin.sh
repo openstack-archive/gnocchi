@@ -344,6 +344,9 @@ function preinstall_gnocchi {
 
 # install_gnocchi() - Collect source and prepare
 function install_gnocchi {
+    # ensure gnocchi honours correct branch
+    git -C $GNOCCHI_DIR checkout ${GITBRANCH[gnocchi]}
+
     if [ "${GNOCCHI_COORDINATOR_URL%%:*}" == "redis" ]; then
         _gnocchi_install_redis
     fi
