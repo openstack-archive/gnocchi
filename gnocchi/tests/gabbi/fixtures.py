@@ -80,11 +80,8 @@ class ConfigFixture(fixture.GabbiFixture):
             dcf = None
         else:
             dcf = []
-        default_opts = [('url',
-                         os.environ.get("GNOCCHI_TEST_INDEXER_URL", "null://"),
-                         'indexer')]
-        conf = service.prepare_service([], default_opts,
-                                       default_config_files=dcf)
+        conf = service.prepare_service([],
+                                       default_config_files=[])
 
         CONF = self.conf = conf
         self.tmp_dir = data_tmp_dir
