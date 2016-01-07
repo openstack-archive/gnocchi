@@ -95,6 +95,20 @@ class TestIndexerDriver(tests_base.TestCase):
         m2 = self.index.get_metrics([r1])
         self.assertEqual([m], m2)
 
+    def test_expunge_metric(self):
+        r1 = uuid.uuid4()
+        user = uuid.uuid4()
+        project = uuid.uuid4()
+        m = self.index.create_metric(r1, user, project, "low")
+        self.index.delete_metric(m.id)
+        self.index.expunge_metric(m.id)
+        self.assertRaises(indexer.NoSuchMetric,
+                          self.index.delete_metric,
+                          m.id)
+        self.assertRaises(indexer.NoSuchMetric,
+                          self.index.expunge_metric,
+                          m.id)
+
     def test_create_resource(self):
         r1 = uuid.uuid4()
         user = uuid.uuid4()
