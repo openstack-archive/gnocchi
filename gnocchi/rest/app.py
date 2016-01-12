@@ -59,10 +59,6 @@ class OsloJSONRenderer(object):
 
 
 PECAN_CONFIG = {
-    'app': {
-        'root': 'gnocchi.rest.RootController',
-        'modules': ['gnocchi.rest'],
-    },
 }
 
 
@@ -149,5 +145,9 @@ def build_server():
 
 def app_factory(global_config, **local_conf):
     pecan_config = global_config.get('pecan_config')
+    pecan_config['app'] = {
+        'root': local_conf.get('root'),
+        'modules': ['gnocchi.rest'],
+    }
     conf = global_config.get('conf')
     return _setup_app(pecan_config=pecan_config, conf=conf)
