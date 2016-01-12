@@ -28,6 +28,7 @@ import sqlalchemy.engine.url as sqlalchemy_url
 import sqlalchemy_utils
 
 from gnocchi import indexer
+from gnocchi import rest
 from gnocchi.rest import app
 from gnocchi import service
 from gnocchi import storage
@@ -41,10 +42,15 @@ CONF = None
 PECAN_CONF = None
 
 
+class RootController(rest.VersionsController):
+    v1 = rest.V1Controller()
+
+
 def setup_app():
     global CONF
     global PECAN_CONF
-    return app.load_app(pecan_config=PECAN_CONF, conf=CONF, appname="gnocchi")
+    return app.load_app(pecan_config=PECAN_CONF, conf=CONF,
+                        appname="gnocchi+noauth")
 
 
 class ConfigFixture(fixture.GabbiFixture):
@@ -72,7 +78,6 @@ class ConfigFixture(fixture.GabbiFixture):
         global PECAN_CONF
 
         PECAN_CONF = {}
-        PECAN_CONF.update(app.PECAN_CONFIG)
 
         data_tmp_dir = tempfile.mkdtemp(prefix='gnocchi')
 
