@@ -1068,7 +1068,7 @@ class ResourcesController(rest.RestController):
     def get_all(self):
         return dict(
             (type_name,
-             pecan.request.application_url + '/v1/resource/' + type_name)
+             pecan.request.application_url + '/resource/' + type_name)
             for type_name in self.resources_ctrl_by_type.keys())
 
     @pecan.expose()
@@ -1343,18 +1343,16 @@ class V1Controller(object):
             "version": "1.0",
             "links": [
                 {"rel": "self",
-                 "href": pecan.request.application_url + "/v1"}
+                 "href": pecan.request.application_url}
             ] + [
                 {"rel": name,
-                 "href": pecan.request.application_url + "/v1/" + name}
+                 "href": pecan.request.application_url + name}
                 for name in sorted(self.sub_controllers)
             ]
         }
 
 
-class RootController(object):
-    v1 = V1Controller()
-
+class VersionsController(object):
     @staticmethod
     @pecan.expose('json')
     def index():

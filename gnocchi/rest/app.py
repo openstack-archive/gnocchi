@@ -92,7 +92,7 @@ def load_app(conf, appname=None):
     return deploy.loadapp("config:" + cfg_path, name=appname)
 
 
-def setup_app(config=None, cfg=None):
+def setup_app(config=None, cfg=None, root=None):
     if cfg is None:
         # NOTE(jd) That sucks but pecan forces us to use kwargs :(
         raise RuntimeError("Config is actually mandatory")
@@ -104,6 +104,8 @@ def setup_app(config=None, cfg=None):
     if not i:
         i = indexer.get_driver(cfg)
         i.connect()
+    if root:
+        config['app']['root'] = root
 
     # NOTE(sileht): pecan debug won't work in multi-process environment
     pecan_debug = cfg.api.pecan_debug
@@ -151,4 +153,4 @@ def build_server():
 
 def app_factory(global_config, **local_conf):
     cfg = service.prepare_service()
-    return setup_app(None, cfg=cfg)
+    return setup_app(cfg=cfg, root=local_conf.get('root'))

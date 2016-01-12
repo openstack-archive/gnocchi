@@ -269,14 +269,19 @@ function configure_gnocchi {
 
     if is_service_enabled key; then
         if is_service_enabled gnocchi-grafana; then
-            iniset $GNOCCHI_PASTE_CONF pipeline:main pipeline "cors keystone_authtoken gnocchi"
+            iniset $GNOCCHI_PASTE_CONF composite:main / cors+gnocchiversions
+            iniset $GNOCCHI_PASTE_CONF composite:main /v1 cors+gnocchiv1+auth
             iniset $KEYSTONE_CONF cors allowed_origin ${GRAFANA_URL}
             iniset $GNOCCHI_CONF cors allowed_origin ${GRAFANA_URL}
             iniset $GNOCCHI_CONF cors allow_methods GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH
             iniset $GNOCCHI_CONF cors allow_headers Content-Type,Cache-Control,Content-Language,Expires,Last-Modified,Pragma,X-Auth-Token,X-Subject-Token
+        else:
+            iniset $GNOCCHI_PASTE_CONF composite:main / gnocchiversions
+            iniset $GNOCCHI_PASTE_CONF composite:main /v1 gnocchiv1+auth
         fi
     else
-        iniset $GNOCCHI_PASTE_CONF pipeline:main pipeline gnocchi
+        iniset $GNOCCHI_PASTE_CONF composite:main / gnocchiversions
+        inicomment $GNOCCHI_PASTE_CONF composite:main /v1
     fi
 
     # Configure the indexer database
