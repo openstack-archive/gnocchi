@@ -162,7 +162,8 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
 
     @classmethod
     def app_factory(cls, global_config, **local_conf):
-        return app.setup_app(cls.pecan_config, cls.conf)
+        return app.setup_app(cls.pecan_config, cls.conf,
+                             root=local_conf.get('root'))
 
     @classmethod
     def keystone_authtoken_filter_factory(cls, global_conf, **local_conf):
