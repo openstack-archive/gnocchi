@@ -26,4 +26,4 @@ from gnocchi.rest import app
 conf = service.prepare_service()
 # The pecan debugger cannot be used in wsgi mode
 conf.set_default('pecan_debug', False, group='api')
-application = app.load_app(app.PECAN_CONFIG, conf)
+application = app.load_app({}, conf)

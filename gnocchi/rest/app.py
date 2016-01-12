@@ -58,14 +58,6 @@ class OsloJSONRenderer(object):
         return json.dumps(namespace)
 
 
-PECAN_CONFIG = {
-    'app': {
-        'root': 'gnocchi.rest.RootController',
-        'modules': ['gnocchi.rest'],
-    },
-}
-
-
 class NotImplementedMiddleware(object):
     def __init__(self, app):
         self.app = app
@@ -111,7 +103,7 @@ def _setup_app(pecan_config, conf):
                     'the value is overrided with False')
 
     app = pecan.make_app(
-        pecan_config['app']['root'],
+        pecan_config['app'],
         debug=pecan_debug,
         hooks=(GnocchiHook(s, i, conf),),
         guess_content_type_from_ext=False,
@@ -136,7 +128,7 @@ class WerkzeugApp(object):
 
     def __call__(self, environ, start_response):
         if self.app is None:
-            self.app = load_app(PECAN_CONFIG, self.conf)
+            self.app = load_app({}, self.conf)
         return self.app(environ, start_response)
 
 
@@ -149,5 +141,6 @@ def build_server():
 
 def app_factory(global_config, **local_conf):
     pecan_config = global_config.get('pecan_config')
+    pecan_config['app'] = local_conf.get('root')
     conf = global_config.get('conf')
     return _setup_app(pecan_config=pecan_config, conf=conf)
