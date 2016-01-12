@@ -106,7 +106,6 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
                                group="api")
 
         pecan_config = {}
-        pecan_config.update(app.PECAN_CONFIG)
         pecan_config['indexer'] = self.index
         pecan_config['storage'] = self.storage
         pecan_config['not_implemented_middleware'] = False
@@ -143,8 +142,8 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
         # See: https://bugs.launchpad.net/keystonemiddleware/+bug/1466499
         self.app = TestingApp(app.load_app(pecan_config=pecan_config,
                                            conf=self.conf,
-                                           appname="main"
-                                           if self.auth else "gnocchi"),
+                                           appname="gnocchi+auth"
+                                           if self.auth else "gnocchi+noauth"),
                               storage=self.storage,
                               indexer=self.index,
                               auth=self.auth,
