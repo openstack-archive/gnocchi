@@ -135,15 +135,13 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 raise indexer.ArchivePolicyInUse(name)
             raise
 
-    def get_metrics(self, uuids, active_only=True, with_resource=False):
+    def get_metrics(self, uuids, active_only=True):
         if not uuids:
             return []
         session = self.engine_facade.get_session()
         query = session.query(Metric).filter(Metric.id.in_(uuids))
         if active_only:
             query = query.filter(Metric.status == 'active')
-        if with_resource:
-            query = query.options(sqlalchemy.orm.joinedload('resource'))
 
         metrics = list(query.all())
         session.expunge_all()
