@@ -44,7 +44,7 @@ PECAN_CONF = None
 def setup_app():
     global CONF
     global PECAN_CONF
-    return app.setup_app(config=PECAN_CONF, cfg=CONF)
+    return app.load_app(pecan_config=PECAN_CONF, conf=CONF, appname="gnocchi")
 
 
 class ConfigFixture(fixture.GabbiFixture):
@@ -82,6 +82,10 @@ class ConfigFixture(fixture.GabbiFixture):
             dcf = []
         conf = service.prepare_service([],
                                        default_config_files=dcf)
+
+        conf.set_override('paste_config',
+                          os.path.abspath('etc/gnocchi/api-paste.ini'),
+                          'api')
 
         CONF = self.conf = conf
         self.tmp_dir = data_tmp_dir
