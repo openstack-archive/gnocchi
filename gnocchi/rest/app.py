@@ -79,7 +79,7 @@ class NotImplementedMiddleware(object):
                 "not implement this feature 😞")
 
 
-def load_app(conf, appname=None):
+def load_app(pecan_config, conf, appname=None):
     # Build the WSGI app
     cfg_path = conf.api.paste_config
     if not os.path.isabs(cfg_path):
@@ -89,38 +89,36 @@ def load_app(conf, appname=None):
         raise cfg.ConfigFilesNotFoundError([conf.api.paste_config])
 
     LOG.info("WSGI config used: %s" % cfg_path)
-    return deploy.loadapp("config:" + cfg_path, name=appname)
+    return deploy.loadapp("config:" + cfg_path, name=appname,
+                          global_conf=dict(conf=conf,
+                                           pecan_config=pecan_config))
 
 
-def setup_app(config=None, cfg=None):
-    if cfg is None:
-        # NOTE(jd) That sucks but pecan forces us to use kwargs :(
-        raise RuntimeError("Config is actually mandatory")
-    config = config or PECAN_CONFIG
-    s = config.get('storage')
+def _setup_app(pecan_config=None, conf=None):
+    s = pecan_config.get('storage')
     if not s:
-        s = storage.get_driver(cfg)
-    i = config.get('indexer')
+        s = storage.get_driver(conf)
+    i = pecan_config.get('indexer')
     if not i:
-        i = indexer.get_driver(cfg)
+        i = indexer.get_driver(conf)
         i.connect()
 
     # NOTE(sileht): pecan debug won't work in multi-process environment
-    pecan_debug = cfg.api.pecan_debug
-    if cfg.api.workers != 1 and pecan_debug:
+    pecan_debug = conf.api.pecan_debug
+    if conf.api.workers != 1 and pecan_debug:
         pecan_debug = False
         LOG.warning('pecan_debug cannot be enabled, if workers is > 1, '
                     'the value is overrided with False')
 
     app = pecan.make_app(
-        config['app']['root'],
+        pecan_config['app']['root'],
         debug=pecan_debug,
-        hooks=(GnocchiHook(s, i, cfg),),
+        hooks=(GnocchiHook(s, i, conf),),
         guess_content_type_from_ext=False,
         custom_renderers={'json': OsloJSONRenderer},
     )
 
-    if config.get('not_implemented_middleware', True):
+    if pecan_config.get('not_implemented_middleware', True):
         app = webob.exc.HTTPExceptionMiddleware(NotImplementedMiddleware(app))
 
     return app
@@ -138,7 +136,7 @@ class WerkzeugApp(object):
 
     def __call__(self, environ, start_response):
         if self.app is None:
-            self.app = load_app(self.conf)
+            self.app = load_app(PECAN_CONFIG, self.conf)
         return self.app(environ, start_response)
 
 
@@ -150,5 +148,6 @@ def build_server():
 
 
 def app_factory(global_config, **local_conf):
-    cfg = service.prepare_service()
-    return setup_app(None, cfg=cfg)
+    pecan_config = global_config.get('pecan_config')
+    conf = global_config.get('conf')
+    return _setup_app(pecan_config=pecan_config, conf=conf)
