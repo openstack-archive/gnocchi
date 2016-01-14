@@ -16,6 +16,7 @@
 import collections
 import logging
 import multiprocessing
+import random
 import uuid
 
 from concurrent import futures
@@ -167,6 +168,10 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     @staticmethod
     def _list_metric_with_measures_to_process(metric_id):
         raise NotImplementedError
+
+    @staticmethod
+    def _measures_to_process_batch_size():
+        return random.randint(100, 200)
 
     @staticmethod
     def _pending_measures_to_process_count(metric_id):

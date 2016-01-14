@@ -16,6 +16,7 @@
 
 import contextlib
 import datetime
+import itertools
 import uuid
 
 from oslo_config import cfg
@@ -73,13 +74,15 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             ioctx.write_full(name, data)
             ioctx.set_xattr(self.MEASURE_PREFIX, name, "")
 
-    @classmethod
-    def _list_object_names_to_process(cls, ioctx, prefix=None):
+    def _list_object_names_to_process(self, ioctx, prefix=None, batch=False):
         try:
-            xattrs_iterator = ioctx.get_xattrs(cls.MEASURE_PREFIX)
+            xattrs = ioctx.get_xattrs(self.MEASURE_PREFIX)
         except rados.ObjectNotFound:
             return []
-        return [name for name, __ in xattrs_iterator
+        if batch:
+            batch_size = self._measures_to_process_batch_size()
+            xattrs = itertools.islice(xattrs, batch_size)
+        return [name for name, __ in xattrs
                 if prefix is None or name.startswith(prefix)]
 
     def _pending_measures_to_process_count(self, metric_id):
@@ -91,7 +94,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
     def _list_metric_with_measures_to_process(self):
         with self._get_ioctx() as ioctx:
             return [name.split("_")[1] for name in
-                    self._list_object_names_to_process(ioctx)]
+                    self._list_object_names_to_process(ioctx, batch=True)]
 
     def _delete_unprocessed_measures_for_metric_id(self, metric_id):
         with self._get_ioctx() as ctx:
