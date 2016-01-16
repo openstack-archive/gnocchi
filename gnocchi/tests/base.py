@@ -341,14 +341,16 @@ class TestCase(base.BaseTestCase):
                                             default_config_files=[])
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
-                               group="oslo_policy")
+                               group="oslo_policy",
+                               enforce_type=True)
 
         self.index = indexer.get_driver(self.conf)
         self.index.connect()
 
         self.conf.set_override('coordination_url',
                                os.getenv("GNOCCHI_COORDINATION_URL", "ipc://"),
-                               'storage')
+                               'storage',
+                               enforce_type=True)
 
         # NOTE(jd) So, some driver, at least SQLAlchemy, can't create all
         # their tables in a single transaction even with the
@@ -392,7 +394,8 @@ class TestCase(base.BaseTestCase):
         self.conf.set_override(
             'driver',
             os.getenv("GNOCCHI_TEST_STORAGE_DRIVER", "null"),
-            'storage')
+            'storage',
+            enforce_type=True)
 
         if self.conf.storage.driver == 'file':
             tempdir = self.useFixture(fixtures.TempDir())
@@ -401,17 +404,19 @@ class TestCase(base.BaseTestCase):
                                    'storage')
         elif self.conf.storage.driver == 'influxdb':
             self.conf.set_override('influxdb_block_until_data_ingested', True,
-                                   'storage')
-            self.conf.set_override('influxdb_password', 'root', 'storage')
+                                   'storage',enforce_type=True)
+            self.conf.set_override('influxdb_password', 'root', 'storage',
+                                   enforce_type=True)
             self.conf.set_override('influxdb_port',
                                    os.getenv("GNOCCHI_TEST_INFLUXDB_PORT",
-                                             51234), 'storage')
+                                             51234), 'storage',
+                                   enforce_type=True)
             # NOTE(ityaptin) Creating unique database for every test may cause
             # tests failing by timeout, but in may be useful in some cases
             if os.getenv("GNOCCHI_TEST_INFLUXDB_UNIQUE_DATABASES"):
                 self.conf.set_override("influxdb_database",
                                        "gnocchi_%s" % uuid.uuid4().hex,
-                                       'storage')
+                                       'storage',enforce_type=True)
 
         self.storage = storage.get_driver(self.conf)
         # NOTE(jd) Do not upgrade the storage. We don't really need the storage

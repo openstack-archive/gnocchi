@@ -36,7 +36,8 @@ class TestStorageDriver(tests_base.TestCase):
                                      self.archive_policies['low'])
 
     def test_get_driver(self):
-        self.conf.set_override('driver', 'null', 'storage')
+        self.conf.set_override('driver', 'null', 'storage',
+                               enforce_type=True)
         driver = storage.get_driver(self.conf)
         self.assertIsInstance(driver, null.NullStorage)
 
