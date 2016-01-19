@@ -41,6 +41,14 @@ class ResourceType(object):
     def __eq__(self, other):
         return self.name == other.name
 
+    @staticmethod
+    def resource_schema(self):
+        raise exceptions.NotImplementedError
+
+    @staticmethod
+    def resource_columns(self):
+        raise exceptions.NotImplementedError
+
 
 class Resource(object):
     def get_metric(self, metric_name):
@@ -384,4 +392,8 @@ class IndexerDriver(object):
                             limit=None,
                             marker=None,
                             sorts=None):
+        raise exceptions.NotImplementedError
+
+    @staticmethod
+    def get_resource_attributes_schemas():
         raise exceptions.NotImplementedError

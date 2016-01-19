@@ -40,9 +40,26 @@ tests:
           content-type: application/json
       data:
           name: my_custom_resource
+          attributes:
+              name: 
+                  type: string
+                  required: true
+                  length: 5
+              foobar:
+                  type: string
+                  required: false
       status: 201
       response_json_paths:
           $.name: my_custom_resource
+          $.attributes:
+              name: 
+                  type: string
+                  required: True
+                  length: 5
+              foobar:
+                  type: string
+                  required: False
+                  length: 255
       response_headers:
           location: $SCHEME://$NETLOC/v1/resource_type/my_custom_resource
 
@@ -69,6 +86,19 @@ tests:
       method: DELETE
       status: 403
 
+    - name: post invalid resource
+      url: /v1/resource/my_custom_resource
+      method: post
+      request_headers:
+          x-user-id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
+          x-project-id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          name: toolong!!!
+          foobar: what
+      status: 400
+
     - name: post generic resource
       url: /v1/resource/my_custom_resource
       method: post
@@ -78,7 +108,22 @@ tests:
           content-type: application/json
       data:
           id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          name: foo
+          foobar: what
       status: 201
+      response_json_paths:
+          $.id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $.name: foo
+          $.foobar: what
+
+    - name: get resource
+      url: /v1/resource/my_custom_resource/d11edfca-4393-4fda-b94d-b05a3a1b3747
+      request_headers:
+          content-type: application/json
+      response_json_paths:
+          $.id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $.name: foo
+          $.foobar: what
 
     - name: delete in use resource_type
       url: /v1/resource_type/my_custom_resource
