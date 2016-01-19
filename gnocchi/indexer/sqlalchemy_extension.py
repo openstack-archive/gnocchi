@@ -14,8 +14,10 @@
 
 from __future__ import absolute_import
 
+import six
 import sqlalchemy
 import sqlalchemy_utils
+import voluptuous
 
 
 class Image(object):
@@ -48,3 +50,26 @@ class InstanceNetworkInterface(object):
 
 class Volume(object):
     display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=True)
+
+
+class StringSchema(object):
+    schema = {
+        voluptuous.Required('type'): 'string',
+        voluptuous.Required('required', default=True): bool,
+        voluptuous.Required('length', default=255):
+            voluptuous.All(int, voluptuous.Range(min=1, max=255))
+    }
+
+    @staticmethod
+    def resource_schema(name, conf):
+        schema = voluptuous.All(six.text_type,
+                                voluptuous.Length(max=conf['length']))
+        if conf['required']:
+            return {voluptuous.Required(name): schema}
+        else:
+            return {voluptuous.Optional(name): schema}
+
+    @staticmethod
+    def column(conf):
+        return sqlalchemy.Column(sqlalchemy.String(conf['length']),
+                                 nullable=not conf['required'])
