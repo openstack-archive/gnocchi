@@ -29,6 +29,7 @@ import sqlalchemy
 from sqlalchemy.ext import declarative
 from sqlalchemy import types
 import sqlalchemy_utils
+from stevedore import extension
 
 from gnocchi import archive_policy
 from gnocchi import indexer
@@ -214,6 +215,25 @@ class ResourceType(Base, GnocchiBase, indexer.ResourceType):
     name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True,
                              nullable=False)
     tablename = sqlalchemy.Column(sqlalchemy.String(18), nullable=False)
+
+    # TODO(sileht): Perhaps we can store it more efficiently
+    attributes = sqlalchemy.Column(sqlalchemy_utils.JSONType())
+
+    RESOURCE_SCHEMAS = extension.ExtensionManager('gnocchi.indexer.schemas')
+
+    def resource_schema(self):
+        schema = {}
+        for name, attr in self.attributes.items():
+            ext = self.RESOURCE_SCHEMAS[attr['type']].plugin
+            schema.update(ext.resource_schema(name, attr))
+        return schema
+
+    def resource_columns(self):
+        cols = {}
+        for name, attr in self.attributes.items():
+            ext = self.RESOURCE_SCHEMAS[attr['type']].plugin
+            cols[name] = ext.column(attr)
+        return cols
 
     def jsonify(self):
         d = dict(self)
