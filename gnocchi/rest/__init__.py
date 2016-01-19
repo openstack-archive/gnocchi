@@ -804,6 +804,67 @@ def etag_set_headers(obj):
     pecan.response.last_modified = obj.lastmodified
 
 
+class ResourceTypeController(rest.RestController):
+    def __init__(self, name):
+        self._name = name
+
+    @pecan.expose('json')
+    def get(self):
+        try:
+            resource_type = pecan.request.indexer.get_resource_type(self._name)
+        except indexer.NoSuchResourceType as e:
+            abort(404, e)
+        enforce("get resource type", resource_type)
+        return resource_type
+
+    @pecan.expose()
+    def delete(self):
+        try:
+            resource_type = pecan.request.indexer.get_resource_type(self._name)
+        except indexer.NoSuchResourceType as e:
+            abort(404, e)
+        enforce("delete resource type", resource_type)
+        try:
+            pecan.request.indexer.delete_resource_type(self._name)
+        except (indexer.NoSuchResourceType,
+                indexer.ResourceTypeInUse) as e:
+            abort(400, e)
+
+
+def ResourceTypeSchema(definition):
+    # FIXME(sileht): Add resource type attributes from the indexer
+    return voluptuous.Schema({
+        "name": six.text_type,
+    })(definition)
+
+
+class ResourceTypesController(rest.RestController):
+
+    @pecan.expose()
+    def _lookup(self, name, *remainder):
+        return ResourceTypeController(name), remainder
+
+    @pecan.expose('json')
+    def post(self):
+        body = deserialize_and_validate(ResourceTypeSchema)
+        enforce("create resource type", body)
+        try:
+            resource_type = pecan.request.indexer.create_resource_type(**body)
+        except indexer.ResourceTypeAlreadyExists as e:
+            abort(409, e)
+        set_resp_location_hdr("/resource_type/" + resource_type.name)
+        pecan.response.status = 201
+        return resource_type
+
+    @pecan.expose('json')
+    def get_all(self, **kwargs):
+        enforce("list resource type", {})
+        try:
+            return pecan.request.indexer.list_resource_types()
+        except indexer.IndexerException as e:
+            abort(400, e)
+
+
 def ResourceSchema(schema):
     base_schema = {
         voluptuous.Optional('started_at'): Timestamp,
@@ -934,7 +995,12 @@ RESOURCE_SCHEMA_MANAGER = extension.ExtensionManager(
 
 
 def schema_for(resource_type):
-    return RESOURCE_SCHEMA_MANAGER[resource_type].plugin
+    if resource_type in RESOURCE_SCHEMA_MANAGER:
+        # TODO(sileht): Remove this legacy resource schema loading
+        return RESOURCE_SCHEMA_MANAGER[resource_type].plugin
+    else:
+        # TODO(sileht): Load schema from indexer
+        return GenericSchema
 
 
 def ResourceID(value):
@@ -1012,16 +1078,17 @@ class ResourcesByTypeController(rest.RestController):
     @pecan.expose('json')
     def get_all(self):
         return dict(
-            (ext.name,
-             pecan.request.application_url + '/resource/' + ext.name)
-            for ext in RESOURCE_SCHEMA_MANAGER)
+            (rt.name,
+             pecan.request.application_url + '/resource/' + rt.name)
+            for rt in pecan.request.indexer.list_resource_types())
 
     @pecan.expose()
     def _lookup(self, resource_type, *remainder):
-        if resource_type in RESOURCE_SCHEMA_MANAGER:
-            return ResourcesController(resource_type), remainder
-        else:
-            abort(404, indexer.NoSuchResourceType(resource_type))
+        try:
+            pecan.request.indexer.get_resource_type(resource_type)
+        except indexer.NoSuchResourceType as e:
+            abort(404, e)
+        return ResourcesController(resource_type), remainder
 
 
 def _ResourceSearchSchema(v):
@@ -1097,10 +1164,11 @@ class SearchResourceTypeController(rest.RestController):
 class SearchResourceController(rest.RestController):
     @pecan.expose()
     def _lookup(self, resource_type, *remainder):
-        if resource_type in RESOURCE_SCHEMA_MANAGER:
-            return SearchResourceTypeController(resource_type), remainder
-        else:
-            abort(404, indexer.NoSuchResourceType(resource_type))
+        try:
+            pecan.request.indexer.get_resource_type(resource_type)
+        except indexer.NoSuchResourceType as e:
+            abort(404, e)
+        return SearchResourceTypeController(resource_type), remainder
 
 
 def _MetricSearchSchema(v):
@@ -1398,6 +1466,7 @@ class V1Controller(object):
             "metric": MetricsController(),
             "batch": BatchController(),
             "resource": ResourcesByTypeController(),
+            "resource_type": ResourceTypesController(),
             "aggregation": AggregationController(),
             "capabilities": CapabilityController(),
             "status": StatusController(),
