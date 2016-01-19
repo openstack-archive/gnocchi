@@ -40,6 +40,7 @@ ArchivePolicy = base.ArchivePolicy
 ArchivePolicyRule = base.ArchivePolicyRule
 Resource = base.Resource
 ResourceHistory = base.ResourceHistory
+ResourceType = base.ResourceType
 
 _marker = indexer._marker
 
@@ -105,6 +106,14 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 command.stamp(cfg, "head")
             else:
                 command.upgrade(cfg, "head")
+
+        session = self.engine_facade.get_session()
+        for resource_type in self._RESOURCE_CLASS_MAPPER:
+            session.add(ResourceType(name=resource_type))
+            try:
+                session.flush()
+            except exception.DBDuplicateEntry:
+                pass
 
     def _resource_type_to_class(self, resource_type, purpose="resource"):
         if resource_type not in self._RESOURCE_CLASS_MAPPER:
