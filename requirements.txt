@@ -12,7 +12,7 @@ futures
 requests
 six
 stevedore
-voluptuous
+voluptuous>=0.8.6
 werkzeug
 trollius
 retrying
