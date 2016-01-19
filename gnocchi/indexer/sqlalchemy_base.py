@@ -32,6 +32,7 @@ import sqlalchemy_utils
 
 from gnocchi import archive_policy
 from gnocchi import indexer
+from gnocchi import resource_type
 from gnocchi import storage
 from gnocchi import utils
 
@@ -202,7 +203,22 @@ class Metric(Base, GnocchiBase, storage.Metric):
     __hash__ = storage.Metric.__hash__
 
 
-class ResourceType(Base, GnocchiBase, indexer.ResourceType):
+RESOURCE_TYPE_SCHEMA_MANAGER = resource_type.ResourceTypeSchemaManager(
+    "gnocchi.indexer.sqlalchemy.resource_type_attribute")
+
+
+class ResourceTypeAttributes(sqlalchemy_utils.JSONType):
+    def process_bind_param(self, attributes, dialect):
+        return super(ResourceTypeAttributes, self).process_bind_param(
+            attributes.jsonify(), dialect)
+
+    def process_result_value(self, value, dialect):
+        attributes = super(ResourceTypeAttributes, self).process_result_value(
+            value, dialect)
+        return RESOURCE_TYPE_SCHEMA_MANAGER.attributes_from_dict(attributes)
+
+
+class ResourceType(Base, GnocchiBase, resource_type.ResourceType):
     __tablename__ = 'resource_type'
     __table_args__ = (
         sqlalchemy.Index('ix_resource_type_name', 'name'),
@@ -214,11 +230,14 @@ class ResourceType(Base, GnocchiBase, indexer.ResourceType):
     name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True,
                              nullable=False)
     tablename = sqlalchemy.Column(sqlalchemy.String(18), nullable=False)
+    attributes = sqlalchemy.Column(ResourceTypeAttributes)
 
-    def jsonify(self):
-        d = dict(self)
-        del d['tablename']
-        return d
+    def to_baseclass(self):
+        cols = {}
+        for attr in self.attributes:
+            cols[attr.name] = sqlalchemy.Column(attr.satype,
+                                                nullable=not attr.required)
+        return type(str("%s_base" % self.tablename), (object, ), cols)
 
 
 class ResourceJsonifier(indexer.Resource):
