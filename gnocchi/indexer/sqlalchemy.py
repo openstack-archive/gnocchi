@@ -121,7 +121,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 pass
         session.expunge_all()
 
-    def create_resource_type(self, name):
+    def create_resource_type(self, name, attributes):
         # NOTE(sileht): mysql have a stupid and small length limitation on the
         # foreign key and index name, so we can't use the resource type name as
         # tablename, the limit is 64. The longest name we have is
@@ -129,7 +129,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         # so 64 - 46 = 18
         tablename = "rt_%s" % uuid.uuid4().hex[:15]
         resource_type = ResourceType(name=name,
-                                     tablename=tablename)
+                                     tablename=tablename,
+                                     attributes=attributes)
 
         session = self.engine_facade.get_session()
         session.add(resource_type)
@@ -157,6 +158,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         rt = session.query(ResourceType).get(name)
         session.expunge_all()
         return rt
+
+    @staticmethod
+    def get_resource_attributes_schemas():
+        return [ext.plugin.schema() for ext in ResourceType.RESOURCE_SCHEMAS]
 
     def list_resource_types(self):
         session = self.engine_facade.get_session()
@@ -219,8 +224,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
     def _build_class_mappers(self, resource_type):
         name = resource_type.name
-        # TODO(sileht): Add columns
-        klass = type(str("%sMapperClass" % name.capitalize()), (object, ), {})
+        klass = type(str("%s_base" % resource_type.tablename),
+                     (object, ), resource_type.resource_columns())
         resource_ext = type(
             str(name),
             (klass, base.ResourceExtMixin, Resource),
