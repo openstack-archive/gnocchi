@@ -202,7 +202,7 @@ class Metric(Base, GnocchiBase, storage.Metric):
     __hash__ = storage.Metric.__hash__
 
 
-class ResourceType(Base, GnocchiBase):
+class ResourceType(Base, GnocchiBase, indexer.ResourceType):
     __tablename__ = 'resource_type'
     __table_args__ = (
         sqlalchemy.Index('ix_resource_type_name', 'name'),

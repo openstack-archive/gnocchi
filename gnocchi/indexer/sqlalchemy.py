@@ -17,6 +17,7 @@ from __future__ import absolute_import
 import itertools
 import operator
 import os.path
+import threading
 import uuid
 
 import oslo_db.api
@@ -45,9 +46,9 @@ ResourceType = base.ResourceType
 _marker = indexer._marker
 
 
-def get_resource_mappers(ext):
+def get_resource_mappers_from_ext(ext):
     if ext.name == "generic":
-        resource_ext = ext.plugin
+        resource_ext = base.Resource
         resource_history_ext = ResourceHistory
     else:
         tablename = getattr(ext.plugin, '__tablename__', ext.name)
@@ -67,8 +68,9 @@ def get_resource_mappers(ext):
 class SQLAlchemyIndexer(indexer.IndexerDriver):
     resources = extension.ExtensionManager('gnocchi.indexer.resources')
 
-    _RESOURCE_CLASS_MAPPER = {ext.name: get_resource_mappers(ext)
+    _RESOURCE_CLASS_MAPPER = {ext.name: get_resource_mappers_from_ext(ext)
                               for ext in resources.extensions}
+    _RESOURCE_CLASS_MAPPER_LOCK = threading.Lock()
 
     def __init__(self, conf):
         conf.set_override("connection", conf.indexer.url, "database")
@@ -114,12 +116,99 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 session.flush()
             except exception.DBDuplicateEntry:
                 pass
-            session.expunge_all()
+        session.expunge_all()
 
-    def _resource_type_to_class(self, resource_type, purpose="resource"):
-        if resource_type not in self._RESOURCE_CLASS_MAPPER:
-            raise indexer.UnknownResourceType(resource_type)
-        return self._RESOURCE_CLASS_MAPPER[resource_type][purpose]
+    def create_resource_type(self, name):
+        resource_type = ResourceType(name=name)
+        mappers = self._build_class_mappers(resource_type)
+
+        session = self.engine_facade.get_session()
+        session.add(resource_type)
+        try:
+            session.flush()
+        except exception.DBDuplicateEntry:
+            raise indexer.ResourceTypeAlreadyExists(name)
+        session.expunge_all()
+
+        with self._RESOURCE_CLASS_MAPPER_LOCK:
+            tables = [Base.metadata.tables[klass.__tablename__]
+                      for klass in mappers.values()]
+
+            # FIXME(sileht): does this can fail ? perhaps we need
+            # to cleanup the resource_type in that case
+            engine = self.engine_facade.get_engine()
+            Base.metadata.create_all(engine, tables=tables)
+            self._RESOURCE_CLASS_MAPPER[name] = mappers
+
+        return resource_type
+
+    def get_resource_type(self, name):
+        session = self.engine_facade.get_session()
+        rt = session.query(ResourceType).get(name)
+        session.expunge_all()
+        return rt
+
+    def list_resource_types(self):
+        session = self.engine_facade.get_session()
+        resource_types = list(session.query(ResourceType).all())
+        session.expunge_all()
+        return resource_types
+
+    def delete_resource_type(self, name):
+        session = self.engine_facade.get_session()
+        try:
+            if session.query(ResourceType).filter(
+                    ResourceType.name == name).delete() == 0:
+                raise indexer.NoSuchResourceType(name)
+        except exception.DBReferenceError as e:
+            if (e.constraint in [
+                    'fk_resource_type_resource_type_name',
+                    'fk_resource_history_type_resource_type_name']):
+                raise indexer.ResourceTypeInUse(name)
+            raise
+
+        with self._RESOURCE_CLASS_MAPPER_LOCK:
+            # FIXME(sileht): does this can fail ?
+            engine = self.engine_facade.get_engine()
+            for klass in [self._resource_type_to_class(name),
+                          self._resource_type_to_class(name, 'history')]:
+                Base.metadata.tables[klass.__tablename__].drop(engine)
+
+            try:
+                del self._RESOURCE_CLASS_MAPPER[name]
+            except KeyError:
+                pass
+
+    def _resource_type_to_class(self, name, purpose="resource"):
+        # NOTE(sileht): Most of the times we can bypass the lock so do it
+        if name not in self._RESOURCE_CLASS_MAPPER:
+            with self._RESOURCE_CLASS_MAPPER_LOCK:
+                if name not in self._RESOURCE_CLASS_MAPPER:
+                    resource_type = self.get_resource_type(name)
+                    if resource_type:
+                        mappers = self._build_class_mappers(resource_type)
+                        self._RESOURCE_CLASS_MAPPER[name] = mappers
+                    else:
+                        raise indexer.UnknownResourceType(name)
+        return self._RESOURCE_CLASS_MAPPER[name][purpose]
+
+    def _build_class_mappers(self, resource_type):
+        name = resource_type.name
+        # FIXME(sileht): allow to configure the table name
+        # mysql have (stupid) restriction on index/foreignkey name length
+        tablename = "rt_%s" % resource_type.name
+        # TODO(sileht): Add columns
+        klass = type(str("%sMapperClass" % name.capitalize()), (object, ), {})
+        resource_ext = type(str(name),
+                            (klass, base.ResourceExtMixin, Resource),
+                            {"__tablename__": tablename})
+        resource_history_ext = type(str("%s_history" % name),
+                                    (klass, base.ResourceHistoryExtMixin,
+                                     ResourceHistory),
+                                    {"__tablename__": (
+                                        "%s_history" % tablename)})
+        return {'resource': resource_ext,
+                'history': resource_history_ext}
 
     def list_archive_policies(self):
         session = self.engine_facade.get_session()
