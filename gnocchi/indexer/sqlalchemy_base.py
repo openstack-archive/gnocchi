@@ -202,15 +202,18 @@ class Metric(Base, GnocchiBase, storage.Metric):
     __hash__ = storage.Metric.__hash__
 
 
-class ResourceType(Base, GnocchiBase):
+class ResourceType(Base, GnocchiBase, indexer.ResourceType):
     __tablename__ = 'resource_type'
     __table_args__ = (
         sqlalchemy.Index('ix_resource_type_name', 'name'),
+        sqlalchemy.UniqueConstraint("tablename",
+                                    name="uniq_resource_type@tablename"),
         COMMON_TABLES_ARGS,
     )
 
     name = sqlalchemy.Column(sqlalchemy.String(255), primary_key=True,
                              nullable=False)
+    tablename = sqlalchemy.Column(sqlalchemy.String(18), nullable=False)
 
 
 class ResourceJsonifier(indexer.Resource):
