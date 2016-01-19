@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-#
+
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -16,6 +16,8 @@ from __future__ import absolute_import
 
 import sqlalchemy
 import sqlalchemy_utils
+
+from gnocchi import resource_type
 
 
 class Image(object):
@@ -48,3 +50,9 @@ class InstanceNetworkInterface(object):
 
 class Volume(object):
     display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=True)
+
+
+class StringSchema(resource_type.StringSchema):
+    @property
+    def satype(self):
+        return sqlalchemy.String(self.length)
