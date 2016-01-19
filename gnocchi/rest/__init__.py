@@ -453,6 +453,7 @@ class MetricController(rest.RestController):
 
     @pecan.expose('json')
     def get_all(self):
+        user, project = get_user_and_project()
         self.enforce_metric("get metric")
         return self.metric
 
@@ -536,7 +537,8 @@ class MetricsController(rest.RestController):
             metric_id = uuid.UUID(id)
         except ValueError:
             abort(404, indexer.NoSuchMetric(id))
-        metrics = pecan.request.indexer.get_metrics([metric_id])
+        metrics = pecan.request.indexer.get_metrics(
+            [metric_id], with_resource=True)
         if not metrics:
             abort(404, indexer.NoSuchMetric(id))
         return MetricController(metrics[0]), remainder
