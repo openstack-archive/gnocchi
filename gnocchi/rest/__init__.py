@@ -787,9 +787,12 @@ class ResourceTypesController(rest.RestController):
 
     @staticmethod
     def ResourceTypeSchema(definition):
-        # FIXME(sileht): Add resource type attributes from the indexer
+        schemas = pecan.request.indexer.get_resource_attributes_schemas()
         return voluptuous.Schema({
             "name": six.text_type,
+            voluptuous.Required("attributes", default={}): {
+                six.text_type: voluptuous.Any(*tuple(schemas))
+            }
         })(definition)
 
     @pecan.expose()
@@ -952,8 +955,8 @@ def schema_for(resource_type):
         # TODO(sileht): Remove this legacy resource schema loading
         return RESOURCE_SCHEMA_MANAGER[resource_type].plugin
     else:
-        # TODO(sileht): Load schema from indexer
-        return GenericSchema
+        return ResourceSchema(pecan.request.indexer.get_resource_type(
+            resource_type).resource_schema())
 
 
 class ResourcesController(rest.RestController):
