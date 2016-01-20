@@ -39,14 +39,17 @@ def upgrade():
         cfg.BoolOpt("skip-index", default=False,
                     help="Skip index upgrade."),
         cfg.BoolOpt("skip-storage", default=False,
-                    help="Skip storage upgrade.")
+                    help="Skip storage upgrade."),
+        cfg.BoolOpt("create-legacy-resource-types", default=False,
+                    help="Creation of Ceilometer legacy resource types.")
     ])
     conf = service.prepare_service(conf=conf)
     if not conf.skip_index:
         index = indexer.get_driver(conf)
         index.connect()
         LOG.info("Upgrading indexer %s" % index)
-        index.upgrade()
+        index.upgrade(
+            create_legacy_resource_types=conf.create_legacy_resource_types)
     if not conf.skip_storage:
         s = storage.get_driver(conf)
         LOG.info("Upgrading storage %s" % s)
