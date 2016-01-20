@@ -318,6 +318,7 @@
     {
         "name": "my_custom_type",
         "attributes": {
+            "id": {"type": "uuid"},
             "display_name": {"type": "string", "required": true},
             "prefix": {"type": "string", "required": false, "length": 8}
         }
