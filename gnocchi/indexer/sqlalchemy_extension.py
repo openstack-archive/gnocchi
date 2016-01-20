@@ -60,3 +60,11 @@ class StringSchema(resource_type.StringSchema):
 
 class UUIDSchema(resource_type.UUIDSchema):
     satype = sqlalchemy_utils.UUIDType()
+
+
+class IntSchema(resource_type.IntSchema):
+    satype = sqlalchemy.Integer
+
+
+class FloatSchema(resource_type.FloatSchema):
+    satype = sqlalchemy.Float(53)
