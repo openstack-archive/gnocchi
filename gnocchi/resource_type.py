@@ -129,6 +129,11 @@ class NumberSchema(CommonAttributeSchema):
         return d
 
 
+class BoolSchema(CommonAttributeSchema):
+    typename = "bool"
+    schema_ext = bool
+
+
 class ResourceTypeAttributes(list):
     def jsonify(self):
         d = {}
