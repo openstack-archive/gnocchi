@@ -98,3 +98,44 @@ class UUIDSchema(object):
     def column(conf):
         return sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
                                  nullable=not conf['required'])
+
+
+class IntSchema(object):
+    schema_name = "int"
+    schema_type = int
+    sql_type = sqlalchemy.Integer
+
+    @classmethod
+    def schema(cls):
+        return {
+            voluptuous.Required('type'): cls.schema_name,
+            voluptuous.Required('required', default=True): bool,
+            voluptuous.Required('min', default=None): voluptuous.Any(
+                None, voluptuous.All(cls.schema_type,
+                                     voluptuous.Range(min=0))),
+            voluptuous.Required('max', default=None): voluptuous.Any(
+                None, voluptuous.All(cls.schema_type,
+                                     voluptuous.Range(min=0)))
+        }
+
+    @classmethod
+    def resource_schema(cls, name, conf):
+        schema = voluptuous.All(cls.schema_type,
+                                voluptuous.Range(min=conf['min'],
+                                                 max=conf['max']))
+        if conf['required']:
+            return {name: schema}
+        else:
+            return {voluptuous.Optional(name): schema}
+
+    @classmethod
+    def column(cls, conf):
+        return sqlalchemy.Column(cls.sql_type, nullable=not conf['required'])
+
+
+class FloatSchema(IntSchema):
+    schema_name = "float"
+    schema_type = float
+    # NOTE(sileht): precision based on what we use in Ceilometer
+    # Gnocchi should offer more ?
+    sql_type = sqlalchemy.Float(53)
