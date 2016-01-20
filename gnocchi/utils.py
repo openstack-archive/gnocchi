@@ -44,6 +44,13 @@ def ResourceUUID(value):
         raise ValueError(e)
 
 
+def UUID(value):
+    try:
+        return uuid.UUID(value)
+    except Exception as e:
+        raise ValueError(e)
+
+
 def to_timestamp(v):
     if isinstance(v, datetime.datetime):
         return v
