@@ -68,3 +68,7 @@ class IntSchema(resource_type.IntSchema):
 
 class FloatSchema(resource_type.FloatSchema):
     satype = sqlalchemy.Float(53)
+
+
+class BoolSchema(resource_type.BoolSchema):
+    satype = sqlalchemy.Boolean
