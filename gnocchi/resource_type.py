@@ -16,6 +16,8 @@ import six
 import stevedore
 import voluptuous
 
+from gnocchi import utils
+
 
 class CommonAttributeSchema(object):
     meta_schema_ext = {}
@@ -66,6 +68,11 @@ class StringSchema(CommonAttributeSchema):
         d = super(StringSchema, self).jsonify()
         d.update({"length": self.length})
         return d
+
+
+class UUIDSchema(CommonAttributeSchema):
+    typename = "uuid"
+    schema_ext = staticmethod(utils.UUID)
 
 
 class ResourceTypeAttributes(list):
