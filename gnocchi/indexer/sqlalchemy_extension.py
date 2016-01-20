@@ -64,3 +64,7 @@ class UUIDSchema(resource_type.UUIDSchema):
 
 class NumberSchema(resource_type.NumberSchema):
     satype = sqlalchemy.Float(53)
+
+
+class BoolSchema(resource_type.BoolSchema):
+    satype = sqlalchemy.Boolean
