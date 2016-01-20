@@ -28,11 +28,11 @@ from oslo_db.sqlalchemy import utils as oslo_db_utils
 import six
 import sqlalchemy
 import sqlalchemy_utils
-from stevedore import extension
 
 from gnocchi import exceptions
 from gnocchi import indexer
 from gnocchi.indexer import sqlalchemy_base as base
+from gnocchi.indexer import sqlalchemy_extension as extension
 from gnocchi import utils
 
 Base = base.Base
@@ -46,36 +46,9 @@ ResourceType = base.ResourceType
 _marker = indexer._marker
 
 
-def get_resource_mappers_from_ext(ext):
-    tablename = getattr(ext.plugin, '__tablename__', ext.name)
-    if ext.name == "generic":
-        resource_ext = base.Resource
-        resource_history_ext = ResourceHistory
-    else:
-        resource_ext = type(str(ext.name),
-                            (ext.plugin, base.ResourceExtMixin, Resource),
-                            {"__tablename__": tablename})
-        resource_history_ext = type(str("%s_history" % ext.name),
-                                    (ext.plugin, base.ResourceHistoryExtMixin,
-                                     ResourceHistory),
-                                    {"__tablename__": (
-                                        "%s_history" % tablename)})
-    return tablename, {'resource': resource_ext,
-                       'history': resource_history_ext}
-
-
-def load_legacy_mappers(extensions):
-    mappers = {}
-    for ext in extensions:
-        table, mapper = get_resource_mappers_from_ext(ext)
-        mappers[table] = mapper
-    return mappers
-
-
 class SQLAlchemyIndexer(indexer.IndexerDriver):
-    resources = extension.ExtensionManager('gnocchi.indexer.resources')
-
-    _RESOURCE_CLASS_MAPPER = load_legacy_mappers(resources.extensions)
+    _RESOURCE_CLASS_MAPPER = {"generic": {"resource": Resource,
+                                          "history": ResourceHistory}}
     _RESOURCE_CLASS_MAPPER_LOCK = threading.Lock()
 
     def __init__(self, conf):
@@ -115,16 +88,25 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             else:
                 command.upgrade(cfg, "head")
 
+        # TODO(sileht): generic shouldn't be an particular case
+        # we must create a rt_generic and rt_generic_history table
+        # like other type
         session = self.engine_facade.get_session()
-        for ext in self.resources.extensions:
-            tablename = getattr(ext.plugin, '__tablename__', ext.name)
-            session.add(ResourceType(name=ext.name,
-                                     tablename=tablename))
-            try:
-                session.flush()
-            except exception.DBDuplicateEntry:
-                pass
+        session.add(ResourceType(name="generic",
+                                 tablename="generic",
+                                 attributes={}))
+        try:
+            session.flush()
+        except exception.DBDuplicateEntry:
+            pass
         session.expunge_all()
+
+        for name, attributes in extension.legacy_ceilometer_resources.items():
+            tablename = extension.legacy_ceilometer_tablenames.get(name, name)
+            try:
+                self._create_resource_type(name, attributes, tablename)
+            except indexer.ResourceTypeAlreadyExists:
+                pass
 
     def create_resource_type(self, name, attributes):
         # NOTE(sileht): mysql have a stupid and small length limitation on the
@@ -133,6 +115,9 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         # fk_<tablaname>_history_revision_resource_history_revision,
         # so 64 - 46 = 18
         tablename = "rt_%s" % uuid.uuid4().hex[:15]
+        return self._create_resource_type(name, attributes, tablename)
+
+    def _create_resource_type(self, name, attributes, tablename):
         resource_type = ResourceType(name=name,
                                      tablename=tablename,
                                      attributes=attributes)
@@ -178,7 +163,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def delete_resource_type(self, name):
         # FIXME(sileht) this type have special handling
         # until we remove this special thing we reject its deletion
-        if name in self.resources:
+        if name == "generic":
             raise indexer.ResourceTypeInUse(name)
 
         resource_type = self.get_resource_type(name)
