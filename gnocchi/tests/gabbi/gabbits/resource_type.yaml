@@ -131,6 +131,31 @@ tests:
       url: /v1/resource_type/my_custom_resource
       response_json_paths:
           $.name: my_custom_resource
+          $.attributes:
+              name:
+                  type: string
+                  required: True
+                  length: 5
+              foobar:
+                  type: string
+                  required: False
+                  length: 255
+              uuid:
+                  type: uuid
+                  required: True
+              int:
+                  type: int
+                  required: False
+                  min:
+                  max: 3
+              float:
+                  type: float
+                  required: false
+                  min: 2.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
 
 # Some bad case case on the type
     - name: get wrong accept
