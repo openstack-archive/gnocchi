@@ -134,6 +134,11 @@ class FloatSchema(IntSchema):
     pytype = float
 
 
+class BoolSchema(CommonAttributeSchema):
+    typename = "bool"
+    schema_ext = bool
+
+
 class ResourceTypeAttributes(list):
     def jsonify(self):
         d = {}
