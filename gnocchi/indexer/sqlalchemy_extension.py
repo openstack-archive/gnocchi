@@ -19,6 +19,8 @@ import sqlalchemy
 import sqlalchemy_utils
 import voluptuous
 
+from gnocchi import utils
+
 
 class Image(object):
     name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
@@ -74,4 +76,25 @@ class StringSchema(object):
     @staticmethod
     def column(conf):
         return sqlalchemy.Column(sqlalchemy.String(conf['length']),
+                                 nullable=not conf['required'])
+
+
+class UUIDSchema(object):
+    @staticmethod
+    def schema():
+        return {
+            voluptuous.Required('type'): 'uuid',
+            voluptuous.Required('required', default=True): bool,
+        }
+
+    @staticmethod
+    def resource_schema(name, conf):
+        if conf['required']:
+            return {name: utils.UUID}
+        else:
+            return {voluptuous.Optional(name): utils.UUID}
+
+    @staticmethod
+    def column(conf):
+        return sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
                                  nullable=not conf['required'])
