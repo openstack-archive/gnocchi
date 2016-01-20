@@ -117,7 +117,7 @@ class ConfigFixture(fixture.GabbiFixture):
 
         index = indexer.get_driver(conf)
         index.connect()
-        index.upgrade()
+        index.upgrade(create_legacy_resource_types=True)
 
         PECAN_CONF['indexer'] = index
 

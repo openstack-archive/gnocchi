@@ -70,7 +70,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             self.conf.database.connection)
         return cfg
 
-    def upgrade(self, nocreate=False):
+    def upgrade(self, nocreate=False, create_legacy_resource_types=False):
         from alembic import command
         from alembic import migration
 
@@ -100,6 +100,9 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         except exception.DBDuplicateEntry:
             pass
         session.expunge_all()
+
+        if not create_legacy_resource_types:
+            return
 
         for name, attributes in extension.legacy_ceilometer_resources.items():
             tablename = extension.legacy_ceilometer_tablenames.get(name, name)
