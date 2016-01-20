@@ -263,7 +263,7 @@ class IndexerDriver(object):
         pass
 
     @staticmethod
-    def upgrade(nocreate=False):
+    def upgrade(nocreate=False, create_legacy_resource_types=False):
         pass
 
     @staticmethod

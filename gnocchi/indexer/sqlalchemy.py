@@ -142,7 +142,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             self.conf.database.connection)
         return cfg
 
-    def upgrade(self, nocreate=False):
+    def upgrade(self, nocreate=False, create_legacy_resource_types=False):
         from alembic import command
         from alembic import migration
 
@@ -166,6 +166,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         engine = self.engine_facade.get_engine()
         session = self.engine_facade.get_session()
         for rt in self._RESOURCE_TYPE_MANAGER.get_legacy_resource_types():
+            if not (rt.name == "generic" or create_legacy_resource_types):
+                continue
             session.add(rt)
             try:
                 session.flush()
