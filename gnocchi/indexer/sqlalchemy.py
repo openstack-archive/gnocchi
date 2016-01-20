@@ -207,7 +207,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         mappers = self._build_class_mappers(resource_type)
                         self._RESOURCE_CLASS_MAPPER[name] = mappers
                     else:
-                        raise indexer.UnknownResourceType(name)
+                        raise indexer.NoSuchResourceType(name)
         return self._RESOURCE_CLASS_MAPPER[name][purpose]
 
     def _build_class_mappers(self, resource_type):
