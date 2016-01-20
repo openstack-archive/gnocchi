@@ -28,11 +28,11 @@ from oslo_db.sqlalchemy import utils as oslo_db_utils
 import six
 import sqlalchemy
 import sqlalchemy_utils
-from stevedore import extension
 
 from gnocchi import exceptions
 from gnocchi import indexer
 from gnocchi.indexer import sqlalchemy_base as base
+from gnocchi.indexer import sqlalchemy_extension as extension
 from gnocchi import utils
 
 Base = base.Base
@@ -48,9 +48,8 @@ _marker = indexer._marker
 
 class ResourceClassMapper(object):
     def __init__(self):
-        self._resources = extension.ExtensionManager(
-            'gnocchi.indexer.resources')
-        self._cache = self.load_legacy_mappers()
+        self._cache = {'generic': {'resource': base.Resource,
+                                   'history': base.ResourceHistory}}
         self._lock = threading.RLock()
 
     @staticmethod
@@ -71,29 +70,13 @@ class ResourceClassMapper(object):
         return {'resource': resource_ext,
                 'history': resource_history_ext}
 
-    def is_legacy(self, resource_type_name):
-        return resource_type_name in self._resources
-
-    def load_legacy_mappers(self):
-        mappers = {}
-        for ext in self._resources.extensions:
-            tablename = getattr(ext.plugin, '__tablename__', ext.name)
-            if ext.name == "generic":
-                mappers[tablename] = {'resource': base.Resource,
-                                      'history': base.ResourceHistory}
-            else:
-                resource_type = base.ResourceType(name=ext.name,
-                                                  tablename=tablename)
-                mappers[tablename] = self._build_class_mappers(resource_type,
-                                                               ext.plugin)
-        return mappers
-
     def get_legacy_resource_types(self):
         resource_types = []
-        for ext in self._resources.extensions:
-            tablename = getattr(ext.plugin, '__tablename__', ext.name)
-            resource_types.append(base.ResourceType(name=ext.name,
-                                                    tablename=tablename))
+        for name, attributes in extension.legacy_ceilometer_resources.items():
+            tablename = extension.legacy_ceilometer_tablenames.get(name, name)
+            resource_types.append(base.ResourceType(name=name,
+                                                    tablename=tablename,
+                                                    attributes=attributes))
         return resource_types
 
     def get_classes(self, resource_type):
@@ -177,6 +160,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             else:
                 command.upgrade(cfg, "head")
 
+        # TODO(sileht): generic shouldn't be an particular case
+        # we must create a rt_generic and rt_generic_history table
+        # like other type
+        engine = self.engine_facade.get_engine()
         session = self.engine_facade.get_session()
         for rt in self._RESOURCE_TYPE_MANAGER.get_legacy_resource_types():
             session.add(rt)
@@ -184,6 +171,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 session.flush()
             except exception.DBDuplicateEntry:
                 pass
+            self._RESOURCE_TYPE_MANAGER.map_and_create_tables(rt, engine)
 
     def create_resource_type(self, name, attributes):
         # NOTE(sileht): mysql have a stupid and small length limitation on the
@@ -228,7 +216,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
     def delete_resource_type(self, name):
         # FIXME(sileht) this type have special handling
         # until we remove this special thing we reject its deletion
-        if self._RESOURCE_TYPE_MANAGER.is_legacy(name):
+        if name == "generic":
             raise indexer.ResourceTypeInUse(name)
 
         resource_type = self.get_resource_type(name)
