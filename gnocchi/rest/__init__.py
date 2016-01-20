@@ -758,20 +758,18 @@ class ResourceType(rest.RestController):
         if resource_type:
             enforce("get resource type", resource_type)
             return resource_type
-        # FIXME(sileht): Rename this example to NoSuchResourceType
-        # to homogenise
-        abort(404, indexer.UnknownResourceType(self._name))
+        abort(404, indexer.NoSuchResourceType(self._name))
 
     @pecan.expose()
     def delete(self):
         resource_type = pecan.request.indexer.get_resource_type(
             self._name)
         if not resource_type:
-            abort(404, indexer.UnknownResourceType(self._name))
+            abort(404, indexer.NoSuchResourceType(self._name))
         enforce("delete resource type", resource_type)
         try:
             pecan.request.indexer.delete_resource_type(self._name)
-        except (indexer.UnknownResourceType,
+        except (indexer.NoSuchResourceType,
                 indexer.ResourceTypeInUse) as e:
             abort(400, e)
 
@@ -995,7 +993,7 @@ class ResourcesByTypeController(rest.RestController):
         if pecan.request.indexer.get_resource_type(resource_type):
             return ResourcesController(resource_type), remainder
         else:
-            abort(404, indexer.UnknownResourceType(resource_type))
+            abort(404, indexer.NoSuchResourceType(resource_type))
 
 
 def _ResourceSearchSchema(v):
@@ -1079,7 +1077,7 @@ class SearchResourceController(rest.RestController):
         if pecan.request.indexer.get_resource_type(resource_type):
             return SearchResourceTypeController(resource_type), remainder
         else:
-            abort(404, indexer.UnknownResourceType(resource_type))
+            abort(404, indexer.NoSuchResourceType(resource_type))
 
 
 def _MetricSearchSchema(v):
