@@ -589,8 +589,8 @@ tests:
                   archive_policy_name: medium
       status: 201
       response_json_paths:
-          created_by_user_id: 0fbb2314-8461-4b1a-8013-1fc22f6afc9c
-          created_by_project_id: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+          created_by_user_id: 0fbb231484614b1a80131fc22f6afc9c
+          created_by_project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
 
 
     - name: get metrics for this resource
