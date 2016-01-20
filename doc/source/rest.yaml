@@ -322,7 +322,8 @@
             "display_name": {"type": "string", "required": true},
             "prefix": {"type": "string", "required": false, "length": 8},
             "size": {"type": "float", "min": "5", "max": "32.8"},
-            "index": {"type": "int", "min": "0"}
+            "index": {"type": "int", "min": "0"},
+            "enabled": {"type": "bool", "required": false}
         }
     }
 
