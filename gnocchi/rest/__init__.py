@@ -51,7 +51,7 @@ def abort(status_code, detail='', headers=None, comment=None, **kw):
 
 def get_user_and_project():
     headers = pecan.request.headers
-    # NOTE(jd) If user_id or project_id is UUID, try to convert them into
+    # NOTE(jd) If user_id or project_id is utils.UUID, try to convert them into
     # the proper dashed format. It's indeed possible that a middleware passes
     # these UUIDs without the dash representation. It's valid, we can parse,
     # but the policy module won't see the equality in the string
@@ -519,13 +519,6 @@ class MetricController(rest.RestController):
             abort(404, e)
 
 
-def UUID(value):
-    try:
-        return uuid.UUID(value)
-    except Exception as e:
-        raise ValueError(e)
-
-
 class MetricsController(rest.RestController):
 
     @pecan.expose()
@@ -540,8 +533,8 @@ class MetricsController(rest.RestController):
         return MetricController(metrics[0]), remainder
 
     _MetricSchema = voluptuous.Schema({
-        "user_id": UUID,
-        "project_id": UUID,
+        "user_id": utils.UUID,
+        "project_id": utils.UUID,
         "archive_policy_name": six.text_type,
         "name": six.text_type,
     })
@@ -621,7 +614,7 @@ class MetricsController(rest.RestController):
 
 
 _MetricsSchema = voluptuous.Schema({
-    six.text_type: voluptuous.Any(UUID,
+    six.text_type: voluptuous.Any(utils.UUID,
                                   MetricsController.MetricSchema),
 })
 
@@ -823,8 +816,8 @@ def ResourceSchema(schema):
         "id": utils.ResourceUUID,
         voluptuous.Optional('started_at'): Timestamp,
         voluptuous.Optional('ended_at'): Timestamp,
-        voluptuous.Optional('user_id'): voluptuous.Any(None, UUID),
-        voluptuous.Optional('project_id'): voluptuous.Any(None, UUID),
+        voluptuous.Optional('user_id'): voluptuous.Any(None, utils.UUID),
+        voluptuous.Optional('project_id'): voluptuous.Any(None, utils.UUID),
         voluptuous.Optional('metrics'): MetricsSchema,
     }
     base_schema.update(schema)
@@ -915,12 +908,12 @@ GenericSchema = ResourceSchema({})
 
 InstanceDiskSchema = ResourceSchema({
     "name": six.text_type,
-    "instance_id": UUID,
+    "instance_id": utils.UUID,
 })
 
 InstanceNetworkInterfaceSchema = ResourceSchema({
     "name": six.text_type,
-    "instance_id": UUID,
+    "instance_id": utils.UUID,
 })
 
 InstanceSchema = ResourceSchema({
@@ -1223,7 +1216,7 @@ class SearchMetricController(rest.RestController):
 
 class MeasuresBatchController(rest.RestController):
     MeasuresBatchSchema = voluptuous.Schema({
-        UUID: [MeasureSchema],
+        utils.UUID: [MeasureSchema],
     })
 
     @pecan.expose()
