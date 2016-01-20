@@ -145,3 +145,24 @@ class FloatSchema(IntSchema):
     # NOTE(sileht): precision based on what we use in Ceilometer
     # Gnocchi should offer more ?
     sql_type = sqlalchemy.Float(53)
+
+
+class BoolSchema(object):
+    @staticmethod
+    def schema():
+        return {
+            voluptuous.Required('type'): 'bool',
+            voluptuous.Required('required', default=True): bool,
+        }
+
+    @staticmethod
+    def resource_schema(name, conf):
+        if conf['required']:
+            return {name: bool}
+        else:
+            return {voluptuous.Optional(name): bool}
+
+    @staticmethod
+    def column(conf):
+        return sqlalchemy.Column(sqlalchemy.Boolean(),
+                                 nullable=not conf['required'])
