@@ -946,50 +946,9 @@ class ResourceController(rest.RestController):
             abort(404, e)
 
 
-GenericSchema = ResourceSchema({})
-
-InstanceDiskSchema = ResourceSchema({
-    "name": six.text_type,
-    "instance_id": utils.UUID,
-})
-
-InstanceNetworkInterfaceSchema = ResourceSchema({
-    "name": six.text_type,
-    "instance_id": utils.UUID,
-})
-
-InstanceSchema = ResourceSchema({
-    "flavor_id": six.text_type,
-    voluptuous.Optional("image_ref"): six.text_type,
-    "host": six.text_type,
-    "display_name": six.text_type,
-    voluptuous.Optional("server_group"): six.text_type,
-})
-
-VolumeSchema = ResourceSchema({
-    voluptuous.Optional("display_name"): voluptuous.Any(None,
-                                                        six.text_type),
-})
-
-ImageSchema = ResourceSchema({
-    "name": six.text_type,
-    "container_format": six.text_type,
-    "disk_format": six.text_type,
-})
-
-
-# NOTE(sileht): Must be loaded after all ResourceSchema
-RESOURCE_SCHEMA_MANAGER = extension.ExtensionManager(
-    'gnocchi.controller.schemas')
-
-
 def schema_for(resource_type):
-    if resource_type in RESOURCE_SCHEMA_MANAGER:
-        # TODO(sileht): Remove this legacy resource schema loading
-        return RESOURCE_SCHEMA_MANAGER[resource_type].plugin
-    else:
-        resource_type = pecan.request.indexer.get_resource_type(resource_type)
-        return ResourceSchema(resource_type.schema)
+    resource_type = pecan.request.indexer.get_resource_type(resource_type)
+    return ResourceSchema(resource_type.schema)
 
 
 def ResourceID(value):
