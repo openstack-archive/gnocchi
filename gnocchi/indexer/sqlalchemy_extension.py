@@ -22,36 +22,42 @@ import voluptuous
 from gnocchi import utils
 
 
-class Image(object):
-    name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    container_format = sqlalchemy.Column(sqlalchemy.String(255),
-                                         nullable=False)
-    disk_format = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-
-
-class Instance(object):
-    flavor_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    image_ref = sqlalchemy.Column(sqlalchemy.String(255))
-    host = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    server_group = sqlalchemy.Column(sqlalchemy.String(255))
-
-
-class InstanceDisk(object):
-    name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    instance_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
-                                    nullable=False)
-
-
-class InstanceNetworkInterface(object):
-    __tablename__ = 'instance_net_int'
-    name = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
-    instance_id = sqlalchemy.Column(sqlalchemy_utils.UUIDType(),
-                                    nullable=False)
-
-
-class Volume(object):
-    display_name = sqlalchemy.Column(sqlalchemy.String(255), nullable=True)
+# NOTE(sileht): this code is also in alembic migration
+legacy_ceilometer_tablenames = {
+    "instance_network_interface": "instance_net_int"
+}
+legacy_ceilometer_resources = {
+    "image": {
+        "name": {"type": "string", "length": 255, "required": True},
+        "container_format": {"type": "string", "length": 255,
+                             "required": True},
+        "disk_format": {"type": "string", "length": 255, "required": True},
+    },
+    "instance": {
+        "flavor_id": {"type": "string", "length": 255, "required": True},
+        "image_ref": {"type": "string", "length": 255, "required": False},
+        "host": {"type": "string", "length": 255, "required": True},
+        "display_name": {"type": "string", "length": 255, "required": True},
+        "server_group": {"type": "string", "length": 255, "required": False},
+    },
+    "instance_disk": {
+        "name": {"type": "string", "length": 255, "required": True},
+        "instance_id": {"type": "uuid", "required": True},
+    },
+    "instance_network_interface": {
+        "name": {"type": "string", "length": 255, "required": True},
+        "instance_id": {"type": "uuid", "required": True},
+    },
+    "volume": {
+        "display_name": {"type": "string", "length": 255, "required": False},
+    },
+    "swift_account": {},
+    "ceph_account": {},
+    "network": {},
+    "identity": {},
+    "ipmi": {},
+    "stack": {},
+}
 
 
 class StringSchema(object):
