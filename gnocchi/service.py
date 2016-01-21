@@ -1,5 +1,6 @@
-# Copyright (c) 2013 Mirantis Inc.
+# Copyright (c) 2016 Red Hat, Inc.
 # Copyright (c) 2015 eNovance
+# Copyright (c) 2013 Mirantis Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ from oslo_config import cfg
 from oslo_db import options as db_options
 from oslo_log import log
 from oslo_policy import opts as policy_opts
+from six.moves.urllib import parse as urlparse
 
 from gnocchi import archive_policy
 from gnocchi import opts
@@ -54,6 +56,15 @@ def prepare_service(args=None, conf=None,
 
     conf.set_default("workers", default_workers, group="api")
     conf.set_default("workers", default_workers, group="metricd")
+
+    # If no coordination URL is provided, default to using the indexer as
+    # coordinator
+    if conf.storage.coordination_url is None:
+        parsed = list(urlparse.urlparse(conf.indexer.url))
+        parsed[0], _, _ = parsed[0].partition("+")
+        conf.set_default("coordination_url",
+                         urlparse.urlunparse(parsed),
+                         "storage")
 
     conf(args, project='gnocchi', validate_default_values=True,
          default_config_files=default_config_files)
