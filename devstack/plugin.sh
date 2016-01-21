@@ -95,24 +95,6 @@ function install_gnocchiclient {
     fi
 }
 
-# install redis
-# NOTE(chdent): We shouldn't rely on ceilometer being present so cannot
-# use its install_redis. There are enough packages now using redis
-# that there should probably be something devstack itself for
-# installing it.
-function _gnocchi_install_redis {
-    if is_ubuntu; then
-        install_package redis-server
-        restart_service redis-server
-    else
-        # This will fail (correctly) where a redis package is unavailable
-        install_package redis
-        restart_service redis
-    fi
-
-    pip_install_gr redis
-}
-
 # install influxdb
 # NOTE(chdent): InfluxDB is not currently packaged by the distro at the
 # version that gnocchi needs. Until that is true we're downloading
@@ -226,13 +208,6 @@ function configure_gnocchi {
     # Install the configuration files
     cp $GNOCCHI_DIR/etc/gnocchi/* $GNOCCHI_CONF_DIR
 
-    iniset $GNOCCHI_CONF storage coordination_url "$GNOCCHI_COORDINATOR_URL"
-    if [ "${GNOCCHI_COORDINATOR_URL:0:7}" == "file://" ]; then
-        gnocchi_locks_dir=${GNOCCHI_COORDINATOR_URL:7}
-        [ ! -d $gnocchi_locks_dir ] && sudo mkdir -m 755 -p ${gnocchi_locks_dir}
-        sudo chown $STACK_USER $gnocchi_locks_dir
-    fi
-
     # Configure auth token middleware
     configure_auth_token_middleware $GNOCCHI_CONF gnocchi $GNOCCHI_AUTH_CACHE_DIR
 
@@ -325,10 +300,6 @@ function preinstall_gnocchi {
 
 # install_gnocchi() - Collect source and prepare
 function install_gnocchi {
-    if [ "${GNOCCHI_COORDINATOR_URL%%:*}" == "redis" ]; then
-        _gnocchi_install_redis
-    fi
-
     if [[ "${GNOCCHI_STORAGE_BACKEND}" == 'influxdb' ]] ; then
         _gnocchi_install_influxdb
         pip_install influxdb
