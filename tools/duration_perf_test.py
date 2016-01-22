@@ -43,6 +43,7 @@ import time
 
 from keystoneclient.v2_0 import client as keystone_client
 import requests
+import six
 
 
 def timer(func):
@@ -133,7 +134,7 @@ class PerfTools(object):
             self.dump_logs()
 
     def dump_logs(self):
-        for name, data in self._timers.iteritems():
+        for name, data in six.iteritems(self._timers):
             filepath = "%s_%s.csv" % (self.args.result_path, name)
             dirpath = os.path.dirname(filepath)
             if dirpath and not os.path.exists(dirpath):

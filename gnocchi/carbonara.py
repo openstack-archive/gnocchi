@@ -631,6 +631,6 @@ def dump_archive_file():
     print("Timespan: %ds × %d = %s" % (ts.sampling, ts.max_size, timespan))
     print("Number of measures: %d" % len(ts))
     table = prettytable.PrettyTable(("Timestamp", "Value"))
-    for k, v in ts.ts.iteritems():
+    for k, v in six.iteritems(ts.ts):
         table.add_row((k, v))
     print(table.get_string())
