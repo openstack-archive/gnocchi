@@ -16,6 +16,7 @@
 import collections
 import logging
 import multiprocessing
+import random
 import uuid
 
 from concurrent import futures
@@ -226,6 +227,13 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def process_measures(self, indexer, sync=False):
         metrics_to_process = self._list_metric_with_measures_to_process()
+
+        # NOTE(mnaser): Due to the fact that these list of metrics are
+        #               sent to multiple workers, randomizing will make
+        #               it more effective and reduce chances of getting
+        #               an already completed job.
+        random.shuffle(metrics_to_process)
+
         metrics = indexer.get_metrics(metrics_to_process)
         # This build the list of deleted metrics, i.e. the metrics we have
         # measures to process for but that are not in the indexer anymore.
@@ -241,6 +249,12 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # get back later to it if needed.
             if lock.acquire(blocking=sync):
                 try:
+                    # NOTE(mnaser): The metric could have been handled by another
+                    #               worker so we ignore it if nothing to process.
+                    if self._pending_measures_to_process_count(metric) == 0:
+                        LOG.debug("Skipping %s (aleady processed)" % metric)
+                        continue
+
                     LOG.debug("Processing measures for %s" % metric)
                     with self._process_measure_for_metric(metric) as measures:
                         try:
