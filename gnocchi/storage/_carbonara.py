@@ -241,6 +241,12 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # get back later to it if needed.
             if lock.acquire(blocking=sync):
                 try:
+                    # NOTE(mnaser): The metric could have been handled by another
+                    #               worker so we ignore it if nothing to process.
+                    if self._pending_measures_to_process_count(metric) == 0:
+                        LOG.debug("Skipping %s (aleady processed)" % metric)
+                        continue
+
                     LOG.debug("Processing measures for %s" % metric)
                     with self._process_measure_for_metric(metric) as measures:
                         try:
