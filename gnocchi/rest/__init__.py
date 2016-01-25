@@ -1195,6 +1195,19 @@ class AggregationResource(rest.RestController):
             m = r.get_metric(self.metric_name)
             if m:
                 metrics.append(m)
+
+        if start is not None:
+            try:
+                start = Timestamp(start)
+            except Exception:
+                abort(400, "Invalid value for start")
+
+        if stop is not None:
+            try:
+                stop = Timestamp(stop)
+            except Exception:
+                abort(400, "Invalid value for stop")
+
         return AggregatedMetricController.get_cross_metric_measures_from_objs(
             metrics, start, stop, aggregation, needed_overlap)
 
