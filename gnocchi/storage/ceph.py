@@ -16,6 +16,7 @@
 
 import contextlib
 import datetime
+import logging
 import uuid
 
 from oslo_config import cfg
@@ -23,6 +24,9 @@ from oslo_utils import importutils
 
 from gnocchi import storage
 from gnocchi.storage import _carbonara
+
+
+LOG = logging.getLogger(__name__)
 
 # NOTE(sileht): rados module is not available on pypi
 rados = importutils.try_import('rados')
@@ -38,6 +42,11 @@ OPTS = [
     cfg.StrOpt('ceph_conffile',
                default='/etc/ceph/ceph.conf',
                help='Ceph configuration file.'),
+    cfg.BoolOpt('disable_rados_threading',
+                default=True,
+                help="Disable the python-rados additional threads. "
+                "Side effects: timeout parameter of rados API call will "
+                "be ignored.")
 ]
 
 
@@ -53,10 +62,25 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         # by default if a call timeout (30sec), it raises
         # a rados.Timeout exception, and librados
         # still continues to reconnect on the next call
+
+        if conf.disable_rados_threading:
+            if not hasattr(rados, "run_in_thread"):
+                LOG.debug("rados.run_in_thread does not exists, skip "
+                          "monkeypatching")
+            else:
+                LOG.debug("Enable rados.run_in_thread monkeypatching")
+                import signal
+                signal.signal(signal.SIGINT, signal.SIG_DFL)
+                rados.run_in_thread = self._dummy_run_in_thread
+
         self.rados = rados.Rados(conffile=conf.ceph_conffile,
                                  rados_id=conf.ceph_username,
                                  conf=options)
         self.rados.connect()
+
+    @classmethod
+    def _dummy_run_in_thread(target, args, timeout=0):
+        return target(*args)
 
     def _store_measures(self, metric, data):
         # NOTE(sileht): list all objects in a pool is too slow with
