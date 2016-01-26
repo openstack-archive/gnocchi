@@ -232,7 +232,11 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         deleted_metrics_id = (set(map(uuid.UUID, metrics_to_process))
                               - set(m.id for m in metrics))
         for metric_id in deleted_metrics_id:
-            self._delete_unprocessed_measures_for_metric_id(metric_id)
+            # NOTE(jd): We need to lock the metric otherwise we might delete
+            # measures that another worker might be processing. Deleting
+            # measurement files under its feet is not nice!
+            with self._lock(metric_id)(blocking=sync):
+                self._delete_unprocessed_measures_for_metric_id(metric_id)
         for metric in metrics:
             lock = self._lock(metric)
             agg_methods = list(metric.archive_policy.aggregation_methods)
