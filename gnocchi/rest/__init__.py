@@ -171,12 +171,18 @@ def deserialize():
     return params
 
 
-def deserialize_and_validate(schema, required=True):
+def deserialize_and_validate(schema, required=True,
+                             save_original_resource_id=False):
+    params = deserialize()
     try:
-        return voluptuous.Schema(schema, required=required)(
-            deserialize())
+        data = voluptuous.Schema(schema, required=required)(params)
+        if save_original_resource_id:
+            original_id = params.get('id')
+            if original_id is not None:
+                data['original_resource_id'] = six.text_type(original_id)
     except voluptuous.Error as e:
         abort(400, "Invalid input: %s" % e)
+    return data
 
 
 def Timestamp(v):
@@ -934,7 +940,8 @@ class ResourcesController(rest.RestController):
 
     @pecan.expose('json')
     def post(self):
-        body = deserialize_and_validate(schema_for(self._resource_type))
+        body = deserialize_and_validate(schema_for(self._resource_type),
+                                        save_original_resource_id=True)
         target = {
             "resource_type": self._resource_type,
         }
