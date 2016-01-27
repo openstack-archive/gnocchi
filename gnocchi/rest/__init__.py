@@ -13,6 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import copy
 import uuid
 
 from oslo_utils import strutils
@@ -171,10 +172,10 @@ def deserialize():
     return params
 
 
-def deserialize_and_validate(schema, required=True):
+def deserialize_and_validate(schema, required=True,
+                             schema_cls=voluptuous.Schema):
     try:
-        return voluptuous.Schema(schema, required=required)(
-            deserialize())
+        return schema_cls(schema, required=required)(deserialize())
     except voluptuous.Error as e:
         abort(400, "Invalid input: %s" % e)
 
@@ -790,6 +791,16 @@ def etag_set_headers(obj):
     pecan.response.last_modified = obj.lastmodified
 
 
+class ResourceVoluptuousSchema(voluptuous.Schema):
+    def __call__(self, data):
+        if isinstance(data, dict):
+            # Set original_resource_id to user supplied id
+            if data.get('id') is not None:
+                data = copy.deepcopy(data)
+                data['original_resource_id'] = six.text_type(data['id'])
+        return super(ResourceVoluptuousSchema, self).__call__(data)
+
+
 def ResourceSchema(schema):
     base_schema = {
         "id": utils.ResourceUUID,
@@ -798,6 +809,8 @@ def ResourceSchema(schema):
         voluptuous.Optional('user_id'): voluptuous.Any(None, UUID),
         voluptuous.Optional('project_id'): voluptuous.Any(None, UUID),
         voluptuous.Optional('metrics'): MetricsSchema,
+        voluptuous.Optional('original_resource_id'): voluptuous.Any(
+            None, six.text_type),
     }
     base_schema.update(schema)
     return base_schema
@@ -934,7 +947,8 @@ class ResourcesController(rest.RestController):
 
     @pecan.expose('json')
     def post(self):
-        body = deserialize_and_validate(schema_for(self._resource_type))
+        body = deserialize_and_validate(schema_for(self._resource_type),
+                                        schema_cls=ResourceVoluptuousSchema)
         target = {
             "resource_type": self._resource_type,
         }
