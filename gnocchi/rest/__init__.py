@@ -1193,10 +1193,51 @@ class SearchMetricController(rest.RestController):
             abort(400, e)
 
 
-class MeasuresBatchController(rest.RestController):
-    MeasuresBatchSchema = voluptuous.Schema({
-        UUID: [MeasureSchema],
-    })
+class ResourcesMetricsMeasuresBatchController(rest.RestController):
+    MeasuresBatchSchema = voluptuous.Schema(
+        {utils.ResourceUUID: {six.text_type: [MeasureSchema]}}
+    )
+
+    @pecan.expose()
+    def post(self):
+        body = deserialize_and_validate(self.MeasuresBatchSchema)
+
+        metrics = []
+        unknown_metrics = []
+        for resource_id in body:
+            for metric_name in body[resource_id]:
+                m = pecan.request.indexer.list_metrics(
+                    name=metric_name, resource_id=resource_id)
+                if m:
+                    metrics.append(m[0])
+                else:
+                    unknown_metrics.append(
+                        "%s/%s" % (six.text_type(resource_id), metric_name))
+
+        if unknown_metrics:
+            abort(400, "Unknown metrics: %s" % ", ".join(
+                sorted(unknown_metrics)))
+
+        for metric in metrics:
+            enforce("post measures", metric)
+
+        for metric in metrics:
+            measures = body[metric.resource_id][metric.name]
+            pecan.request.storage.add_measures(metric, measures)
+
+        pecan.response.status = 202
+
+
+class MetricsMeasuresBatchController(rest.RestController):
+    # NOTE(sileht): we don't allow to mix both formats
+    # to not have to deal with id collision that can
+    # occurs between a metric_id and a resource_id.
+    # Because while json allow duplicate keys in dict payload
+    # only the last key will be retain by json python module to
+    # build the python dict.
+    MeasuresBatchSchema = voluptuous.Schema(
+        {UUID: [MeasureSchema]}
+    )
 
     @pecan.expose()
     def post(self):
@@ -1282,8 +1323,21 @@ class StatusController(rest.RestController):
         return {"storage": {"measures_to_process": report}}
 
 
+class MetricsBatchController(object):
+    measures = MetricsMeasuresBatchController()
+
+
+class ResourcesMetricsBatchContrller(object):
+    measures = ResourcesMetricsMeasuresBatchController()
+
+
+class ResourcesBatchContrller(object):
+    metrics = ResourcesMetricsBatchContrller()
+
+
 class BatchController(object):
-    measures = MeasuresBatchController()
+    metrics = MetricsBatchController()
+    resources = ResourcesBatchContrller()
 
 
 class V1Controller(object):
