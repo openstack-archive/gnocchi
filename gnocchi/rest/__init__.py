@@ -1194,25 +1194,64 @@ class SearchMetricController(rest.RestController):
 
 
 class MeasuresBatchController(rest.RestController):
-    MeasuresBatchSchema = voluptuous.Schema({
-        UUID: [MeasureSchema],
-    })
+    # NOTE(sileht): we don't allow to mix both formats
+    # to not have to deal with id collision that can
+    # occurs between a metric_id and a resource_id.
+    # Because while json allow duplicate keys in dict payload
+    # only the last key will be retain by json python module to
+    # build the python dict.
+    MeasuresBatchSchema = voluptuous.Schema(
+        voluptuous.Any(
+            {UUID: [MeasureSchema]},
+            {UUID: {six.text_type: [MeasureSchema]}}
+        )
+    )
 
     @pecan.expose()
     def post(self):
         body = deserialize_and_validate(self.MeasuresBatchSchema)
-        metrics = pecan.request.indexer.get_metrics(body.keys())
 
-        if len(metrics) != len(body):
-            missing_metrics = sorted(set(body) - set(m.id for m in metrics))
-            abort(400, "Unknown metrics: %s" % ", ".join(
-                six.moves.map(str, missing_metrics)))
+        if not body:
+            pecan.response.status = 202
+            return
+
+        is_named_metrics = isinstance(list(body.values())[0], dict)
+        if is_named_metrics:
+            metrics = []
+            unknown_metrics = []
+            for resource_id in body:
+                for metric_name in body[resource_id]:
+                    m = pecan.request.indexer.list_metrics(
+                        name=metric_name,
+                        resource_id=utils.ResourceUUID(resource_id))
+                    if m:
+                        metrics.append(m[0])
+                    else:
+                        unknown_metrics.append(
+                            "%s/%s" % (resource_id, metric_name))
+
+            if unknown_metrics:
+                abort(400, "Unknown metrics: %s" % ", ".join(
+                    sorted(unknown_metrics)))
+
+        else:
+            metrics = pecan.request.indexer.get_metrics(body.keys())
+            if len(metrics) != len(body):
+                missing_metrics = sorted(set(body) -
+                                         set(m.id for m in metrics))
+                abort(400, "Unknown metrics: %s" % ", ".join(
+                    six.moves.map(str, missing_metrics)))
 
         for metric in metrics:
             enforce("post measures", metric)
 
         for metric in metrics:
-            pecan.request.storage.add_measures(metric, body[metric.id])
+            if is_named_metrics:
+                measures = body[metric.resource_id][metric.name]
+            else:
+                measures = body[metric.id]
+            if measures:
+                pecan.request.storage.add_measures(metric, measures)
 
         pecan.response.status = 202
 
