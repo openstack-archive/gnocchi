@@ -37,9 +37,10 @@ sudo chown -R stack:stack $GNOCCHI_DIR
 cd $GNOCCHI_DIR
 
 openstack catalog list
+openstack catalog show metric -c endpoints -f value
 
 export GNOCCHI_SERVICE_TOKEN=$(openstack token issue -c id -f value)
-export GNOCCHI_SERVICE_URL=$(openstack catalog show metric -c endpoints -f value | awk '/publicURL/{print $2}')
+export GNOCCHI_SERVICE_URL=$(openstack catalog show metric -c endpoints -f value | awk '/^public/{print $2}')
 
 curl -X GET ${GNOCCHI_SERVICE_URL}/v1/archive_policy -H "Content-Type: application/json"
 
