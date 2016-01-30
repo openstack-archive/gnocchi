@@ -58,7 +58,7 @@ class TestAggregates(tests_base.TestCase):
                     for n, val in enumerate(data)]
         self.storage.add_measures(metric, measures)
 
-        with mock.patch.object(self.index, 'get_metrics') as f:
+        with mock.patch.object(self.index, 'list_metrics') as f:
             f.return_value = [metric]
             self.storage.process_background_tasks(self.index, True)
 
