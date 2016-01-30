@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
+# Copyright © 2016 Red Hat, Inc.
 # Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,6 +14,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import itertools
 import uuid
 
 from oslo_utils import strutils
@@ -388,7 +390,7 @@ class AggregatedMetricController(rest.RestController):
                                            granularity=None,
                                            needed_overlap=100.0):
         # Check RBAC policy
-        metrics = pecan.request.indexer.get_metrics(metric_ids)
+        metrics = pecan.request.indexer.list_metrics(ids=metric_ids)
         missing_metric_ids = (set(metric_ids)
                               - set(six.text_type(m.id) for m in metrics))
         if missing_metric_ids:
@@ -577,8 +579,8 @@ class MetricsController(rest.RestController):
             metric_id = uuid.UUID(id)
         except ValueError:
             abort(404, indexer.NoSuchMetric(id))
-        metrics = pecan.request.indexer.get_metrics(
-            [metric_id], with_resource=True)
+        metrics = pecan.request.indexer.list_metrics(
+            id=metric_id, details=True)
         if not metrics:
             abort(404, indexer.NoSuchMetric(id))
         return MetricController(metrics[0]), remainder
@@ -660,8 +662,12 @@ class MetricsController(rest.RestController):
         else:
             user_id = kwargs.get('user_id')
             project_id = kwargs.get('project_id')
-        return pecan.request.indexer.list_metrics(
-            user_id, project_id)
+        attr_filter = {}
+        if user_id is not None:
+            attr_filter['creater_by_user_id'] = user_id
+        if project_id is not None:
+            attr_filter['created_by_project_id'] = project_id
+        return pecan.request.indexer.list_metrics(**attr_filter)
 
 
 _MetricsSchema = voluptuous.Schema({
@@ -671,7 +677,7 @@ _MetricsSchema = voluptuous.Schema({
 
 
 def MetricsSchema(data):
-    # NOTE(jd) Before doing any kind of validation, copy the metric name
+    # NOTE(jd) Before doing any kind of validation, copy the MetricsSchema name
     # into the metric definition. This is required so we have the name
     # available when doing the metric validation with its own MetricSchema,
     # and so we can do things such as applying archive policy rules.
@@ -1050,8 +1056,7 @@ class SearchResourceTypeController(rest.RestController):
         )
     )
 
-    @pecan.expose('json')
-    def post(self, **kwargs):
+    def _search(self, **kwargs):
         if pecan.request.body:
             attr_filter = deserialize_and_validate(self.ResourceSearchSchema)
         else:
@@ -1074,13 +1079,17 @@ class SearchResourceTypeController(rest.RestController):
             else:
                 attr_filter = policy_filter
 
+        return pecan.request.indexer.list_resources(
+            self._resource_type,
+            attribute_filter=attr_filter,
+            details=details,
+            history=history,
+            **pagination_opts)
+
+    @pecan.expose('json')
+    def post(self, **kwargs):
         try:
-            return pecan.request.indexer.list_resources(
-                self._resource_type,
-                attribute_filter=attr_filter,
-                details=details,
-                history=history,
-                **pagination_opts)
+            return self._search(**kwargs)
         except indexer.IndexerException as e:
             abort(400, e)
 
@@ -1153,7 +1162,8 @@ class SearchMetricController(rest.RestController):
 
     @pecan.expose('json')
     def post(self, metric_id, start=None, stop=None, aggregation='mean'):
-        metrics = pecan.request.indexer.get_metrics(arg_to_list(metric_id))
+        metrics = pecan.request.indexer.list_metrics(
+            ids=arg_to_list(metric_id))
 
         for metric in metrics:
             enforce("search metric", metric)
@@ -1239,7 +1249,7 @@ class MetricsMeasuresBatchController(rest.RestController):
     @pecan.expose()
     def post(self):
         body = deserialize_and_validate(self.MeasuresBatchSchema)
-        metrics = pecan.request.indexer.get_metrics(body.keys())
+        metrics = pecan.request.indexer.list_metrics(ids=body.keys())
 
         if len(metrics) != len(body):
             missing_metrics = sorted(set(body) - set(m.id for m in metrics))
@@ -1267,15 +1277,53 @@ class AggregationResourceController(rest.RestController):
 
     @pecan.expose('json')
     def post(self, start=None, stop=None, aggregation='mean',
-             granularity=None, needed_overlap=100.0):
-        resources = SearchResourceTypeController(self.resource_type).post()
-        metrics = []
-        for r in resources:
-            m = r.get_metric(self.metric_name)
-            if m:
-                metrics.append(m)
-        return AggregatedMetricController.get_cross_metric_measures_from_objs(
-            metrics, start, stop, aggregation, granularity, needed_overlap)
+             granularity=None, needed_overlap=100.0,
+             groupby=None):
+        # First, set groupby in the right format: a sorted list of unique
+        # strings.
+        if groupby:
+            if not isinstance(groupby, list):
+                groupby = [groupby]
+            groupby = sorted(set(groupby))
+        else:
+            groupby = []
+
+        # NOTE(jd) Sort by groupby so we are sure we do not return multiple
+        # groups when using itertools.groupby later.
+        try:
+            resources = SearchResourceTypeController(
+                self.resource_type)._search(sort=groupby)
+        except indexer.InvalidPagination:
+            abort(400, "Invalid groupby attribute")
+        except indexer.IndexerException as e:
+            abort(400, e)
+
+        if resources is None:
+            return []
+
+        if not groupby:
+            metrics = list(filter(None,
+                                  (r.get_metric(self.metric_name)
+                                   for r in resources)))
+            return AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
+                metrics, start, stop, aggregation, granularity, needed_overlap)
+
+        def groupper(r):
+            return tuple((attr, r[attr]) for attr in groupby)
+
+        results = []
+        for key, resources in itertools.groupby(resources, groupper):
+            metrics = list(filter(None,
+                                  (r.get_metric(self.metric_name)
+                                   for r in resources)))
+            results.append({
+                "group": dict(key),
+                "measures": AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
+                    metrics, start, stop, aggregation,
+                    granularity, needed_overlap)
+            })
+
+        return results
 
 
 class AggregationController(rest.RestController):

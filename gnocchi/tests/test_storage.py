@@ -32,8 +32,14 @@ class TestStorageDriver(tests_base.TestCase):
     def setUp(self):
         super(TestStorageDriver, self).setUp()
         # A lot of tests wants a metric, create one
-        self.metric = storage.Metric(uuid.uuid4(),
-                                     self.archive_policies['low'])
+        self.metric = self._create_metric()
+
+    def _create_metric(self, archive_policy_name="low"):
+        m = storage.Metric(uuid.uuid4(),
+                           self.archive_policies[archive_policy_name])
+        self.index.create_metric(m.id, str(uuid.uuid4()), str(uuid.uuid4()),
+                                 archive_policy_name)
+        return m
 
     def test_get_driver(self):
         self.conf.set_override('driver', 'null', 'storage')
@@ -48,20 +54,16 @@ class TestStorageDriver(tests_base.TestCase):
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
         ])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [self.metric]
-            self.storage.process_background_tasks(self.index, True)
+        self.storage.process_background_tasks(self.index, True)
 
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 13, 0, 1), 1),
         ])
-        with mock.patch.object(self.index, 'get_metrics',
-                               return_value=[self.metric]):
-            with mock.patch('gnocchi.carbonara.msgpack.unpack',
+        with mock.patch('gnocchi.carbonara.msgpack.unpack',
+                        side_effect=ValueError("boom!")):
+            with mock.patch('gnocchi.carbonara.msgpack.loads',
                             side_effect=ValueError("boom!")):
-                with mock.patch('gnocchi.carbonara.msgpack.loads',
-                                side_effect=ValueError("boom!")):
-                    self.storage.process_background_tasks(self.index, True)
+                self.storage.process_background_tasks(self.index, True)
 
         self.assertEqual([
             (utils.datetime_utc(2014, 1, 1), 86400.0, 1),
@@ -73,9 +75,7 @@ class TestStorageDriver(tests_base.TestCase):
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
         ])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [self.metric]
-            self.storage.process_background_tasks(self.index, True)
+        self.storage.process_background_tasks(self.index, True)
         self.storage.delete_metric(self.metric)
         self.storage.process_background_tasks(self.index, True)
 
@@ -91,13 +91,11 @@ class TestStorageDriver(tests_base.TestCase):
         self.assertIsInstance(report, dict)
 
     def test_add_measures_big(self):
-        m = storage.Metric(uuid.uuid4(), self.archive_policies['high'])
+        m = self._create_metric('high')
         self.storage.add_measures(m, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, i, j), 100)
             for i in six.moves.range(0, 60) for j in six.moves.range(0, 60)])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [m]
-            self.storage.process_background_tasks(self.index, True)
+        self.storage.process_background_tasks(self.index, True)
 
         self.assertEqual(3661, len(self.storage.get_measures(m)))
 
@@ -132,9 +130,7 @@ class TestStorageDriver(tests_base.TestCase):
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 4),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 12, 45), 44),
         ])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [self.metric]
-            self.storage.process_background_tasks(self.index, True)
+        self.storage.process_background_tasks(self.index, True)
 
         self.assertEqual([
             (utils.datetime_utc(2014, 1, 1), 86400.0, 39.75),
@@ -289,8 +285,7 @@ class TestStorageDriver(tests_base.TestCase):
                           [self.metric, metric2])
 
     def test_add_and_get_cross_metric_measures(self):
-        metric2 = storage.Metric(uuid.uuid4(),
-                                 self.archive_policies['low'])
+        metric2 = self._create_metric()
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
@@ -303,9 +298,8 @@ class TestStorageDriver(tests_base.TestCase):
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 10, 31), 4),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 4),
         ])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [self.metric, metric2]
-            self.storage.process_background_tasks(self.index, True)
+
+        self.storage.process_background_tasks(self.index, True)
 
         values = self.storage.get_cross_metric_measures([self.metric, metric2])
         self.assertEqual([
@@ -367,8 +361,7 @@ class TestStorageDriver(tests_base.TestCase):
         ], values)
 
     def test_add_and_get_cross_metric_measures_with_holes(self):
-        metric2 = storage.Metric(uuid.uuid4(),
-                                 self.archive_policies['low'])
+        metric2 = self._create_metric()
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
@@ -382,9 +375,8 @@ class TestStorageDriver(tests_base.TestCase):
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 6),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
         ])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [self.metric, metric2]
-            self.storage.process_background_tasks(self.index, True)
+
+        self.storage.process_background_tasks(self.index, True)
 
         values = self.storage.get_cross_metric_measures([self.metric, metric2])
         self.assertEqual([
@@ -396,8 +388,7 @@ class TestStorageDriver(tests_base.TestCase):
         ], values)
 
     def test_search_value(self):
-        metric2 = storage.Metric(uuid.uuid4(),
-                                 self.archive_policies['low'])
+        metric2 = self._create_metric()
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1,), 69),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 7, 31), 42),
@@ -412,9 +403,8 @@ class TestStorageDriver(tests_base.TestCase):
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 9, 31), 6),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 13, 10), 2),
         ])
-        with mock.patch.object(self.index, 'get_metrics') as f:
-            f.return_value = [self.metric, metric2]
-            self.storage.process_background_tasks(self.index, True)
+
+        self.storage.process_background_tasks(self.index, True)
 
         self.assertEqual(
             {metric2: [],
