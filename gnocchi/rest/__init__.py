@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
+# Copyright © 2016 Red Hat, Inc.
 # Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,6 +14,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import itertools
 import uuid
 
 from oslo_utils import strutils
@@ -1056,8 +1058,7 @@ class SearchResourceTypeController(rest.RestController):
         )
     )
 
-    @pecan.expose('json')
-    def post(self, **kwargs):
+    def _search(self, **kwargs):
         if pecan.request.body:
             attr_filter = deserialize_and_validate(self.ResourceSearchSchema)
         else:
@@ -1080,13 +1081,17 @@ class SearchResourceTypeController(rest.RestController):
             else:
                 attr_filter = policy_filter
 
+        return pecan.request.indexer.list_resources(
+            self._resource_type,
+            attribute_filter=attr_filter,
+            details=details,
+            history=history,
+            **pagination_opts)
+
+    @pecan.expose('json')
+    def post(self, **kwargs):
         try:
-            return pecan.request.indexer.list_resources(
-                self._resource_type,
-                attribute_filter=attr_filter,
-                details=details,
-                history=history,
-                **pagination_opts)
+            return self._search(**kwargs)
         except indexer.IndexerException as e:
             abort(400, e)
 
@@ -1230,15 +1235,51 @@ class AggregationResource(rest.RestController):
 
     @pecan.expose('json')
     def post(self, start=None, stop=None, aggregation='mean',
-             granularity=None, needed_overlap=100.0):
-        resources = SearchResourceTypeController(self.resource_type).post()
-        metrics = []
-        for r in resources:
-            m = r.get_metric(self.metric_name)
-            if m:
-                metrics.append(m)
-        return AggregatedMetricController.get_cross_metric_measures_from_objs(
-            metrics, start, stop, aggregation, granularity, needed_overlap)
+             granularity=None, needed_overlap=100.0,
+             groupby=None):
+        # First, set groupby in the right format: a sorted list of unique
+        # strings.
+        if groupby:
+            if not isinstance(groupby, list):
+                groupby = [groupby]
+            groupby = sorted(set(groupby))
+        else:
+            groupby = []
+
+        # NOTE(jd) Sort by groupby so we are sure we do not return multiple
+        # groups when using itertools.groupby later.
+        try:
+            resources = SearchResourceTypeController(
+                self.resource_type)._search(sort=groupby)
+        except indexer.InvalidPagination:
+            abort(400, "Invalid groupby attribute")
+
+        if resources is None:
+            return []
+
+        if not groupby:
+            metrics = list(filter(None,
+                                  (r.get_metric(self.metric_name)
+                                   for r in resources)))
+            return AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
+                metrics, start, stop, aggregation, granularity, needed_overlap)
+
+        def groupper(r):
+            return tuple((attr, r[attr]) for attr in groupby)
+
+        results = []
+        for key, resources in itertools.groupby(resources, groupper):
+            metrics = list(filter(None,
+                                  (r.get_metric(self.metric_name)
+                                   for r in resources)))
+            results.append({
+                "group": dict(key),
+                "measures": AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
+                    metrics, start, stop, aggregation,
+                    granularity, needed_overlap)
+            })
+
+        return results
 
 
 class Aggregation(rest.RestController):
