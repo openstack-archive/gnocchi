@@ -1281,12 +1281,7 @@ class AggregationResourceController(rest.RestController):
              groupby=None):
         # First, set groupby in the right format: a sorted list of unique
         # strings.
-        if groupby:
-            if not isinstance(groupby, list):
-                groupby = [groupby]
-            groupby = sorted(set(groupby))
-        else:
-            groupby = []
+        groupby = sorted(set(arg_to_list(groupby)))
 
         # NOTE(jd) Sort by groupby so we are sure we do not return multiple
         # groups when using itertools.groupby later.
