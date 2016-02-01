@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
+# Copyright © 2016 Red Hat, Inc.
 # Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,6 +14,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import itertools
 import uuid
 
 from oslo_utils import strutils
@@ -1230,8 +1232,37 @@ class AggregationResource(rest.RestController):
 
     @pecan.expose('json')
     def post(self, start=None, stop=None, aggregation='mean',
-             granularity=None, needed_overlap=100.0):
+             granularity=None, needed_overlap=100.0,
+             groupby=None):
         resources = SearchResourceTypeController(self.resource_type).post()
+
+        if groupby is not None and resources:
+            if not isinstance(groupby, list):
+                groupby = [groupby]
+            groupby = sorted(set(groupby))
+            for g in groupby:
+                if g not in resources[0]:
+                    abort(400, "Invalid groupby field `%s'" % g)
+
+            def groupper(r):
+                return tuple((attr, r[attr]) for attr in groupby)
+
+            results = []
+            for key, resources in itertools.groupby(resources, groupper):
+                metrics = []
+                for r in resources:
+                    m = r.get_metric(self.metric_name)
+                    if m:
+                        metrics.append(m)
+                results.append({
+                    "group": dict(key),
+                    "measures": AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
+                        metrics, start, stop, aggregation,
+                        granularity, needed_overlap)
+                })
+
+            return results
+
         metrics = []
         for r in resources:
             m = r.get_metric(self.metric_name)
