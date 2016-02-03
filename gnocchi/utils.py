@@ -44,6 +44,13 @@ def ResourceUUID(value):
         raise ValueError(e)
 
 
+def FormatedUUID(value):
+    try:
+        return six.text_type(uuid.UUID(value))
+    except Exception:
+        return value
+
+
 def to_timestamp(v):
     if isinstance(v, datetime.datetime):
         return v

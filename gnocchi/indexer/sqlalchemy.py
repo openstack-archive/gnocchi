@@ -653,6 +653,10 @@ class QueryTransformer(object):
 
                 if isinstance(attr.type, base.PreciseTimestamp):
                     converter = utils.to_timestamp
+                elif field_name in ["project_id", "user_id",
+                                    "created_by_project_id",
+                                    "created_by_user_id"]:
+                    converter = utils.FormatedUUID
                 elif (isinstance(attr.type, sqlalchemy_utils.UUIDType)
                       and not isinstance(value, uuid.UUID)):
                     converter = utils.ResourceUUID

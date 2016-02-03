@@ -51,8 +51,8 @@ def abort(status_code, detail='', headers=None, comment=None, **kw):
 
 def get_user_and_project():
     headers = pecan.request.headers
-    user_id = headers.get("X-User-Id")
-    project_id = headers.get("X-Project-Id")
+    user_id = utils.FormatedUUID(headers.get("X-User-Id"))
+    project_id = utils.FormatedUUID(headers.get("X-Project-Id"))
     return (user_id, project_id)
 
 
@@ -584,8 +584,8 @@ class MetricsController(rest.RestController):
         return MetricController(metrics[0]), remainder
 
     _MetricSchema = voluptuous.Schema({
-        "user_id": six.text_type,
-        "project_id": six.text_type,
+        "user_id": utils.FormatedUUID,
+        "project_id": utils.FormatedUUID,
         "archive_policy_name": six.text_type,
         "name": six.text_type,
     })
@@ -651,15 +651,15 @@ class MetricsController(rest.RestController):
         except webob.exc.HTTPForbidden:
             enforce("list metric", {})
             user_id, project_id = get_user_and_project()
-            provided_user_id = kwargs.get('user_id')
-            provided_project_id = kwargs.get('project_id')
+            provided_user_id = utils.FormatedUUID(kwargs.get('user_id'))
+            provided_project_id = utils.FormatedUUID(kwargs.get('project_id'))
             if ((provided_user_id and user_id != provided_user_id)
                or (provided_project_id and project_id != provided_project_id)):
                 abort(
                     403, "Insufficient privileges to filter by user/project")
         else:
-            user_id = kwargs.get('user_id')
-            project_id = kwargs.get('project_id')
+            user_id = utils.FormatedUUID(kwargs.get('user_id'))
+            project_id = utils.FormatedUUID(kwargs.get('project_id'))
         return pecan.request.indexer.list_metrics(
             user_id, project_id)
 
@@ -803,8 +803,10 @@ def ResourceSchema(schema):
         "id": utils.ResourceUUID,
         voluptuous.Optional('started_at'): Timestamp,
         voluptuous.Optional('ended_at'): Timestamp,
-        voluptuous.Optional('user_id'): voluptuous.Any(None, six.text_type),
-        voluptuous.Optional('project_id'): voluptuous.Any(None, six.text_type),
+        voluptuous.Optional('user_id'): voluptuous.Any(
+            None, utils.FormatedUUID),
+        voluptuous.Optional('project_id'): voluptuous.Any(
+            None, utils.FormatedUUID),
         voluptuous.Optional('metrics'): MetricsSchema,
     }
     base_schema.update(schema)
