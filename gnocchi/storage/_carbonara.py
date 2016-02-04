@@ -16,6 +16,7 @@
 import collections
 import logging
 import multiprocessing
+import random
 import uuid
 
 from concurrent import futures
@@ -45,6 +46,7 @@ LOG = logging.getLogger(__name__)
 
 class CarbonaraBasedStorage(storage.StorageDriver):
     MEASURE_PREFIX = "measure"
+    METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE = 128
 
     def __init__(self, conf):
         super(CarbonaraBasedStorage, self).__init__(conf)
@@ -59,6 +61,12 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 self.aggregation_workers_number = 2
         else:
             self.aggregation_workers_number = conf.aggregation_workers_number
+
+        # NOTE: build weighted list to choose what partition to processs. it is
+        #       weighted more to first partition.
+        parts = [(i, (conf.metricd.workers - i) ** 2) for i in
+                 range(conf.metricd.workers)]
+        self.weighted_parts = [val for val, cnt in parts for i in range(cnt)]
 
     def stop(self):
         self.coord.stop()
@@ -442,3 +450,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # We use 'list' to iterate all threads here to raise the first
             # exception now, not much choice
             return list(executor.map(lambda args: method(*args), list_of_args))
+
+    def _get_random_partition(self):
+        return random.choice(self.weighted_parts)
