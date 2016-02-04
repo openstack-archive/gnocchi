@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
+# Copyright © 2016 Red Hat, Inc.
 # Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -356,21 +357,44 @@ class AggregatedTimeSerie(TimeSerie):
         :param d: The dict.
         :returns: A TimeSerie object
         """
-        timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
+        timestamps = d.get('timestamps')
+        # FIXME(jd) sampling must be mandatory at this stage!
+        sampling = d.get('sampling')
+        first_timestamp = d.get('first_timestamp')
+        timestamps = list(six.moves.map(
+            lambda v: pandas.Timestamp(
+                10e8 * ((v * sampling) + first_timestamp)),
+            timestamps))
         return cls.from_data(
-            timestamps, values,
+            timestamps,
+            d.get('values'),
             max_size=d.get('max_size'),
             sampling=d.get('sampling'),
             aggregation_method=d.get('aggregation_method', 'mean'))
 
     def to_dict(self):
-        d = super(AggregatedTimeSerie, self).to_dict()
-        d.update({
+        if self.ts.empty:
+            timestamps = []
+            values = []
+            first_timestamp = 0
+        else:
+            first_timestamp = float(
+                self.get_split_key(self.ts.index[0], self.sampling))
+            timestamps = [
+                int((i - pandas.Timestamp(
+                    first_timestamp * 10e8)).total_seconds() / self.sampling)
+                for i in self.ts.index
+            ]
+            values = self.ts.values.tolist()
+
+        return {
+            'first_timestamp': first_timestamp,
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
             'sampling': self._serialize_time_period(self._sampling),
-        })
-        return d
+            'timestamps': timestamps,
+            'values': values,
+        }
 
     def _truncate(self):
         """Truncate the timeserie."""
