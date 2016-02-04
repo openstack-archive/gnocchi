@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
+# Copyright © 2016 Red Hat, Inc.
 # Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -356,21 +357,45 @@ class AggregatedTimeSerie(TimeSerie):
         :param d: The dict.
         :returns: A TimeSerie object
         """
-        timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
+        # FIXME(jd) sampling must be mandatory at this stage!
+        sampling = d.get('sampling')
+        prev_timestamp = pandas.Timestamp(d.get('first_timestamp') * 10e8)
+        timestamps = []
+        for delta in d.get('timestamps'):
+            prev_timestamp = datetime.timedelta(seconds=delta * sampling) + prev_timestamp
+            timestamps.append(prev_timestamp)
         return cls.from_data(
-            timestamps, values,
+            timestamps,
+            d.get('values'),
             max_size=d.get('max_size'),
             sampling=d.get('sampling'),
             aggregation_method=d.get('aggregation_method', 'mean'))
 
     def to_dict(self):
-        d = super(AggregatedTimeSerie, self).to_dict()
-        d.update({
+        if self.ts.empty:
+            timestamps = []
+            values = []
+            first_timestamp = 0
+        else:
+            first_timestamp = float(
+                self.get_split_key(self.ts.index[0], self.sampling))
+            timestamps = []
+            prev_timestamp = pandas.Timestamp(first_timestamp * 10e8)
+            for i in self.ts.index:
+                # Use double delta encoding for timestamps
+                timestamps.append(int(
+                    (i - prev_timestamp).total_seconds() / self.sampling))
+                prev_timestamp = i
+            values = self.ts.values.tolist()
+
+        return {
+            'first_timestamp': first_timestamp,
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
             'sampling': self._serialize_time_period(self._sampling),
-        })
-        return d
+            'timestamps': timestamps,
+            'values': values,
+        }
 
     def _truncate(self):
         """Truncate the timeserie."""
