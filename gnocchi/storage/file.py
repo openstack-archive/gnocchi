@@ -133,7 +133,10 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                         raise
 
     def _list_metric_with_measures_to_process(self):
-        return os.listdir(self.measure_path)
+        part = self._get_random_partition()
+        return os.listdir(self.measure_path)[
+            self.METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE * part:
+            self.METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE * (part + 1)]
 
     def _list_measures_container_for_metric_id(self, metric_id):
         try:

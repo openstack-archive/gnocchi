@@ -16,6 +16,7 @@
 
 import contextlib
 import datetime
+from itertools import islice
 import logging
 import uuid
 
@@ -50,8 +51,6 @@ OPTS = [
 
 
 class CephStorage(_carbonara.CarbonaraBasedStorage):
-
-    METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE = 128
 
     def __init__(self, conf):
         super(CephStorage, self).__init__(conf)
@@ -104,7 +103,11 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             except rados.ObjectNotFound:
                 return []
         metrics = set()
-        for name, __ in xattrs:
+        part = self._get_random_partition()
+        for name, __ in islice(
+                xattrs,
+                self.METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE * part,
+                None):
             metrics.add(name.split("_")[1])
             if (len(metrics) >=
                self.METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE):
