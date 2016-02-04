@@ -74,6 +74,7 @@ class MetricProcessBase(multiprocessing.Process):
                     stop_max_delay=300000)
     def _configure(self):
         self.store = storage.get_driver(self.conf)
+        self.store.enable_partitioning(self.conf.metricd.workers)
         self.index = indexer.get_driver(self.conf)
         self.index.connect()
 
