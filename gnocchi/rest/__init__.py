@@ -1217,7 +1217,7 @@ class SearchController(object):
     metric = SearchMetricController()
 
 
-class AggregationResource(rest.RestController):
+class ResourceAggregationController(rest.RestController):
     def __init__(self, resource_type, metric_name):
         self.resource_type = resource_type
         self.metric_name = metric_name
@@ -1235,25 +1235,32 @@ class AggregationResource(rest.RestController):
             metrics, start, stop, aggregation, granularity, needed_overlap)
 
 
-class Aggregation(rest.RestController):
-    _custom_actions = {
-        'metric': ['GET'],
-    }
-
-    @pecan.expose()
-    def _lookup(self, object_type, subtype, key, metric_name, *remainder):
-        if object_type == 'resource' and key == 'metric':
-            return AggregationResource(subtype, metric_name), remainder
-        return super(Aggregation, self)._lookup(object_type, subtype, key,
-                                                metric_name, *remainder)
-
+class MetricAggregationController(rest.RestController):
+    @staticmethod
     @pecan.expose('json')
-    def get_metric(self, metric=None, start=None,
-                   stop=None, aggregation='mean',
-                   granularity=None, needed_overlap=100.0):
+    def get(metric=None, start=None, stop=None, aggregation='mean',
+            granularity=None, needed_overlap=100.0):
         return AggregatedMetricController.get_cross_metric_measures_from_ids(
             arg_to_list(metric), start, stop, aggregation,
             granularity, needed_overlap)
+
+
+class ResourceTypeAggregationController(object):
+    @pecan.expose()
+    def _lookup(self, resource_type, key, metric_name, *remainder):
+        if resource_type not in RESOURCE_SCHEMA_MANAGER:
+            abort(404, indexer.NoSuchResourceType(resource_type))
+        elif key != "metric" or not metric_name:
+            # NOTE(sileht): we want the raw 404 message here
+            # so use directly pecan
+            pecan.abort(404)
+        return ResourceAggregationController(resource_type,
+                                             metric_name), remainder
+
+
+class AggregationController(object):
+    resource = ResourceTypeAggregationController()
+    metric = MetricAggregationController()
 
 
 class CapabilityController(rest.RestController):
@@ -1291,7 +1298,7 @@ class V1Controller(object):
             "metric": MetricsController(),
             "batch": BatchController(),
             "resource": ResourcesByTypeController(),
-            "aggregation": Aggregation(),
+            "aggregation": AggregationController(),
             "capabilities": CapabilityController(),
             "status": StatusController(),
         }
