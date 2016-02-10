@@ -144,6 +144,9 @@ class FakeRadosModule(object):
             del self.kvs[key]
             del self.kvs_xattrs[key]
 
+        def aio_remove(self, key):
+            self.remove_object(key)
+
     class FakeRados(object):
         def __init__(self, kvs, kvs_xattrs):
             self.kvs = kvs
