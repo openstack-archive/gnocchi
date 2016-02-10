@@ -146,3 +146,14 @@ So, in realistic scenarios, the direct relation between the archive policy and
 the size of the rados objects created by Gnocchi is not a problem.
 
 .. _`Ceph extended attributes documentation`: http://docs.ceph.com/docs/master/rados/configuration/filestore-config-ref/#extended-attributes
+
+
+Swift driver implementation details
+-----------------------------------
+
+The Swift driver leverages the bulk delete functionality provided by the bulk_
+middleware to minimise the amount of requests made to clean storage data. This
+middleware must be enabled to ensure Gnocchi functions correctly. By default,
+Swift has this middleware enabled in its pipeline.
+
+.. _bulk: http://docs.openstack.org/liberty/config-reference/content/object-storage-bulk-delete.html
