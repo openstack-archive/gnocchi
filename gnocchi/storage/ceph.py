@@ -118,7 +118,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             for n in object_names:
                 try:
                     ctx.rm_xattr(self.MEASURE_PREFIX, n)
-                    ctx.remove_object(n)
+                    ctx.aio_remove(n)
                 except rados.ObjectNotFound:
                     # Another worker may have removed it, don't worry.
                     pass
@@ -140,7 +140,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             # Now clean objects and xattrs
             for n in object_names:
                 ctx.rm_xattr(self.MEASURE_PREFIX, n)
-                ctx.remove_object(n)
+                ctx.aio_remove(n)
 
     def _get_ioctx(self):
         return self.rados.open_ioctx(self.pool)
@@ -184,10 +184,10 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 pass
             else:
                 for xattr, _ in xattrs:
-                    ioctx.remove_object(xattr)
+                    ioctx.aio_remove(xattr)
             for name in ('container', 'none'):
                 try:
-                    ioctx.remove_object("gnocchi_%s_%s" % (metric.id, name))
+                    ioctx.aio_remove("gnocchi_%s_%s" % (metric.id, name))
                 except rados.ObjectNotFound:
                     # Maybe it never got measures
                     pass
@@ -280,7 +280,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         with self._get_ioctx() as ioctx:
             for aggregation in metric.archive_policy.aggregation_methods:
                 try:
-                    ioctx.remove_object(
+                    ioctx.aio_remove(
                         str("gnocchi_%s_%s" % (metric.id, aggregation)))
                 except rados.ObjectNotFound:
                     pass
