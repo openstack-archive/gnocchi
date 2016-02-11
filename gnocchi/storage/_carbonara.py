@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 #
+# Copyright © 2016 Red Hat, Inc.
 # Copyright © 2014-2015 eNovance
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -14,6 +15,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import collections
+import datetime
 import logging
 import multiprocessing
 import uuid
@@ -183,13 +185,23 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             sampling=granularity,
             max_size=points)
 
-    def _add_measures(self, aggregation, granularity, metric, timeserie):
-        ts = self._get_measures_timeserie(metric, aggregation, granularity,
+    def _add_measures(self, aggregation, archive_policy_def,
+                      metric, timeserie):
+        ts = self._get_measures_timeserie(metric, aggregation,
+                                          archive_policy_def.granularity,
                                           timeserie.first, timeserie.last)
         ts.update(timeserie)
         for key, split in ts.split():
-            self._store_metric_measures(metric, key, aggregation, granularity,
+            self._store_metric_measures(metric, key, aggregation,
+                                        archive_policy_def.granularity,
                                         split.serialize())
+
+        if ts.last and archive_policy_def.timespan:
+            oldest_point_to_keep = ts.last - datetime.timedelta(
+                seconds=archive_policy_def.timespan)
+            self._delete_metric_measures_before(metric, aggregation,
+                                                archive_policy_def.granularity,
+                                                oldest_point_to_keep)
 
     def add_measures(self, metric, measures):
         self._store_measures(metric, msgpackutils.dumps(
@@ -217,6 +229,24 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # here too
             self._delete_metric_archives(metric)
             self._delete_metric(metric)
+
+    def _delete_metric_measures_before(self, metric, aggregation_method,
+                                       granularity, timestamp):
+        """Delete measures for a metric before a timestamp."""
+        ts = carbonara.AggregatedTimeSerie.get_split_key(timestamp, granularity)
+        for key in self._list_split_keys_for_metric(
+                metric, aggregation_method, granularity):
+            # NOTE(jd) Only delete if the key is strictly inferior to
+            # the timestamp; we don't delete any timeserie split that
+            # contains our timestamp, so we prefer to keep a bit more
+            # than deleting too much
+            if key < ts:
+                self._delete_metric_measure(
+                    metric, key, aggregation_method, granularity)
+
+    @staticmethod
+    def _delete_metric_measure(metric, timestamp_key, aggregation, granularity):
+        raise NotImplementedError
 
     @staticmethod
     def _unserialize_measures(data):
@@ -336,8 +366,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         def _map_add_measures(bound_timeserie):
                             self._map_in_thread(
                                 self._add_measures,
-                                ((aggregation, d.granularity,
-                                 metric, bound_timeserie)
+                                ((aggregation, d, metric, bound_timeserie)
                                  for aggregation in agg_methods
                                  for d in metric.archive_policy.definition))
 
