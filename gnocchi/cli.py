@@ -62,10 +62,11 @@ def statsd():
 
 
 class MetricProcessBase(multiprocessing.Process):
-    def __init__(self, conf, startup_delay=0, interval_delay=0):
+    def __init__(self, conf, worker_id=0, interval_delay=0):
         super(MetricProcessBase, self).__init__()
         self.conf = conf
-        self.startup_delay = startup_delay
+        self.worker_id = worker_id
+        self.startup_delay = worker_id
         self.interval_delay = interval_delay
 
     # Retry with exponential backoff for up to 5 minutes
@@ -74,6 +75,7 @@ class MetricProcessBase(multiprocessing.Process):
                     stop_max_delay=300000)
     def _configure(self):
         self.store = storage.get_driver(self.conf)
+        self.store.partition = self.worker_id
         self.index = indexer.get_driver(self.conf)
         self.index.connect()
 
@@ -98,9 +100,21 @@ class MetricProcessBase(multiprocessing.Process):
 
 
 class MetricReporting(MetricProcessBase):
+    def __init__(self, conf, worker_id=0, interval_delay=0, queues=None):
+        super(MetricReporting, self).__init__(conf, worker_id, interval_delay)
+        self.queues = queues
+
     def _run_job(self):
         try:
             report = self.store.measures_report(details=False)
+            if self.queues:
+                partition_size = len(report) // len(self.queues)
+                if partition_size < 16:
+                    partition_size = 16
+                elif partition_size > 256:
+                    partition_size = 256
+                for queue in self.queues:
+                    queue.put(partition_size)
             LOG.info("Metricd reporting: %d measurements bundles across %d "
                      "metrics wait to be processed.",
                      report['summary']['metrics'],
@@ -111,8 +125,19 @@ class MetricReporting(MetricProcessBase):
 
 
 class MetricProcessor(MetricProcessBase):
+    def __init__(self, conf, worker_id=0, interval_delay=0, queue=None):
+        super(MetricProcessor, self).__init__(conf, worker_id, interval_delay)
+        self.queue = queue
+        self.part_size = 128
+
     def _run_job(self):
         try:
+            if self.queue:
+                while not self.queue.empty():
+                    self.part_size = self.queue.get()
+            self.store.partition_size = self.part_size or 128
+            LOG.error('worker: %s, block_size: %s', self.store.partition,
+                      self.store.partition_size)
             self.store.process_background_tasks(self.index)
         except Exception:
             LOG.error("Unexpected error during measures processing",
@@ -121,25 +146,33 @@ class MetricProcessor(MetricProcessBase):
 
 def metricd():
     conf = service.prepare_service()
+    if (conf.storage.metric_reporting_delay <
+            conf.storage.metric_processing_delay):
+        LOG.error("Metric reporting must run less frequently then processing")
+        sys.exit(0)
 
     signal.signal(signal.SIGTERM, _metricd_terminate)
 
     try:
+        queues = []
+        for __ in range(conf.metricd.workers):
+            queues.append(multiprocessing.Queue())
         metric_report = MetricReporting(
-            conf, 0, conf.storage.metric_reporting_delay)
+            conf, 0, conf.storage.metric_reporting_delay, queues)
         metric_report.start()
 
         workers = [metric_report]
         for worker in range(conf.metricd.workers):
             metric_worker = MetricProcessor(
-                conf, worker, conf.storage.metric_processing_delay)
+                conf, worker, conf.storage.metric_processing_delay,
+                queues[worker])
             metric_worker.start()
             workers.append(metric_worker)
 
         for worker in workers:
             worker.join()
     except KeyboardInterrupt:
-        _metricd_cleanup(workers)
+        _metricd_cleanup(workers, queues)
         sys.exit(0)
     except Exception:
         LOG.warning("exiting", exc_info=True)
@@ -147,7 +180,9 @@ def metricd():
         sys.exit(1)
 
 
-def _metricd_cleanup(workers):
+def _metricd_cleanup(workers, queues):
+    for queue in queues:
+        queue.close()
     for worker in workers:
         worker.terminate()
     for worker in workers:

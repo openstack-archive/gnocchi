@@ -45,7 +45,6 @@ LOG = logging.getLogger(__name__)
 
 class CarbonaraBasedStorage(storage.StorageDriver):
     MEASURE_PREFIX = "measure"
-    METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE = 128
 
     def __init__(self, conf):
         super(CarbonaraBasedStorage, self).__init__(conf)
@@ -60,6 +59,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 self.aggregation_workers_number = 2
         else:
             self.aggregation_workers_number = conf.aggregation_workers_number
+        self.partition = 0
+        self.partition_size = 128
 
     def stop(self):
         self.coord.stop()
