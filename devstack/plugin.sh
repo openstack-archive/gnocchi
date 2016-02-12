@@ -343,9 +343,14 @@ function install_gnocchi {
 
     is_service_enabled key && EXTRA_FLAVOR=,keystonmiddleware
 
-    # We don't use setup_package because we don't follow openstack/requirements
+    # We don't use setup_package because we don't follow openstack/requirementsc
     sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
 
+    if [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+        install_package cython
+        install_package librados-dev
+        sudo -H pip install -e "git+https://github.com/sileht/pycradox.git#egg=cradox"
+    fi
     if [ "$GNOCCHI_USE_MOD_WSGI" == "True" ]; then
         install_apache_wsgi
     fi
