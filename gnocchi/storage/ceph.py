@@ -16,6 +16,7 @@
 
 import contextlib
 import datetime
+import itertools
 import logging
 import uuid
 
@@ -121,11 +122,15 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             except rados.ObjectNotFound:
                 return []
         metrics = set()
-        for name, __ in xattrs:
+        if full:
+            objs_it = xattrs
+        else:
+            objs_it = itertools.islice(
+                xattrs, self.partition_size * self.partition, None)
+            objs_it = xattrs
+        for name, __ in objs_it:
             metrics.add(name.split("_")[1])
-            if (full is False and
-               len(metrics) >=
-               self.METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE):
+            if full is False and len(metrics) >= self.partition_size:
                 break
         return metrics
 

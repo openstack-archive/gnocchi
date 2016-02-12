@@ -141,7 +141,11 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                 metric_details if details else {})
 
     def _list_metric_with_measures_to_process(self, full=False):
-        return os.listdir(self.measure_path)
+        if full:
+            return os.listdir(self.measure_path)
+        return os.listdir(self.measure_path)[
+            self.partition_size * self.partition:
+            self.partition_size * (self.partition + 1)]
 
     def _list_measures_container_for_metric_id(self, metric_id):
         try:
