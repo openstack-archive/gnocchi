@@ -321,6 +321,10 @@ function preinstall_gnocchi {
     else
         install_package postgresql-devel
     fi
+    if [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+            install_package cython
+            install_package librados-dev
+    fi
 }
 
 # install_gnocchi() - Collect source and prepare
