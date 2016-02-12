@@ -222,12 +222,10 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def _unserialize_measures(data):
         return msgpackutils.loads(data)
 
-    def measures_report(self):
-        metrics_to_process = self._list_metric_with_measures_to_process(
-            full=True)
-        return dict(
-            (metric_id, self._pending_measures_to_process_count(metric_id))
-            for metric_id in metrics_to_process)
+    def measures_report(self, details=True):
+        metrics, measures, full_details = self._build_report(details)
+        return {'summary': {'metrics': metrics, 'measures': measures},
+                'details': full_details}
 
     def _check_for_metric_upgrade(self, metric):
         lock = self._lock(metric.id)

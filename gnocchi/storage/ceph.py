@@ -82,6 +82,25 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             ioctx.write_full(name, data)
             ioctx.set_xattr(self.MEASURE_PREFIX, name, "")
 
+    def _build_report(self, details):
+        with self._get_ioctx() as ioctx:
+            try:
+                xattrs = ioctx.get_xattrs(self.MEASURE_PREFIX)
+            except rados.ObjectNotFound:
+                return 0, 0, {}
+        metrics = set()
+        count = 0
+        metric_details = {}
+        for name, __ in xattrs:
+            count += 1
+            metric = name.split("_")[1]
+            metrics.add(metric)
+            if details:
+                if metric not in metric_details:
+                    metric_details[metric] = 0
+                metric_details[metric] += 1
+        return len(metrics), count, metric_details
+
     def _list_object_names_to_process(self, ioctx, prefix):
         try:
             xattrs = ioctx.get_xattrs(self.MEASURE_PREFIX)
