@@ -104,6 +104,23 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             six.text_type(metric.id) + "/" + six.text_type(uuid.uuid4()) + now,
             data)
 
+    def _build_report(self, details):
+        headers, files = self.swift.get_container(self.MEASURE_PREFIX,
+                                                  delimiter='/',
+                                                  full_listing=True)
+        metrics = len(files)
+        measures = headers.get('x-container-object-count')
+        metric_details = {}
+        if details:
+            headers, files = self.swift.get_container(self.MEASURE_PREFIX,
+                                                      full_listing=True)
+            for f in files:
+                metric = f['name'].split('/', 1)[0]
+                if metric not in metric_details:
+                    metric_details[metric] = 0
+                metric_details[metric] += 1
+        return metrics, measures, metric_details
+
     def _list_metric_with_measures_to_process(self, full=False):
         limit = self.METRIC_WITH_MEASURES_TO_PROCESS_BATCH_SIZE
         if full:
