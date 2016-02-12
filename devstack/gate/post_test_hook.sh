@@ -32,6 +32,12 @@ function generate_testr_results {
 
 set -x
 
+if [ -x "$(command -v yum)" ]; then
+    sudo yum install -y cython cython3 librados2-devel
+else
+    sudo apt-get install -y cython cython3 librados-dev
+fi
+
 export GNOCCHI_DIR="$BASE/new/gnocchi"
 sudo chown -R stack:stack $GNOCCHI_DIR
 cd $GNOCCHI_DIR
