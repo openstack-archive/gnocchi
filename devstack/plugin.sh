@@ -321,6 +321,10 @@ function preinstall_gnocchi {
     else
         install_package postgresql-devel
     fi
+    if [[ "$GNOCCHI_USE_CRADOX" = 'True' ]] && [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+            install_package cython
+            install_package librados-dev
+    fi
 }
 
 # install_gnocchi() - Collect source and prepare
@@ -345,6 +349,10 @@ function install_gnocchi {
 
     # We don't use setup_package because we don't follow openstack/requirements
     sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
+
+    if [[ "$GNOCCHI_USE_CRADOX" = 'True' ]] && [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+        sudo -H pip install -U cradox
+    fi
 
     if [ "$GNOCCHI_USE_MOD_WSGI" == "True" ]; then
         install_apache_wsgi
