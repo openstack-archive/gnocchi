@@ -321,6 +321,24 @@ function preinstall_gnocchi {
     else
         install_package postgresql-devel
     fi
+    if [[ "$GNOCCHI_USE_CRADOX" = 'True' -a "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+            install_package cython
+            install_package librados-dev
+    fi
+}
+
+
+function source_gnocchi {
+    if [[ "$GNOCCHI_USE_CRADOX" = 'True' -a "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+        if is_ubuntu; then
+            sudo apt-add-repository 'deb http://download.ceph.com/debian-hammer/ $(lsb_release -sc) main'
+            REPOS_UPDATED=True apt_get_update
+        else
+            # FIXME(sileht): Does hammer is the centos version of ceph ?
+            # su -c 'rpm -Uvh http://download.ceph.com/rpms/{distro}/x86_64/ceph-{release}.el6.noarch.rpm'
+            die "GNOCCHI_USE_CRADOX = True is not supported on this OS"
+        fi
+    }
 }
 
 # install_gnocchi() - Collect source and prepare
@@ -343,9 +361,12 @@ function install_gnocchi {
 
     is_service_enabled key && EXTRA_FLAVOR=,keystonmiddleware
 
-    # We don't use setup_package because we don't follow openstack/requirements
+    # We don't use setup_package because we don't follow openstack/requirementsc
     sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
 
+    if [[ "$GNOCCHI_USE_CRADOX" = 'True' -a "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+        sudo -H pip install -e "git+https://github.com/sileht/pycradox.git#egg=cradox"
+    fi
     if [ "$GNOCCHI_USE_MOD_WSGI" == "True" ]; then
         install_apache_wsgi
     fi
@@ -424,7 +445,9 @@ function stop_gnocchi {
 }
 
 if is_service_enabled gnocchi-api; then
-    if [[ "$1" == "stack" && "$2" == "pre-install" ]]; then
+    if [[ "$1" == "source" ]]; then
+        source_gnocchi
+    elif [[ "$1" == "stack" && "$2" == "pre-install" ]]; then
         echo_summary "Configuring system services for Gnocchi"
         preinstall_gnocchi
     elif [[ "$1" == "stack" && "$2" == "install" ]]; then
