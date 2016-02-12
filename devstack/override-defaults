@@ -1,0 +1,11 @@
+
+
+if is_ubuntu; then
+    echo "Install cradox repo on ubuntu"
+    sudo apt-add-repository 'deb http://download.ceph.com/debian-hammer/ '$(lsb_release -sc)' main'
+    RETRY_UPDATE=True apt_get_update
+else
+    # FIXME(sileht): Does hammer is the centos version of ceph ?
+    # rpm -Uvh http://download.ceph.com/rpms/{distro}/x86_64/ceph-{release}.el6.noarch.rpm
+    die "GNOCCHI_USE_CRADOX = True is not supported on this OS"
+fi
