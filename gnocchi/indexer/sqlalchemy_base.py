@@ -222,6 +222,9 @@ class ResourceMixin(ResourceJsonifier):
                                              'identity', 'ipmi', 'stack',
                                              'image', 'instance_disk',
                                              'instance_network_interface',
+                                             'host',
+                                             'host_disk',
+                                             'host_network_interface',
                                              name="resource_type_enum"),
                              nullable=False, default='generic')
     created_by_user_id = sqlalchemy.Column(
