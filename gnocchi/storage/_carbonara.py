@@ -186,6 +186,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def _add_measures(self, aggregation, granularity, metric, timeserie):
         ts = self._get_measures_timeserie(metric, aggregation, granularity,
                                           timeserie.first, timeserie.last)
+
         ts.update(timeserie)
         for key, split in ts.split():
             self._store_metric_measures(metric, key, aggregation, granularity,
