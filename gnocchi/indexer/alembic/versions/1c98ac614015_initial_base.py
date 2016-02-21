@@ -16,7 +16,7 @@
 """Initial base for Gnocchi 1.0.0
 
 Revision ID: 1c98ac614015
-Revises: 
+Revises:
 Create Date: 2015-04-27 16:05:13.530625
 
 """
