@@ -645,4 +645,15 @@ class TimeSerieArchive(SerializableMixin):
 
     @classmethod
     def from_dict(cls, d):
-        return cls([AggregatedTimeSerie.from_dict(a) for a in d['archives']])
+        agg_list = []
+        for a in d['archives']:
+            if 'first_timestamp' in a:
+                agg_list.append(AggregatedTimeSerie.from_dict(a))
+            else:
+                timestamps, values = (
+                    TimeSerie._timestamps_and_values_from_dict(a['values']))
+                agg_list.append(AggregatedTimeSerie.from_data(
+                    a['sampling'], timestamps, values, a.get('max_size'),
+                    a.get('aggregation_method', 'mean')))
+
+        return cls(agg_list)
