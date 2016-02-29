@@ -460,8 +460,8 @@ class AggregatedTimeSerie(TimeSerie):
         if ts.ts.empty:
             return
         index = ts.ts.index
-        first_timestamp = index[0]
-        last_timestamp = index[-1]
+        first_timestamp = index[0] - pandas.Timedelta('1 nanoseconds')
+        last_timestamp = index[-1] + pandas.Timedelta('1 nanoseconds')
         # Build a new time serie excluding all data points in the range of the
         # timeserie passed as argument
         new_ts = self.ts[:first_timestamp].combine_first(
