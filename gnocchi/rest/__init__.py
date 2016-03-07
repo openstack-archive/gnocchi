@@ -476,9 +476,9 @@ def MeasureSchema(m):
         abort(400, "Invalid input for a value")
 
     try:
-        timestamp = utils.to_timestamp(m['timestamp'])
-    except Exception:
-        abort(400, "Invalid input for a timestamp")
+        timestamp = Timestamp(m['timestamp'])
+    except Exception as e:
+        abort(400, "Invalid input for timestamp `%s': %s" % (m['timestamp'], e))
 
     return storage.Measure(timestamp, value)
 
