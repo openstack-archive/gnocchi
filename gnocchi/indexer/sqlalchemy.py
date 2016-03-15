@@ -24,6 +24,7 @@ import oslo_db.api
 from oslo_db import exception
 from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import utils as oslo_db_utils
+from oslo_log import log
 import six
 import sqlalchemy
 import sqlalchemy_utils
@@ -42,6 +43,8 @@ ResourceHistory = base.ResourceHistory
 ResourceType = base.ResourceType
 
 _marker = indexer._marker
+
+LOG = log.getLogger(__name__)
 
 
 class PerInstanceFacade(object):
@@ -138,12 +141,26 @@ class ResourceClassMapper(object):
             tables = [Base.metadata.tables[klass.__tablename__]
                       for klass in mappers.values()]
 
-            # FIXME(sileht): Can this fail ?
             for table in tables:
-                table.drop(connection)
+                self._safe_table_drop(resource_type,
+                                      connection, table)
                 Base.metadata.remove(table)
 
             del self._cache[resource_type.tablename]
+
+    @staticmethod
+    @oslo_db.api.retry_on_deadlock
+    def _safe_table_drop(resource_type, connection, table):
+        try:
+            table.drop(connection)
+        except exception.DBDeadlock:
+            # Retry
+            raise
+        except Exception:
+            LOG.error("Fail to drop the table '%s', leaving it as-is, it's "
+                      "recommanded to delete it manually before recreating a "
+                      "resource type with the same '%s'." % (
+                          table.name, resource_type), exc_info=True)
 
 
 class SQLAlchemyIndexer(indexer.IndexerDriver):
