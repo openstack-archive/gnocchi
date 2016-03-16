@@ -34,6 +34,8 @@ from gnocchi import json
 from gnocchi import storage
 from gnocchi import utils
 
+_NOAUTH = False
+
 
 def arg_to_list(value):
     if isinstance(value, list):
@@ -41,6 +43,29 @@ def arg_to_list(value):
     elif value:
         return [value]
     return []
+
+
+def reset_state_on_forbidden(func):
+    @six.wraps(func)
+    def handle_exceptions(self, **kwargs):
+        try:
+            return func(self, **kwargs)
+        except webob.exc.HTTPForbidden:
+            user_id, project_id = get_user_and_project()
+            provided_user_id = kwargs.get('user_id')
+            provided_project_id = kwargs.get('project_id')
+
+            # deal with forbidden cause by user_id or project_id error
+            if ((provided_user_id and user_id != provided_user_id)
+               or (provided_project_id and project_id != provided_project_id)):
+                abort(
+                    403, "Insufficient privileges to filter by user/project")
+
+            global _NOAUTH
+            _NOAUTH = True
+            return func(self, **kwargs)
+
+    return handle_exceptions
 
 
 def abort(status_code, detail='', headers=None, comment=None, **kw):
@@ -496,10 +521,15 @@ class MetricController(rest.RestController):
     def enforce_metric(self, rule):
         enforce(rule, json.to_primitive(self.metric))
 
+    @reset_state_on_forbidden
     @pecan.expose('json')
-    def get_all(self):
-        self.enforce_metric("get metric")
-        return self.metric
+    def get_all(self, **kwargs):
+        if _NOAUTH is False:
+            self.enforce_metric("get metric")
+            return self.metric
+        else:
+            self.enforce_metric("get personal metric")
+            return self.metric
 
     @pecan.expose()
     def post_measures(self):
@@ -647,23 +677,16 @@ class MetricsController(rest.RestController):
         pecan.response.status = 201
         return m
 
-    @staticmethod
+    @reset_state_on_forbidden
     @pecan.expose('json')
-    def get_all(**kwargs):
-        try:
+    def get_all(self, **kwargs):
+        if _NOAUTH is False:
             enforce("list all metric", {})
-        except webob.exc.HTTPForbidden:
-            enforce("list metric", {})
-            user_id, project_id = get_user_and_project()
-            provided_user_id = kwargs.get('user_id')
-            provided_project_id = kwargs.get('project_id')
-            if ((provided_user_id and user_id != provided_user_id)
-               or (provided_project_id and project_id != provided_project_id)):
-                abort(
-                    403, "Insufficient privileges to filter by user/project")
         else:
-            user_id = kwargs.get('user_id')
-            project_id = kwargs.get('project_id')
+            enforce("list metric", {})
+
+        user_id = kwargs.get('user_id')
+        project_id = kwargs.get('project_id')
         attr_filter = {}
         if user_id is not None:
             attr_filter['creater_by_user_id'] = user_id
