@@ -19,6 +19,7 @@ import datetime
 import itertools
 import logging
 import uuid
+import time
 
 from oslo_config import cfg
 from oslo_utils import importutils
@@ -70,7 +71,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             raise ImportError("No module named 'rados' nor 'cradox'")
 
         LOG.info("Ceph storage backend use '%s' python library" %
-                 RADOS_MODULE_NAME)
+                 rados)
 
         # NOTE(sileht): librados handles reconnection itself,
         # by default if a call timeout (30sec), it raises
@@ -80,6 +81,47 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                                  rados_id=conf.ceph_username,
                                  conf=options)
         self.rados.connect()
+
+        self.lock_name = "measures"
+        self.MEASURE_DONE_PREFIX = self.MEASURE_PREFIX + "_done"
+
+    def cleanup(self):
+        with self._get_ioctx() as ioctx:
+            try:
+                ioctx.unlock(self.MEASURE_PREFIX, self.lock_name, 'del')
+            except Exception:
+                pass
+
+    @contextlib.contextmanager
+    def _measures_lock_allow_concurency(self, ioctx, cookie):
+        while True:
+            try:
+                ioctx.lock_shared(self.MEASURE_PREFIX, self.lock_name, cookie,
+                                  cookie)
+                break
+            except rados.ObjectBusy:
+                time.sleep(0.1)
+                LOG.debug("waiting for shared lock for %s" % cookie)
+
+        yield
+        ioctx.unlock(self.MEASURE_PREFIX, self.lock_name, cookie)
+
+    @contextlib.contextmanager
+    def _measures_lock_no_concurency(self, ioctx, cookie):
+        # NOTE(sileht): perhaps we should prioritize this one
+        # because when we call _list_metric_with_measures_to_process if
+        # other workers continue to grab the shared lock, in worse case
+        # this will wait until all workers tried to acquire the exclusive one
+        while True:
+            try:
+                ioctx.lock_exclusive(self.MEASURE_PREFIX, self.lock_name,
+                                     cookie)
+                break
+            except rados.ObjectBusy:
+                LOG.debug("waiting for exclusive lock for %s" % cookie)
+                time.sleep(0.1)
+        yield
+        ioctx.unlock(self.MEASURE_PREFIX, self.lock_name, cookie)
 
     def _store_measures(self, metric, data):
         # NOTE(sileht): list all objects in a pool is too slow with
@@ -94,18 +136,20 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             datetime.datetime.utcnow().strftime("%Y%m%d_%H:%M:%S")))
         with self._get_ioctx() as ioctx:
             ioctx.write_full(name, data)
-            ioctx.set_xattr(self.MEASURE_PREFIX, name, "")
+            with self._measures_lock_allow_concurency(ioctx,
+                                                      "_store_measures"):
+                ioctx.append(self.MEASURE_PREFIX, name + "\n")
 
     def _build_report(self, details):
         with self._get_ioctx() as ioctx:
-            try:
-                xattrs = ioctx.get_xattrs(self.MEASURE_PREFIX)
-            except rados.ObjectNotFound:
-                return 0, 0, {} if details else None
+            with self._measures_lock_allow_concurency(ioctx, "_build_report"):
+                names = self._list_object_names_to_process(ioctx)
+                if not names:
+                    return 0, 0, {} if details else None
         metrics = set()
         count = 0
         metric_details = defaultdict(int)
-        for name, __ in xattrs:
+        for name in names:
             count += 1
             metric = name.split("_")[1]
             metrics.add(metric)
@@ -113,32 +157,54 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 metric_details[metric] += 1
         return len(metrics), count, metric_details if details else None
 
-    def _list_object_names_to_process(self, ioctx, prefix):
+    def _list_object_names_to_process(self, ioctx, prefix=None):
         try:
-            xattrs = ioctx.get_xattrs(self.MEASURE_PREFIX)
+            data = self._get_object_content(ioctx, self.MEASURE_PREFIX)
+            names = data.split()[:-1]
         except rados.ObjectNotFound:
             return ()
-        return (name for name, __ in xattrs if name.startswith(prefix))
+        try:
+            data = self._get_object_content(ioctx, self.MEASURE_DONE_PREFIX)
+            done = data.split()[:-1]
+        except rados.ObjectNotFound:
+            done = []
+        names = set(names) - set(done)
+        if prefix is None:
+            return names
+        return (name for name in names if name.startswith(prefix))
 
     def _pending_measures_to_process_count(self, metric_id):
         with self._get_ioctx() as ioctx:
             object_prefix = self.MEASURE_PREFIX + "_" + str(metric_id)
-            return len(list(self._list_object_names_to_process(ioctx,
-                                                               object_prefix)))
+            with self._measures_lock_allow_concurency(
+                    ioctx, "_pending_measures_to_process_count "):
+                return len(list(self._list_object_names_to_process(
+                    ioctx, object_prefix)))
 
     def _list_metric_with_measures_to_process(self, block_size, full=False):
         with self._get_ioctx() as ioctx:
-            try:
-                xattrs = ioctx.get_xattrs(self.MEASURE_PREFIX)
-            except rados.ObjectNotFound:
+            with self._measures_lock_no_concurency(
+                    ioctx, "_list_metric_with_measures_to_process"):
+                names = self._list_object_names_to_process(ioctx)
+
+                # Cleanup measures and measures_done object
+                if names:
+                    ioctx.write_full(self.MEASURE_PREFIX,
+                                     "\n".join(names) + "\n")
+                else:
+                    ioctx.trunc(self.MEASURE_PREFIX, 0)
+                ioctx.trunc(self.MEASURE_DONE_PREFIX, 0)
+            if not names:
                 return []
         metrics = set()
         if full:
-            objs_it = xattrs
+            objs_it = names
         else:
             objs_it = itertools.islice(
-                xattrs, block_size * self.partition, None)
-        for name, __ in objs_it:
+                names, block_size * self.partition, None)
+        objs_it = list(objs_it)
+        print objs_it
+        for name in objs_it:
             metrics.add(name.split("_")[1])
             if full is False and len(metrics) >= block_size:
                 break
@@ -147,34 +213,45 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
     def _delete_unprocessed_measures_for_metric_id(self, metric_id):
         with self._get_ioctx() as ctx:
             object_prefix = self.MEASURE_PREFIX + "_" + str(metric_id)
-            object_names = self._list_object_names_to_process(ctx,
-                                                              object_prefix)
-            for n in object_names:
-                try:
-                    ctx.rm_xattr(self.MEASURE_PREFIX, n)
-                except rados.ObjectNotFound:
-                    # Another worker may have removed it, don't worry.
-                    pass
-                ctx.aio_remove(n)
+            with self._measures_lock_allow_concurency(
+                    ctx, "_delete_unprocessed_measures_for_metric_id"):
+                object_names = self._list_object_names_to_process(
+                    ctx, object_prefix)
+                for n in object_names:
+                    try:
+                        ctx.append(self.MEASURE_DONE_PREFIX, n + '\n')
+                    finally:
+                        ctx.aio_remove(n)
 
     @contextlib.contextmanager
     def _process_measure_for_metric(self, metric):
         with self._get_ioctx() as ctx:
             object_prefix = self.MEASURE_PREFIX + "_" + str(metric.id)
-            object_names = list(self._list_object_names_to_process(
-                ctx, object_prefix))
+            with self._measures_lock_allow_concurency(
+                    ctx, "_process_measure_for_metric_read"):
+                object_names = list(self._list_object_names_to_process(
+                    ctx, object_prefix))
 
             measures = []
             for n in object_names:
-                data = self._get_object_content(ctx, n)
+                try:
+                    data = self._get_object_content(ctx, n)
+                except rados.ObjectNotFound:
+                    # WHAT ???!!!
+                    LOG.exception("%s doesn't exists anymore" % n)
+                    continue
                 measures.extend(self._unserialize_measures(data))
 
             yield measures
 
             # Now clean objects and xattrs
-            for n in object_names:
-                ctx.rm_xattr(self.MEASURE_PREFIX, n)
-                ctx.aio_remove(n)
+            with self._measures_lock_allow_concurency(
+                    ctx, "_process_measure_for_metric_write"):
+                for n in object_names:
+                    try:
+                        ctx.append(self.MEASURE_DONE_PREFIX, n + '\n')
+                    finally:
+                        ctx.aio_remove(n)
 
     def _get_ioctx(self):
         return self.rados.open_ioctx(self.pool)
