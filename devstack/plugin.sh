@@ -56,8 +56,13 @@ function is_gnocchi_enabled {
 # gnocchi_swift         gnocchi_swift  ResellerAdmin  (if Swift is enabled)
 function create_gnocchi_accounts {
     # Gnocchi
-    if is_service_enabled key && is_service_enabled gnocchi-api
+    if is_service_enabled gnocchi-api
     then
+        # At this time, the /etc/openstack/clouds.yaml is available,
+        # we could leverage that by setting OS_CLOUD
+        OLD_OS_CLOUD=$OS_CLOUD
+        export OS_CLOUD='devstack-admin'
+
         create_service_user "gnocchi"
 
         local gnocchi_service=$(get_or_create_service "gnocchi" \
@@ -74,6 +79,8 @@ function create_gnocchi_accounts {
                 "$SERVICE_PASSWORD" default "gnocchi_swift@example.com")
             get_or_add_user_project_role "ResellerAdmin" $gnocchi_swift_user "gnocchi_swift"
         fi
+
+        export OS_CLOUD=$OLD_OS_CLOUD
     fi
 }
 
