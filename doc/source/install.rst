@@ -63,6 +63,17 @@ install extra variants using, for example::
   pip install -e .[postgresql,ceph]
 
 
+Ceph requirements
+-----------------
+
+Gnocchi leverages omap API of librados, but this is available only since
+python-rados >= 9.1.0. So Gnocchi uses 'cradox' python library that have
+exactly the same API.
+
+If Ceph and python-rados are >= 9.1.0, cradox python library become optional
+but still recommanded until 10.1.0.
+
+
 Initialization
 ==============
 
