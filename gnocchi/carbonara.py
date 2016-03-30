@@ -223,8 +223,8 @@ class BoundTimeSerie(TimeSerie):
 
     def set_values(self, values, before_truncate_callback=None,
                    ignore_too_old_timestamps=False):
+        # NOTE: values must be sorted when passed in.
         if self.block_size is not None and not self.ts.empty:
-            values = sorted(values, key=operator.itemgetter(0))
             first_block_timestamp = self._first_block_timestamp()
             if ignore_too_old_timestamps:
                 for index, (timestamp, value) in enumerate(values):

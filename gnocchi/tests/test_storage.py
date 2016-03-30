@@ -115,21 +115,22 @@ class TestStorageDriver(tests_base.TestCase):
     def test_add_measures_big_update_subset(self):
         m, m_sql = self._create_metric('medium')
         measures = [
-            storage.Measure(datetime.datetime(2014, 1, i, j, 0, 0), 100)
-            for i in six.moves.range(1, 6) for j in six.moves.range(0, 24)]
-        measures.append(
-            storage.Measure(datetime.datetime(2014, 1, 6, 0, 0, 0), 100))
+            storage.Measure(datetime.datetime(2014, 1, 6, i, j, 0), 100)
+            for i in six.moves.range(2) for j in six.moves.range(0, 60, 2)]
         self.storage.add_measures(m, measures)
         self.storage.process_background_tasks(self.index, sync=True)
 
+        # add measure to end, in same aggregate time as last point.
         self.storage.add_measures(m, [
-            storage.Measure(datetime.datetime(2014, 1, 6, 1, 0, 0), 100)])
+            storage.Measure(datetime.datetime(2014, 1, 6, 1, 58, 1), 100)])
 
         with mock.patch.object(self.storage, '_store_metric_measures') as c:
+            # should only resample last aggregate
             self.storage.process_background_tasks(self.index, sync=True)
         count = 0
         for call in c.mock_calls:
-            if mock.call(m_sql, mock.ANY, 'mean', 3600.0, mock.ANY) == call:
+            # policy is 60 points and split is 48. should only update 2nd half
+            if mock.call(m_sql, mock.ANY, 'mean', 60.0, mock.ANY) == call:
                 count += 1
         self.assertEqual(1, count)
 
