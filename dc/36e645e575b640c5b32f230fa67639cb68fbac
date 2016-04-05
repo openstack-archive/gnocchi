@@ -1,0 +1,12 @@
+Code-Review+2: gordon chung <gord@live.ca>
+Code-Review+1: Kshitiz Arora <kshitiz.arora@ericsson.com>
+Code-Review+1: Anil Vashistha <anil.vashistha@ericsson.com>
+Code-Review+1: zhangguoqing <zhang.guoqing@99cloud.net>
+Code-Review+2: Chris Dent <cdent@anticdent.org>
+Workflow+1: Chris Dent <cdent@anticdent.org>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 05 Apr 2016 15:49:15 +0000
+Reviewed-on: https://review.openstack.org/300522
+Project: openstack/gnocchi
+Branch: refs/heads/master
