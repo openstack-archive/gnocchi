@@ -17,7 +17,7 @@
 STORAGE_DRIVER="$1"
 SQL_DRIVER="$2"
 
-ENABLED_SERVICES="key,gnocchi-api,gnocchi-metricd,"
+ENABLED_SERVICES="key,gnocchi-api,gnocchi-metricd,tempest"
 
 # Use efficient wsgi web server
 DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_DEPLOY=uwsgi'
