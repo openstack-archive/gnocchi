@@ -50,7 +50,34 @@ sudo gnocchi-upgrade --create-legacy-resource-types
 gnocchi metric create
 sudo -E -H -u stack $GNOCCHI_DIR/tools/measures_injector.py --metrics 1 --batch-of-measures 2 --measures-per-batch 2
 
-# Run tests
+set +e
+
+sudo -E -H pip install entry_point_inspector
+epi group show tempest.test_plugins
+epi ep show tempest.test_plugins gnocchi_tests
+sudo -EHu stack epi group show tempest.test_plugins
+sudo -EHu stack epi ep show tempest.test_plugins gnocchi_tests
+sudo -EHu tempest epi group show tempest.test_plugins
+sudo -EHu tempest epi ep show tempest.test_plugins gnocchi_tests
+
+python -c "import gnocchi.tempest.plugin"
+python -c "import gnocchi.tempest.scenario"
+python -c "import gnocchi.tempest.config"
+
+# Run tests with tempst
+cd $BASE/new/tempest
+set +e
+sudo -H -u tempest OS_TEST_TIMEOUT=$TEMPEST_OS_TEST_TIMEOUT tox -eall -- --concurrency=$TEMPEST_CONCURRENCY gnocchi
+TEMPEST_EXIT_CODE=$?
+set -e
+if [[ $TEMPEST_EXIT_CODE != 0 ]]; then
+    # Collect and parse result
+    generate_testr_results
+    exit $TEMPEST_EXIT_CODE
+fi
+
+# Run tests with tox
+cd $GNOCCHI_DIR
 echo "Running gnocchi functional test suite"
 set +e
 sudo -E -H -u stack tox -epy27-gate
