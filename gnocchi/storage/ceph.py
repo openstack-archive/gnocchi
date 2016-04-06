@@ -188,7 +188,8 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             objs_it = names
         else:
             objs_it = itertools.islice(
-                names, block_size * self.partition, None)
+                names, block_size * self.partition,
+                block_size * (self.partition + 1))
         for name in objs_it:
             metrics.add(name.split("_")[1])
             if full is False and len(metrics) >= block_size:
