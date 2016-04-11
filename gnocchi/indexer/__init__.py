@@ -116,6 +116,16 @@ class NoSuchArchivePolicy(IndexerException):
         self.archive_policy = archive_policy
 
 
+class NoSuchDefinitionInArchivePolicy(IndexerException):
+    """Error raised when a definition does not exist in archive policy."""
+    def __init__(self, archive_policy, granularity):
+        super(NoSuchDefinitionInArchivePolicy, self).__init__(
+            "Archive policy %s does not capture %s granularity" %
+            (str(archive_policy), granularity))
+        self.archive_policy = archive_policy
+        self.granularity = granularity
+
+
 class ArchivePolicyInUse(IndexerException):
     """Error raised when an archive policy is still being used."""
     def __init__(self, archive_policy):
@@ -283,6 +293,10 @@ class IndexerDriver(object):
 
     @staticmethod
     def get_archive_policy(name):
+        raise exceptions.NotImplementedError
+
+    @staticmethod
+    def update_archive_policy(name, ap_item):
         raise exceptions.NotImplementedError
 
     @staticmethod

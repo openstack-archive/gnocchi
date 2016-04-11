@@ -311,6 +311,26 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         with self.facade.independent_reader() as session:
             return session.query(ArchivePolicy).get(name)
 
+    def update_archive_policy(self, name, ap_item):
+        with self.facade.independent_writer() as session:
+            ap = session.query(ArchivePolicy).get(name)
+            if not ap:
+                raise indexer.NoSuchArchivePolicyRule(name)
+            new_def = []
+            updated = False
+            for d in ap.definition:
+                if d.granularity == ap_item.granularity:
+                    new_def.append(ap_item)
+                    updated = True
+                else:
+                    new_def.append(d)
+            if not updated:
+                raise indexer.NoSuchDefinitionInArchivePolicy(
+                    name, ap_item.granularity)
+            # NOTE(gordc): ORM doesn't update JSON column unless new
+            ap.definition = new_def
+            return ap
+
     def delete_archive_policy(self, name):
         with self.facade.writer() as session:
             try:

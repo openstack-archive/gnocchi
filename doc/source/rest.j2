@@ -159,6 +159,12 @@ It is also possible to list archive policies:
 
 {{ scenarios['list-archive-policy']['doc'] }}
 
+Existing archive policies can be modified to capture more or less data
+depending on requirements. The timespan coverage of an archive policy can be
+changed only if it contains a matching granularity:
+
+{{ scenarios['update-archive-policy']['doc'] }}
+
 It is possible to delete an archive policy if it is not used by any metric:
 
 {{ scenarios['delete-archive-policy']['doc'] }}

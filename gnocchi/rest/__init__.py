@@ -257,6 +257,30 @@ class ArchivePolicyController(rest.RestController):
             return ap
         abort(404, indexer.NoSuchArchivePolicy(self.archive_policy))
 
+    @pecan.expose('json')
+    def patch(self):
+        ap = pecan.request.indexer.get_archive_policy(self.archive_policy)
+        if not ap:
+            abort(404, indexer.NoSuchArchivePolicy(self.archive_policy))
+        enforce("update archive policy", ap)
+
+        body = deserialize_and_validate(voluptuous.Schema({
+            voluptuous.Required("granularity"): Timespan,
+            voluptuous.Optional("points"): PositiveNotNullInt,
+            voluptuous.Optional("timespan"): Timespan}))
+        # Validate the data
+        try:
+            ap_item = archive_policy.ArchivePolicyItem(**body)
+        except ValueError as e:
+            abort(400, e)
+
+        try:
+            ap = pecan.request.indexer.update_archive_policy(
+                self.archive_policy, ap_item)
+        except indexer.NoSuchDefinitionInArchivePolicy as e:
+            abort(404, e)
+        return ap
+
     @pecan.expose()
     def delete(self):
         # NOTE(jd) I don't think there's any point in fetching and passing the
