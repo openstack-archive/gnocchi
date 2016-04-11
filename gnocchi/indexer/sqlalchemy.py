@@ -311,6 +311,19 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         with self.facade.independent_reader() as session:
             return session.query(ArchivePolicy).get(name)
 
+    def update_archive_policy(self, name, ap_item):
+        with self.facade.independent_writer() as session:
+            ap = session.query(ArchivePolicy).get(name)
+            for d in ap.definition:
+                if d['granularity'] == ap_item.granularity:
+                    d['points'] = ap_item.points
+                    d['timespan'] = ap_item.timespan
+                    break
+            else:
+                raise indexer.NoSuchDefinitionInArchivePolicy(
+                    name, ap_item.granularity)
+            return ap
+
     def delete_archive_policy(self, name):
         with self.facade.writer() as session:
             try:
