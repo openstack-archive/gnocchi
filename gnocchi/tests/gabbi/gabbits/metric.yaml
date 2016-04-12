@@ -209,6 +209,12 @@ tests:
       response_json_paths:
           $[0].archive_policy.name: cookies
 
+    - name: get metric list for authenticated user
+      request_headers:
+          x-user-id: foo
+          x-project-id: bar
+      url: /v1/metric
+
     - name: get measurements from metric
       url: /v1/metric/$RESPONSE['$[0].id']/measures
       status: 200
