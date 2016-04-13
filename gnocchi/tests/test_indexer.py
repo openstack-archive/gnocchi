@@ -89,6 +89,10 @@ class TestIndexerDriver(tests_base.TestCase):
         else:
             self.fail("Metric patterns are not ordered")
 
+        # Ensure we can't delete the archive policy
+        self.assertRaises(indexer.ArchivePolicyInUse,
+                          self.index.delete_archive_policy, name)
+
     def test_create_metric(self):
         r1 = uuid.uuid4()
         user = str(uuid.uuid4())
