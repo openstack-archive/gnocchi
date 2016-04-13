@@ -13,11 +13,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import abc
+import uuid
 
 import mock
 from oslo_db.sqlalchemy import test_migrations
 import six
+import sqlalchemy_utils
 
+from gnocchi import indexer
+from gnocchi.indexer import sqlalchemy
 from gnocchi.indexer import sqlalchemy_base
 from gnocchi.tests import base
 
@@ -34,6 +38,14 @@ class ModelsMigrationsSync(
     def setUp(self):
         super(ModelsMigrationsSync, self).setUp()
         self.db = mock.Mock()
+        self.conf.set_override(
+            'url',
+            sqlalchemy.SQLAlchemyIndexer._create_new_database(
+                self.conf.indexer.url),
+            'indexer')
+        self.index = indexer.get_driver(self.conf)
+        self.index.connect()
+        self.index.upgrade(nocreate=True, create_legacy_resource_types=True)
 
     @staticmethod
     def get_metadata():
@@ -44,6 +56,8 @@ class ModelsMigrationsSync(
 
     @staticmethod
     def db_sync(engine):
-        # NOTE(jd) Nothing to do here as setUp() in the base class is already
-        # creating table using upgrade
         pass
+
+    def tearDown(self):
+        sqlalchemy_utils.drop_database(self.conf.indexer.url)
+        super(ModelsMigrationsSync, self).tearDown()
