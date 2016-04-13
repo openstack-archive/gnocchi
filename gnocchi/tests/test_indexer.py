@@ -77,10 +77,10 @@ class TestIndexerDriver(tests_base.TestCase):
         self.index.create_archive_policy_rule('rule2', 'abc.xyz.*', name)
         self.index.create_archive_policy_rule('rule3', 'abc.xyz', name)
         rules = self.index.list_archive_policy_rules()
-        self.assertEqual(3, len(rules))
-        self.assertEqual('abc.xyz.*', rules[0]['metric_pattern'])
-        self.assertEqual('abc.xyz', rules[1]['metric_pattern'])
-        self.assertEqual('abc.*', rules[2]['metric_pattern'])
+        patterns = [r['metric_pattern'] for r in rules]
+        self.assertIn('abc.xyz.*', patterns)
+        self.assertIn('abc.xyz', patterns)
+        self.assertIn('abc.*', patterns)
 
     def test_create_metric(self):
         r1 = uuid.uuid4()
