@@ -13,11 +13,16 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import abc
+import uuid
 
 import mock
 from oslo_db.sqlalchemy import test_migrations
 import six
+from sqlalchemy.engine import url as sqlalchemy_url
+import sqlalchemy_utils
 
+from gnocchi import indexer
+from gnocchi.indexer import sqlalchemy
 from gnocchi.indexer import sqlalchemy_base
 from gnocchi.tests import base
 
@@ -42,8 +47,14 @@ class ModelsMigrationsSync(
     def get_engine(self):
         return self.index.get_engine()
 
-    @staticmethod
-    def db_sync(engine):
-        # NOTE(jd) Nothing to do here as setUp() in the base class is already
-        # creating table using upgrade
-        pass
+    def db_sync(self, engine):
+        url = sqlalchemy_url.make_url(
+            sqlalchemy.SQLAlchemyIndexer.dress_url(
+                self.conf.indexer.url))
+        url.database = url.database + str(uuid.uuid4()).replace('-', '')
+        db_url = str(url)
+        self.conf.set_override('url', db_url, 'indexer')
+        sqlalchemy_utils.create_database(db_url)
+        self.index = indexer.get_driver(self.conf)
+        self.index.connect()
+        self.index.upgrade(nocreate=True, create_legacy_resource_types=True)
