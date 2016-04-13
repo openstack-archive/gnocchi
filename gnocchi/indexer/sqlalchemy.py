@@ -318,8 +318,10 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                         ArchivePolicy.name == name).delete() == 0:
                     raise indexer.NoSuchArchivePolicy(name)
             except exception.DBReferenceError as e:
-                if (e.constraint ==
-                   'fk_metric_archive_policy_name_archive_policy_name'):
+                if (e.constraint in [
+                        'fk_metric_archive_policy_name_archive_policy_name',
+                        'fk_archive_policy_rule_archive_policy_name_'
+                        'archive_policy_name']):
                     raise indexer.ArchivePolicyInUse(name)
                 raise
 
