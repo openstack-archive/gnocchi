@@ -403,8 +403,7 @@ class TestCase(base.BaseTestCase):
             # in the Alembic upgrades. We have a test to check that
             # upgrades == create but it misses things such as custom CHECK
             # constraints.
-            self.index.upgrade(nocreate=True,
-                               create_legacy_resource_types=True)
+            self.index.upgrade(nocreate=True)
 
         self.coord.stop()
 
