@@ -16,8 +16,11 @@ import abc
 
 import mock
 from oslo_db.sqlalchemy import test_migrations
+from pifpaf.drivers import mysql
+from pifpaf.drivers import postgresql
 import six
 
+from gnocchi import indexer
 from gnocchi.indexer import sqlalchemy_base
 from gnocchi.tests import base
 
@@ -34,6 +37,17 @@ class ModelsMigrationsSync(
     def setUp(self):
         super(ModelsMigrationsSync, self).setUp()
         self.db = mock.Mock()
+        if self.conf.indexer.url.startswith("postgresql"):
+            self.database = self.useFixture(
+                postgresql.PostgreSQLDriver(port=9892))
+        elif self.conf.indexer.url.startswith("mysql"):
+            self.database = self.useFixture(
+                mysql.MySQLDriver())
+        else:
+            self.skipTest("Unsupported indexer driver")
+        self.conf.set_override('url',
+                               self.database.url,
+                               'indexer')
 
     @staticmethod
     def get_metadata():
@@ -42,8 +56,7 @@ class ModelsMigrationsSync(
     def get_engine(self):
         return self.index.get_engine()
 
-    @staticmethod
-    def db_sync(engine):
-        # NOTE(jd) Nothing to do here as setUp() in the base class is already
-        # creating table using upgrade
-        pass
+    def db_sync(self, engine):
+        self.index = indexer.get_driver(self.conf)
+        self.index.connect()
+        self.index.upgrade(nocreate=True, create_legacy_resource_types=True)
