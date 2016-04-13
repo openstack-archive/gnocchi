@@ -82,6 +82,14 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertEqual('abc.xyz', rules[1]['metric_pattern'])
         self.assertEqual('abc.*', rules[2]['metric_pattern'])
 
+    def test_delete_archive_policy_used_by_rule(self):
+        name = str(uuid.uuid4())
+        self.index.create_archive_policy(
+            archive_policy.ArchivePolicy(name, 0, {}))
+        self.index.create_archive_policy_rule('rule-constraint', 'abc.*', name)
+        self.assertRaises(indexer.ArchivePolicyInUse,
+                          self.index.delete_archive_policy, name)
+
     def test_create_metric(self):
         r1 = uuid.uuid4()
         user = str(uuid.uuid4())
