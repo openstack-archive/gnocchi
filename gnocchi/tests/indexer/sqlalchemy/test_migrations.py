@@ -17,7 +17,6 @@ import abc
 import mock
 from oslo_db.sqlalchemy import test_migrations
 import six
-import sqlalchemy
 
 from gnocchi.indexer import sqlalchemy_base
 from gnocchi.tests import base
