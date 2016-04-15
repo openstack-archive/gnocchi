@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+import itertools
 
 import iso8601
 from oslo_utils import timeutils
@@ -110,3 +111,12 @@ unix_universal_start = datetime_utc(1970, 1, 1)
 
 def datetime_to_unix(timestamp):
     return (timestamp - unix_universal_start).total_seconds()
+
+
+def grouper(iterable, n):
+    it = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(it, n))
+        if not chunk:
+            return
+        yield chunk
