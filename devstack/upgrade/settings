@@ -1,0 +1,14 @@
+
+# TODO(sileht): move me in GRENADE_PLUGINRC of infra job
+export RUN_SMOKE=False
+export BASE_RUN_SMOKE=False
+export TARGET_RUN_SMOKE=False
+export ENABLE_TEMPEST=False
+export RUN_JAVELIN=False
+export VERIFY_RESOURCES=False
+
+register_project_for_upgrade gnocchi
+register_db_to_save gnocchi
+
+devstack_localrc base enable_plugin gnocchi git://git.openstack.org/openstack/gnocchi
+devstack_localrc base enable_service gnocchi-api gnocchi-metricd gnocchi-statsd
