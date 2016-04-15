@@ -57,6 +57,12 @@ case $SQL_DRIVER in
         ;;
 esac
 
+# Grenade config
+if [ -n "$DEVSTACK_GATE_GRENADE" ]; then
+    export DEVSTACK_GATE_TEMPEST+=$'\nRUN_SMOKE=0'
+    export DEVSTACK_GATE_TEMPEST+=$'\nENABLE_TEMPEST=False'
+fi
+
 export ENABLED_SERVICES
 export DEVSTACK_LOCAL_CONFIG
 
