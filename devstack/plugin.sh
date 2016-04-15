@@ -417,7 +417,9 @@ function start_gnocchi {
             tail_log gnocchi-api /var/log/$APACHE_NAME/access[_\.]log
         fi
     elif [ "$GNOCCHI_DEPLOY" == "uwsgi" ]; then
+        netstat -laputen
         run_process gnocchi-api "$GNOCCHI_BIN_DIR/uwsgi $GNOCCHI_UWSGI_FILE"
+        netstat -laputen
     else
         run_process gnocchi-api "$GNOCCHI_BIN_DIR/gnocchi-api -d -v --config-file $GNOCCHI_CONF"
     fi
@@ -425,9 +427,11 @@ function start_gnocchi {
     if is_service_enabled gnocchi-api; then
 
         echo "Waiting for gnocchi-api to start..."
+        netstat -laputen
         if ! timeout $SERVICE_TIMEOUT sh -c "while ! curl -v --max-time 5 --noproxy '*' -s $(gnocchi_service_url)/v1/resource/generic ; do sleep 1; done"; then
             die $LINENO "gnocchi-api did not start"
         fi
+        netstat -laputen
     fi
 
     # Create a default policy
