@@ -56,4 +56,10 @@ esac
 export ENABLED_SERVICES
 export DEVSTACK_LOCAL_CONFIG
 
+# Grenade config
+if [ -n "$DEVSTACK_GATE_GRENADE" ]; then
+    export RUN_SMOKE=0
+    export ENABLE_TEMPEST=False
+fi
+
 $BASE/new/devstack-gate/devstack-vm-gate.sh
