@@ -57,7 +57,12 @@ case $SQL_DRIVER in
         ;;
 esac
 
+# Grenade config
+GRENADE_PLUGINRC=$'\nRUN_SMOKE=0'
+GRENADE_PLUGINRC+=$'\nENABLE_TEMPEST=False'
+
 export ENABLED_SERVICES
 export DEVSTACK_LOCAL_CONFIG
+export GRENADE_PLUGINRC
 
 $BASE/new/devstack-gate/devstack-vm-gate.sh
