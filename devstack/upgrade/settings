@@ -1,0 +1,4 @@
+register_project_for_upgrade gnocchi
+
+devstack_localrc base enable_plugin gnocchi git://git.openstack.org/openstack/gnocchi
+devstack_localrc base enable_service gnocchi-api gnocchi-metricd gnocchi-statsd
