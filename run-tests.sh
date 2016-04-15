@@ -9,6 +9,19 @@ do
     do
         if [ "$storage" == "ceph" ]; then
             pifpaf run ceph -- pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
+        elif [ "$storage" == "s3" ]
+        then
+            if ! which s3rver >/dev/null 2>&1
+            then
+                mkdir npm-s3rver
+                export NPM_CONFIG_PREFIX=npm-s3rver
+                npm install s3rver --global
+                export PATH=$PWD/npm-s3rver/bin:$PATH
+            fi
+            pifpaf -e GNOCCHI_STORAGE run s3rver -- \
+                   pifpaf -e GNOCCHI_INDEXER run $indexer -- \
+                   ./tools/pretty_tox.sh $*
+
         else
             pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
         fi
