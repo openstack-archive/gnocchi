@@ -380,7 +380,10 @@ function install_gnocchi {
     [ "$GNOCCHI_USE_KEYSTONE" == "True" ] && EXTRA_FLAVOR=,keystonemiddleware
 
     # We don't use setup_package because we don't follow openstack/requirements
-    sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
+    # NOTE(sileht): We use -U because if oslo.utils say 3.8.0 is already installed
+    # and a dep of gnocchi requires a newer version, this one will not be installed
+    # by pip, now your are thinking "WTF?!", but remember this pip...
+    sudo -H pip install -U -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
 
     if [ "$GNOCCHI_DEPLOY" == "mod_wsgi" ]; then
         install_apache_wsgi
