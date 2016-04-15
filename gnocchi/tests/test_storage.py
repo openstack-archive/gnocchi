@@ -59,6 +59,10 @@ class TestStorageDriver(tests_base.TestCase):
     def test_corrupted_data(self):
         if not isinstance(self.storage, _carbonara.CarbonaraBasedStorage):
             self.skipTest("This driver is not based on Carbonara")
+        if self.conf.storage.driver == "s3":
+            self.skipTest(
+                "This test does not work with S3 as backend as the S3 driver "
+                "has no fake client, and tests run in parallel.")
 
         self.storage.add_measures(self.metric, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 1), 69),
@@ -131,6 +135,10 @@ class TestStorageDriver(tests_base.TestCase):
 
     @mock.patch('gnocchi.carbonara.AggregatedTimeSerie.POINTS_PER_SPLIT', 48)
     def test_add_measures_update_subset_split(self):
+        if self.conf.storage.driver == "s3":
+            self.skipTest(
+                "This test does not work with S3 as backend as the S3 driver "
+                "has no fake client, and tests run in parallel.")
         m, m_sql = self._create_metric('medium')
         measures = [
             storage.Measure(datetime.datetime(2014, 1, 6, i, j, 0), 100)
@@ -154,6 +162,10 @@ class TestStorageDriver(tests_base.TestCase):
         self.assertEqual(1, count)
 
     def test_add_measures_update_subset(self):
+        if self.conf.storage.driver == "s3":
+            self.skipTest(
+                "This test does not work with S3 as backend as the S3 driver "
+                "has no fake client, and tests run in parallel.")
         m, m_sql = self._create_metric('medium')
         measures = [
             storage.Measure(datetime.datetime(2014, 1, 6, i, j, 0), 100)
