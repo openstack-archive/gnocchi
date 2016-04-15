@@ -7,6 +7,14 @@ do
     export GNOCCHI_TEST_STORAGE_DRIVER=$storage
     for indexer in ${GNOCCHI_TEST_INDEXER_DRIVERS}
     do
-        pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
+        if [ "$storage" = "s3" ]
+        then
+            pifpaf -e GNOCCHI_STORAGE run s3rver -- \
+                   pifpaf -e GNOCCHI_INDEXER run $indexer -- \
+                   ./tools/pretty_tox.sh $*
+        else
+            pifpaf -e GNOCCHI_INDEXER run $indexer -- \
+                   ./tools/pretty_tox.sh $*
+        fi
     done
 done
