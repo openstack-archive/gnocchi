@@ -55,5 +55,7 @@ esac
 
 export ENABLED_SERVICES
 export DEVSTACK_LOCAL_CONFIG
+# NOTE(sileht): Don't run tempest smoke test for grenade
+export BASE_RUN_SMOKE=0
 
 $BASE/new/devstack-gate/devstack-vm-gate.sh
