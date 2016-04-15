@@ -19,9 +19,11 @@ SQL_DRIVER="$2"
 
 ENABLED_SERVICES="key,gnocchi-api,gnocchi-metricd,tempest,"
 
-# Use efficient wsgi web server
-DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_DEPLOY=uwsgi'
-DEVSTACK_LOCAL_CONFIG+=$'\nexport KEYSTONE_DEPLOY=uwsgi'
+if [ ! "$DEVSTACK_GATE_GRENADE" ] ; then
+    # Use efficient wsgi web server
+    DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_DEPLOY=uwsgi'
+    DEVSTACK_LOCAL_CONFIG+=$'\nexport KEYSTONE_DEPLOY=uwsgi'
+fi
 
 export DEVSTACK_GATE_INSTALL_TESTONLY=1
 export DEVSTACK_GATE_NO_SERVICES=1
