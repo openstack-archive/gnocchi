@@ -14,7 +14,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+<<<<<<< HEAD
 import multiprocessing
+=======
+import itertools
+>>>>>>> Add a S3 based storage driver
 
 import iso8601
 from oslo_utils import timeutils
@@ -124,3 +128,12 @@ def get_default_workers():
     except NotImplementedError:
         default_workers = 1
     return default_workers
+
+
+def grouper(iterable, n):
+    it = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(it, n))
+        if not chunk:
+            return
+        yield chunk
