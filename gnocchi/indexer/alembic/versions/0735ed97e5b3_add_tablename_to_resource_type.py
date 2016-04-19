@@ -43,7 +43,7 @@ def upgrade():
     )
     op.execute(resource_type.update().where(
         resource_type.c.name == "instance_network_interface"
-    ).values({'tablename': op.inline_literal("'instance_net_int'")}))
+    ).values({'tablename': 'instance_net_int'}))
     op.execute(resource_type.update().where(
         resource_type.c.name != "instance_network_interface"
     ).values({'tablename': resource_type.c.name}))
