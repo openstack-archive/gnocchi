@@ -364,6 +364,9 @@ function preinstall_gnocchi {
             install_package cython
             install_package librados-dev
     fi
+    if is_ubuntu; then
+        install_package uuid-runtime
+    fi
 }
 
 # install_gnocchi() - Collect source and prepare
