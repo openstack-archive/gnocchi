@@ -102,9 +102,20 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertEqual(m.created_by_user_id, user)
         self.assertEqual(m.created_by_project_id, project)
         self.assertIsNone(m.name)
+        self.assertIsNone(m.unit)
         self.assertIsNone(m.resource_id)
         m2 = self.index.list_metrics(id=r1)
         self.assertEqual([m], m2)
+
+    def test_create_metric_with_32bytes_length_unit(self):
+        r1 = uuid.uuid4()
+        user = str(uuid.uuid4())
+        project = str(uuid.uuid4())
+        unit = 'B' * 32
+        try:
+            m = self.index.create_metric(r1, user, project, "low", unit=unit)
+        except:
+            pass
 
     def test_expunge_metric(self):
         r1 = uuid.uuid4()
