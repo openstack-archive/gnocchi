@@ -586,6 +586,7 @@ class MetricsController(rest.RestController):
         "project_id": six.text_type,
         "archive_policy_name": six.text_type,
         "name": six.text_type,
+        "unit": six.text_type,
     })
 
     # NOTE(jd) Define this method as it was a voluptuous schema – it's just a
@@ -621,6 +622,7 @@ class MetricsController(rest.RestController):
             "project_id": definition.get('project_id'),
             "archive_policy_name": archive_policy_name,
             "name": name,
+            "unit": definition.get('unit'),
         })
 
         return definition
@@ -634,6 +636,7 @@ class MetricsController(rest.RestController):
                 uuid.uuid4(),
                 user, project,
                 name=body.get('name'),
+                unit=body.get('unit'),
                 archive_policy_name=body['archive_policy_name'])
         except indexer.NoSuchArchivePolicy as e:
             abort(400, e)
