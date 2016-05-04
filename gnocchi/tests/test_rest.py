@@ -253,6 +253,15 @@ class ArchivePolicyTest(RestTest):
 
 class MetricTest(RestTest):
 
+    def test_post_metric_with_over_length_unit(self):
+        result = self.app.post_json(
+                    "/v1/metric",
+                    params={"archive_policy_name": "medium",
+                            "unit": "over_length_unit_over_length_unit"},
+                    status=400)
+        self.assertIn('Invalid input: length of value must be at most 31 '
+                      'for dictionary value', result.text)
+
     def test_get_metric_with_another_user_linked_resource(self):
         result = self.app.post_json(
             "/v1/resource/generic",
