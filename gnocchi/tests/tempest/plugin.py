@@ -20,14 +20,14 @@ from tempest import config
 from tempest.test_discover import plugins
 
 import gnocchi
-from gnocchi.tempest import config as tempest_config
+from gnocchi.tests.tempest import config as tempest_config
 
 
 class GnocchiTempestPlugin(plugins.TempestPlugin):
     def load_tests(self):
         base_path = os.path.split(os.path.dirname(
             os.path.abspath(gnocchi.__file__)))[0]
-        test_dir = "gnocchi/tempest"
+        test_dir = "gnocchi/tests/tempest"
         full_test_dir = os.path.join(base_path, test_dir)
         return full_test_dir, base_path
 
