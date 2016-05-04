@@ -99,6 +99,17 @@ class NoSuchMetric(IndexerException):
         self.metric = metric
 
 
+class MetricValueError(IndexerException, ValueError):
+    """Error raised when an attribute value is invalid for a metric."""
+    def __init__(self, metric, attribute, value):
+        super(MetricValueError, self).__init__(
+            "Value %s for attribute %s on metric %s is invalid"
+            % (value, attribute, metric))
+        self.metric = metric
+        self.attribute = attribute
+        self.value = value
+
+
 class NoSuchResource(IndexerException):
     """Error raised when a resource does not exist."""
     def __init__(self, resource):
@@ -306,7 +317,8 @@ class IndexerDriver(object):
 
     @staticmethod
     def create_metric(id, created_by_user_id, created_by_project_id,
-                      archive_policy_name, name=None, resource_id=None):
+                      archive_policy_name, name=None, unit=None,
+                      resource_id=None):
         raise exceptions.NotImplementedError
 
     @staticmethod
