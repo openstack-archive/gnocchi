@@ -568,6 +568,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
         session.expire(r, ['metrics'])
 
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
     def delete_resource(self, resource_id):
         with self.facade.writer() as session:
             # We are going to delete the resource; the on delete will set the
