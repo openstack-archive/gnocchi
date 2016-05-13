@@ -48,6 +48,8 @@ _marker = indexer._marker
 
 LOG = log.getLogger(__name__)
 
+_TRANSACTION_MAX_RETRY = 3
+
 
 class PerInstanceFacade(object):
     def __init__(self, conf):
@@ -125,7 +127,8 @@ class ResourceClassMapper(object):
                 self._cache[resource_type.tablename] = mapper
                 return mapper
 
-    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               max_retries=_TRANSACTION_MAX_RETRY)
     def map_and_create_tables(self, resource_type, connection):
         with self._lock:
             # NOTE(sileht): map this resource_type to have
@@ -167,7 +170,8 @@ class ResourceClassMapper(object):
                 Base.metadata.remove(table)
             del self._cache[resource_type.tablename]
 
-    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               max_retries=_TRANSACTION_MAX_RETRY)
     def _safe_execute(self, connection, works):
         # NOTE(sileht): we create a transaction to ensure mysql
         # create locks on other transaction...
@@ -457,7 +461,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
             return r
 
-    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               max_retries=_TRANSACTION_MAX_RETRY)
     def update_resource(self, resource_type,
                         resource_id, ended_at=_marker, metrics=_marker,
                         append_metrics=False,
@@ -630,7 +635,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
         return Result
 
-    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               max_retries=_TRANSACTION_MAX_RETRY)
     def list_resources(self, resource_type='generic',
                        attribute_filter=None,
                        details=False,
