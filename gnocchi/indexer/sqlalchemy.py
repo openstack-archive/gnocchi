@@ -418,6 +418,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
 
             return list(q.all())
 
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
     def create_resource(self, resource_type, id,
                         created_by_user_id, created_by_project_id,
                         user_id=None, project_id=None,
