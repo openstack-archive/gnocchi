@@ -25,6 +25,10 @@ from oslo_db import exception
 from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import utils as oslo_db_utils
 from oslo_log import log
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
 import six
 import sqlalchemy
 from sqlalchemy.engine import url as sqlalchemy_url
@@ -136,7 +140,19 @@ class ResourceClassMapper(object):
             mappers = self.get_classes(resource_type)
             tables = [Base.metadata.tables[klass.__tablename__]
                       for klass in mappers.values()]
-            Base.metadata.create_all(connection, tables=tables)
+            try:
+                Base.metadata.create_all(connection, tables=tables)
+            except exception.DBError as e:
+                # HACK(jd) Sometimes, PostgreSQL raises an error such as
+                # "current transaction is aborted, commands ignored until end
+                # of transaction block" on its own catalog, so we need to
+                # retry, but this is not caught by oslo.db as a deadlock
+                inn_e = e.inner_exception
+                if (psycopg2
+                   and isinstance(inn_e, psycopg2.InternalError)
+                   and 'current transaction is aborted' in inn_e):
+                    raise exception.RetryRequest(e.inner_exception)
+                raise
 
     def unmap_and_delete_tables(self, resource_type, connection):
         with self._lock:
