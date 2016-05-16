@@ -25,6 +25,10 @@ from oslo_db import exception
 from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import utils as oslo_db_utils
 from oslo_log import log
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
 import six
 import sqlalchemy
 from sqlalchemy.engine import url as sqlalchemy_url
@@ -52,11 +56,31 @@ LOG = log.getLogger(__name__)
 def retry_on_deadlock(f):
     # FIXME(jd) The default values in oslo.db are useless, we need to fix that.
     # Once it's done, let's remove that wrapper of wrapper.
-    return oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
-                                     retry_on_request=True,
-                                     max_retries=10,
-                                     inc_retry_interval=0.2,
-                                     max_retry_interval=3)(f)
+    @six.wraps(f)
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               retry_on_request=True,
+                               max_retries=10,
+                               inc_retry_interval=0.2,
+                               max_retry_interval=3)
+    def _retry_on_transaction_error(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except exception.DBError as e:
+            # HACK(jd) Sometimes, PostgreSQL raises an error such as "current
+            # transaction is aborted, commands ignored until end of transaction
+            # block" on its own catalog, so we need to retry, but this is not
+            # caught by oslo.db as a deadlock. This is likely because when we
+            # use Base.metadata.create_all(), sqlalchemy itself gets an error
+            # it does not catch or something. So this is paperover I guess.
+            inn_e = e.inner_exception
+            if (psycopg2
+               and isinstance(inn_e.orig, psycopg2.InternalError)
+                # current transaction is aborted
+               and inn_e.orig.pgcode == '25P02'):
+                raise exception.RetryRequest(inn_e)
+            raise
+
+    return _retry_on_transaction_error
 
 
 class PerInstanceFacade(object):
