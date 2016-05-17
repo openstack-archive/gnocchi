@@ -384,6 +384,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             raise indexer.ArchivePolicyRuleAlreadyExists(name)
         return apr
 
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               max_retries=_TRANSACTION_MAX_RETRY)
     def create_metric(self, id, created_by_user_id, created_by_project_id,
                       archive_policy_name,
                       name=None, resource_id=None):
