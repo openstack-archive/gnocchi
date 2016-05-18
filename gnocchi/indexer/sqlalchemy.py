@@ -253,6 +253,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 self._RESOURCE_TYPE_MANAGER.map_and_create_tables(
                     rt, connection)
 
+    @retry_on_deadlock
     def create_resource_type(self, resource_type):
         # NOTE(sileht): mysql have a stupid and small length limitation on the
         # foreign key and index name, so we can't use the resource type name as
