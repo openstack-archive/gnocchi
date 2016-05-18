@@ -405,6 +405,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             raise
         return m
 
+    @oslo_db.api.wrap_db_retry(retry_on_deadlock=True,
+                               max_retries=_TRANSACTION_MAX_RETRY)
     def list_metrics(self, names=None, ids=None, details=False,
                      status='active', **kwargs):
         if ids is not None and not ids:
