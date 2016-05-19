@@ -42,8 +42,11 @@ class ModelsMigrationsSync(
     def get_engine(self):
         return self.index.get_engine()
 
-    @staticmethod
-    def db_sync(engine):
-        # NOTE(jd) Nothing to do here as setUp() in the base class is already
+    def db_sync(self, engine):
+        # NOTE(jd): Nothing to do here as setUp() in the base class is already
         # creating table using upgrade
-        pass
+        # NOTE(sileht): We ensure all resource type sqlalchemy model are loaded
+        # in this process
+        for rt in self.index.list_resource_types():
+            if rt.state == "created":
+                self.index._RESOURCE_TYPE_MANAGER.get_classes(rt)
