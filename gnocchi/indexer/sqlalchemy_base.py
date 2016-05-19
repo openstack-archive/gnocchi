@@ -17,6 +17,7 @@ from __future__ import absolute_import
 import calendar
 import datetime
 import decimal
+import enum
 
 import iso8601
 from oslo_db.sqlalchemy import models
@@ -226,6 +227,14 @@ class ResourceTypeAttributes(sqlalchemy_utils.JSONType):
         return RESOURCE_TYPE_SCHEMA_MANAGER.attributes_from_dict(attributes)
 
 
+class ResourceTypeState(enum.Enum):
+    CREATED = "CREATED"
+    CREATING = "CREATING"
+    ERROR_CREATE = "ERROR_CREATE"
+    DELETING = "DELETING"
+    DELETE_ERROR = "DELETE_ERROR"
+
+
 class ResourceType(Base, GnocchiBase, resource_type.ResourceType):
     __tablename__ = 'resource_type'
     __table_args__ = (
@@ -238,6 +247,7 @@ class ResourceType(Base, GnocchiBase, resource_type.ResourceType):
                              nullable=False)
     tablename = sqlalchemy.Column(sqlalchemy.String(35), nullable=False)
     attributes = sqlalchemy.Column(ResourceTypeAttributes)
+    state = sqlalchemy.Column(sqlalchemy.Enum(ResourceTypeState))
 
     def to_baseclass(self):
         cols = {}

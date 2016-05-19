@@ -111,12 +111,15 @@ class ResourceClassMapper(object):
                 'history': resource_history_ext}
 
     def get_classes(self, resource_type):
+        if resource_type.state != base.ResourceTypeState.CREATED:
+            raise RuntimeError("get_classes must be called in state CREATED")
+
         # NOTE(sileht): Most of the times we can bypass the lock so do it
         try:
             return self._cache[resource_type.tablename]
         except KeyError:
             pass
-        # TODO(sileht): if the table doesn't exis
+        # TODO(sileht): if the table doesn't exist
         with self._lock:
             try:
                 return self._cache[resource_type.tablename]
@@ -127,45 +130,58 @@ class ResourceClassMapper(object):
 
     @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
     def map_and_create_tables(self, resource_type, connection):
-        with self._lock:
-            # NOTE(sileht): map this resource_type to have
-            # Base.metadata filled with sa.Table objects
-            mappers = self.get_classes(resource_type)
-            tables = [Base.metadata.tables[klass.__tablename__]
-                      for klass in mappers.values()]
-            Base.metadata.create_all(connection, tables=tables)
+        if resource_type.state != base.ResourceTypeState.CREATING:
+            raise RuntimeError("get_classes must be called in state CREATING")
+
+        # NOTE(sileht): map this resource_type to have
+        # Base.metadata filled with sa.Table objects
+        mappers = self._build_class_mappers(resource_type)
+        tables = [Base.metadata.tables[klass.__tablename__]
+                  for klass in mappers.values()]
+
+        Base.metadata.create_all(connection, tables=tables)
+        # NOTE(sileht): no need to protect the _cache with a lock
+        # get_classes cannot be called in state CREATING
+        self._cache[resource_type.tablename] = mappers
 
     def unmap_and_delete_tables(self, resource_type, connection):
-        with self._lock:
-            # NOTE(sileht): map this resource_type to have
-            # Base.metadata filled with sa.Table objects
-            mappers = self.get_classes(resource_type)
-            tables = [Base.metadata.tables[klass.__tablename__]
-                      for klass in mappers.values()]
+        if resource_type.state != base.ResourceTypeState.DELETING:
+            raise RuntimeError("get_classes must be called in state DELETING")
 
-            if connection is not None:
-                # NOTE(sileht): Base.metadata.drop_all doesn't
-                # issue CASCADE stuffs correctly at least on postgresql
-                # We drop foreign keys manually to not lock the destination
-                # table for too long during drop table.
-                # It's safe to not use a transaction since
-                # the resource_type table is already cleaned and commited
-                # so this code cannot be triggerred anymore for this
-                # resource_type
-                for table in tables:
-                    for fk in table.foreign_key_constraints:
-                        self._safe_execute(
-                            connection,
-                            sqlalchemy.schema.DropConstraint(fk))
-                for table in tables:
-                    self._safe_execute(connection,
-                                       sqlalchemy.schema.DropTable(table))
-
-            # TODO(sileht): Remove this resource on other workers
-            # by using expiration on cache ?
-            for table in tables:
-                Base.metadata.remove(table)
+        # NOTE(sileht): no need to protect the _cache with a lock
+        # get_classes cannot be called in state DELETING
+        try:
+            mappers = self._cache[resource_type.tablename]
+        except KeyError:
+            mappers = self._build_class_mappers(resource_type)
+        else:
             del self._cache[resource_type.tablename]
+
+        tables = [Base.metadata.tables[klass.__tablename__]
+                  for klass in mappers.values()]
+
+        if connection is not None:
+            # NOTE(sileht): Base.metadata.drop_all doesn't
+            # issue CASCADE stuffs correctly at least on postgresql
+            # We drop foreign keys manually to not lock the destination
+            # table for too long during drop table.
+            # It's safe to not use a transaction since
+            # the resource_type table is already cleaned and commited
+            # so this code cannot be triggerred anymore for this
+            # resource_type
+            for table in tables:
+                for fk in table.foreign_key_constraints:
+                    self._safe_execute(
+                        connection,
+                        sqlalchemy.schema.DropConstraint(fk))
+            for table in tables:
+                self._safe_execute(connection,
+                                   sqlalchemy.schema.DropTable(table))
+
+        # TODO(sileht): Remove this resource on other workers
+        # by using expiration on cache ?
+        for table in tables:
+            Base.metadata.remove(table)
 
     @oslo_db.api.wrap_db_retry(retry_on_deadlock=True)
     def _safe_execute(self, connection, works):
@@ -252,7 +268,8 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         tablename = "rt_%s" % uuid.uuid4().hex
         resource_type = ResourceType(name=resource_type.name,
                                      tablename=tablename,
-                                     attributes=resource_type.attributes)
+                                     attributes=resource_type.attributes,
+                                     state=base.ResourceTypeState.creating)
 
         # NOTE(sileht): ensure the driver is able to store the request
         # resource_type
@@ -264,9 +281,20 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         except exception.DBDuplicateEntry:
             raise indexer.ResourceTypeAlreadyExists(resource_type.name)
 
-        with self.facade.writer_connection() as connection:
-            self._RESOURCE_TYPE_MANAGER.map_and_create_tables(resource_type,
-                                                              connection)
+        try:
+            with self.facade.writer_connection() as connection:
+                self._RESOURCE_TYPE_MANAGER.map_and_create_tables(
+                    resource_type, connection)
+        except Exception:
+            with self.facade.writer() as session:
+                resource_type.state = base.ResourceTypeState.ERROR_CREATE
+                session.update(resource_type)
+            raise
+
+        with self.facade.writer() as session:
+            resource_type.state = base.ResourceTypeState.CREATED
+            session.update(resource_type)
+
         return resource_type
 
     def get_resource_type(self, name):
@@ -296,9 +324,12 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         if name == "generic":
             raise indexer.ResourceTypeInUse(name)
 
+        # TODO(sileht): allow to delete resource_type in state error
         try:
             with self.facade.writer() as session:
                 resource_type = self._get_resource_type(session, name)
+                if resource_type.state != base.ResourceTypeState.CREATED:
+                    raise indexer.ResourceTypeInUse(name)
                 session.delete(resource_type)
         except exception.DBReferenceError as e:
             if (e.constraint in [
@@ -307,12 +338,25 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 raise indexer.ResourceTypeInUse(name)
             raise
 
-        with self.facade.writer_connection() as connection:
-            self._RESOURCE_TYPE_MANAGER.unmap_and_delete_tables(resource_type,
-                                                                connection)
+        # NOTE(sileht): useless but help for code logic
+        resource_type.state = base.ResourceTypeState.DELETING
+
+        try:
+            with self.facade.writer_connection() as connection:
+                self._RESOURCE_TYPE_MANAGER.unmap_and_delete_tables(
+                    resource_type, connection)
+        except Exception:
+            # NOTE(sileht): we fail, recreate the resource with error state
+            with self.facade.writer() as session:
+                resource_type.state = base.ResourceTypeState.ERROR_DELETE
+                session.add(resource_type)
+            raise
 
     def _resource_type_to_classes(self, session, name):
         resource_type = self._get_resource_type(session, name)
+        if resource_type.state != base.ResourceTypeState.CREATED:
+            # FIXME(sileht): raise a better exception
+            raise indexer.ResourceTypeInUse(name)
         return self._RESOURCE_TYPE_MANAGER.get_classes(resource_type)
 
     def list_archive_policies(self):
