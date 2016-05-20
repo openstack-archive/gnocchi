@@ -1046,7 +1046,7 @@ class TestIndexerDriver(tests_base.TestCase):
         rtype = mgr.resource_type_from_dict("indexer_test", {
             "col1": {"type": "string", "required": True,
                      "min_length": 2, "max_length": 15}
-        })
+        }, "creating")
 
         # Create
         self.index.create_resource_type(rtype)
@@ -1106,7 +1106,7 @@ class TestIndexerDriver(tests_base.TestCase):
         rtype = mgr.resource_type_from_dict("indexer_test_fail", {
             "col1": {"type": "string", "required": True,
                      "min_length": 2, "max_length": 15}
-        })
+        }, "creating")
 
         states = {'before': None,
                   'after': None}
@@ -1132,7 +1132,7 @@ class TestIndexerDriver(tests_base.TestCase):
         rtype = mgr.resource_type_from_dict("indexer_test_fail2", {
             "col1": {"type": "string", "required": True,
                      "min_length": 2, "max_length": 15}
-        })
+        }, "creating")
         self.index.create_resource_type(rtype)
 
         states = {'before': None,
