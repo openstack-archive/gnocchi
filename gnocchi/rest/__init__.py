@@ -868,6 +868,7 @@ class ResourceTypesController(rest.RestController):
     def post(self):
         schema = pecan.request.indexer.get_resource_type_schema()
         body = deserialize_and_validate(schema)
+        body["state"] = "creating"
         rt = schema.resource_type_from_dict(**body)
         enforce("create resource type", body)
         try:
