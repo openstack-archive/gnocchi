@@ -83,6 +83,7 @@ tests:
       status: 201
       response_json_paths:
           $.name: my_custom_resource
+          $.state: active
           $.attributes:
               name:
                   type: string
@@ -122,11 +123,13 @@ tests:
       response_json_paths:
           $.`len`: 16
           $.[11].name: my_custom_resource
+          $.[11].state: active
 
     - name: get the custom resource type
       url: /v1/resource_type/my_custom_resource
       response_json_paths:
           $.name: my_custom_resource
+          $.state: active
           $.attributes:
               name:
                   type: string
