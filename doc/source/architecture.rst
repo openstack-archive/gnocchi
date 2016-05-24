@@ -53,7 +53,7 @@ Gnocchi processes. In any case, it is obvious that Ceph and Swift drivers are
 largely more scalable. Ceph also offers better consistency, and hence is the
 recommended driver.
 
-How to plan for Gnocchi’s storage
+How to plan for Gnocchi's storage
 ---------------------------------
 
 Gnocchi uses a custom file format based on its library *Carbonara*. In Gnocchi,
@@ -62,7 +62,7 @@ sample, in the lifespan of a time series. The storage format is compressed
 using various techniques, therefore the computing of a time series' size can
 be estimated based on its worst case scenario with the following formula::
 
-    number of points × 9 bytes = size in bytes
+    number of points * 9 bytes = size in bytes
 
 The number of points you want to keep is usually determined by the following
 formula::
@@ -71,17 +71,17 @@ formula::
 
 For example, if you want to keep a year of data with a one minute resolution::
 
-    number of points = (365 days × 24 hours × 60 minutes) ÷ 1 minute
+    number of points = (365 days * 24 hours * 60 minutes) ÷ 1 minute
     number of points = 525 600
 
 Then::
 
-    size in bytes = 525 600 × 9 = 4 730 400 bytes = 4 620 KiB
+    size in bytes = 525 600 * 9 = 4 730 400 bytes = 4 620 KiB
 
 This is just for a single aggregated time series. If your archive policy uses
 the 8 default aggregation methods (mean, min, max, sum, std, median, count,
 95pct) with the same "one year, one minute aggregations" resolution, the space
-used will go up to a maximum of 8 × 4.5 MiB = 36 MiB.
+used will go up to a maximum of 8 * 4.5 MiB = 36 MiB.
 
 How to set the archive policy and granularity
 ---------------------------------------------
@@ -106,8 +106,8 @@ policies. A typical low grained use case could be::
     720 points with a granularity of 1 hour = 30 days
     365 points with a granularity of 1 day = 1 year
 
-This would represent 6125 points × 9 = 54 KiB per aggregation method. If
-you use the 8 standard aggregation method, your metric will take up to 8 × 54
+This would represent 6125 points * 9 = 54 KiB per aggregation method. If
+you use the 8 standard aggregation method, your metric will take up to 8 * 54
 KiB = 432 KiB of disk space.
 
 Default archive policies
