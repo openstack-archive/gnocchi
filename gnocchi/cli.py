@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import multiprocessing
+import os
 import signal
 import sys
 import time
 
 from oslo_config import cfg
 from oslo_log import log
+from oslo_utils import strutils
 from oslo_utils import timeutils
 import retrying
 import six
@@ -52,8 +54,13 @@ def upgrade():
     index.connect()
     if not conf.skip_index:
         LOG.info("Upgrading indexer %s" % index)
+        indexer_testing = strutils.bool_from_string(
+            os.getenv("GNOCCHI_INDEXER_TESTING"))
         index.upgrade(
-            create_legacy_resource_types=conf.create_legacy_resource_types)
+            create_legacy_resource_types=conf.create_legacy_resource_types,
+            # NOTE(sileht): This is not a oslo.config option because this
+            # is for testing purpose only
+            nocreate=indexer_testing)
     if not conf.skip_storage:
         s = storage.get_driver(conf)
         LOG.info("Upgrading storage %s" % s)

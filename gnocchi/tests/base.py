@@ -17,7 +17,6 @@ import errno
 import functools
 import json
 import os
-import uuid
 
 import fixtures
 from oslotest import base
@@ -30,7 +29,6 @@ try:
 except ImportError:
     swexc = None
 from testtools import testcase
-from tooz import coordination
 
 from gnocchi import archive_policy
 from gnocchi import exceptions
@@ -385,28 +383,6 @@ class TestCase(base.BaseTestCase):
 
         self.index = indexer.get_driver(self.conf)
         self.index.connect()
-
-        # NOTE(jd) So, some driver, at least SQLAlchemy, can't create all
-        # their tables in a single transaction even with the
-        # checkfirst=True, so what we do here is we force the upgrade code
-        # path to be sequential to avoid race conditions as the tests run
-        # in parallel.
-        self.coord = coordination.get_coordinator(
-            self.conf.storage.coordination_url,
-            str(uuid.uuid4()).encode('ascii'))
-
-        self.coord.start()
-
-        with self.coord.get_lock(b"gnocchi-tests-db-lock"):
-            # Force upgrading using Alembic rather than creating the
-            # database from scratch so we are sure we don't miss anything
-            # in the Alembic upgrades. We have a test to check that
-            # upgrades == create but it misses things such as custom CHECK
-            # constraints.
-            self.index.upgrade(nocreate=True,
-                               create_legacy_resource_types=True)
-
-        self.coord.stop()
 
         self.archive_policies = self.ARCHIVE_POLICIES.copy()
         self.archive_policies.update(archive_policy.DEFAULT_ARCHIVE_POLICIES)
