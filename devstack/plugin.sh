@@ -153,14 +153,15 @@ function _gnocchi_install_grafana {
         sudo yum install "$GRAFANA_RPM_PKG"
     fi
 
-    # NOTE(sileht): We current support only 2.6, when 
-    # plugin for 3.0 will be ready we will switch to the grafana
-    # plugin tool to install it
-    git_clone ${GRAFANA_PLUGINS_REPO} ${GRAFANA_PLUGINS_DIR} 2.6
-    # Grafana-server does not handle symlink :(
-    sudo mkdir -p /usr/share/grafana/public/app/plugins/datasource/gnocchi
-    sudo mount -o bind ${GRAFANA_PLUGINS_DIR}/datasources/gnocchi /usr/share/grafana/public/app/plugins/datasource/gnocchi
-
+    if [ $GRAFANA_FROM_SOURCE != "True" ]; then
+        sudo grafana-cli plugins install grafana-gnocchi-datasource
+    else
+        git_clone ${GRAFANA_PLUGINS_REPO} ${GRAFANA_PLUGINS_DIR}
+        mkdir -p ${GRAFANA_PLUGINS_DIR}/dist
+        sudo ln -sf ${GRAFANA_PLUGINS_DIR}/dist  /var/lib/grafana/plugins/grafana-gnocchi-datasource
+        # NOTE(sileht): This is too long and have too many chance to fail
+        # (cd /var/lib/grafana/plugins/grafana-gnocchoi-datasource && npm install && npm install grunt-cli && grunt) || true
+    fi
     sudo service grafana-server restart
 }
 
@@ -274,6 +275,8 @@ function configure_gnocchi {
     if [ "$GNOCCHI_USE_KEYSTONE" == "True" ] ; then
         iniset $GNOCCHI_PASTE_CONF pipeline:main pipeline gnocchi+auth
         if is_service_enabled gnocchi-grafana; then
+            # FIXME(sileht): keystone services have to be restarted
+            # at least when uwsgi is used. Or this should be done earlier.
             iniset $KEYSTONE_CONF cors allowed_origin ${GRAFANA_URL}
             iniset $GNOCCHI_CONF cors allowed_origin ${GRAFANA_URL}
             iniset $GNOCCHI_CONF cors allow_headers Content-Type,Cache-Control,Content-Language,Expires,Last-Modified,Pragma,X-Auth-Token,X-Subject-Token
@@ -447,10 +450,6 @@ function stop_gnocchi {
     for serv in gnocchi-api; do
         stop_process $serv
     done
-
-    if is_service_enabled gnocchi-grafana; then
-        sudo umount /usr/share/grafana/public/app/plugins/datasource/gnocchi
-    fi
 }
 
 if is_service_enabled gnocchi-api; then
