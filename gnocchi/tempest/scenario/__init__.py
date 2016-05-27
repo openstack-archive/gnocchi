@@ -45,6 +45,8 @@ class GnocchiGabbiTest(tempest.test.BaseTestCase):
         prefix = parsed_url.path.rstrip('/')  # turn it into a prefix
         port = 443 if parsed_url.scheme == 'https' else 80
         host = parsed_url.hostname
+        if '::' in host:
+            host = "[%s]" % host
         if parsed_url.port:
             port = parsed_url.port
 
