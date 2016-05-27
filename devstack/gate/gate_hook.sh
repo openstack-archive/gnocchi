@@ -22,6 +22,7 @@ ENABLED_SERVICES="key,gnocchi-api,gnocchi-metricd,tempest,"
 # Use efficient wsgi web server
 DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_DEPLOY=uwsgi'
 DEVSTACK_LOCAL_CONFIG+=$'\nexport KEYSTONE_DEPLOY=uwsgi'
+DEVSTACK_LOCAL_CONFIG+=$'\nexport HOST_IPV6=::1'
 
 export DEVSTACK_GATE_INSTALL_TESTONLY=1
 export DEVSTACK_GATE_NO_SERVICES=1
