@@ -1,0 +1,9 @@
+Code-Review+2: Chris Dent <cdent@anticdent.org>
+Code-Review+2: gordon chung <gord@live.ca>
+Workflow+1: gordon chung <gord@live.ca>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Mon, 30 May 2016 12:06:13 +0000
+Reviewed-on: https://review.openstack.org/317453
+Project: openstack/gnocchi
+Branch: refs/heads/master
