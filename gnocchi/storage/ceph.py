@@ -270,7 +270,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                                      aggregation, granularity)
         with self._get_ioctx() as ioctx:
             ioctx.rm_xattr("gnocchi_%s_container" % metric.id, name)
-            ioctx.remove_object(name)
+            ioctx.aio_remove(name)
 
     def _delete_metric(self, metric):
         with self._get_ioctx() as ioctx:
@@ -280,7 +280,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 pass
             else:
                 for xattr, _ in xattrs:
-                    ioctx.aio_remove(xattr)
+                    ioctx.rm_xattr("gnocchi_%s_container" % metric.id), xattr)
             for name in ('container', 'none'):
                 ioctx.aio_remove("gnocchi_%s_%s" % (metric.id, name))
 
