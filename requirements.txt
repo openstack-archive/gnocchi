@@ -1,6 +1,7 @@
 pbr
 numpy
 oslo.config>=2.6.0
+oslo.db
 oslo.log>=1.0.0
 oslo.policy>=0.3.0
 oslo.serialization>=1.4.0
@@ -13,6 +14,8 @@ futures
 requests
 six
 stevedore
+lz4
+tooz
 voluptuous
 werkzeug
 trollius; python_version < '3.4'
