@@ -1,0 +1,9 @@
+Code-Review+1: zhangguoqing <zhang.guoqing@99cloud.net>
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 22 Jun 2016 18:34:45 +0000
+Reviewed-on: https://review.openstack.org/319383
+Project: openstack/gnocchi
+Branch: refs/heads/master
