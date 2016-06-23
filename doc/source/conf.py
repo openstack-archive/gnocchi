@@ -30,6 +30,7 @@ import oslosphinx
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
     'gnocchi.gendoc',
+    'gnocchi.genswg2rst',
     'sphinxcontrib.httpdomain',
     'sphinx.ext.autodoc',
 ]

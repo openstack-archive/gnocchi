@@ -108,7 +108,7 @@ def setup(app):
         return
     webapp = _setup_test_app()
     # TODO(jd) Do not hardcode doc/source
-    with open("doc/source/rest.yaml") as f:
+    with open("doc/source/rest-description.yaml") as f:
         scenarios = ScenarioList(yaml.load(f))
     for entry in scenarios:
         template = jinja2.Template(entry['request'])
@@ -122,8 +122,8 @@ def setup(app):
             response = webapp.request(request)
         entry['response'] = response
         entry['doc'] = _format_request_reply(request, response)
-    with open("doc/source/rest.j2", "r") as f:
+    with open("doc/source/rest-description.j2", "r") as f:
         template = jinja2.Template(f.read().decode('utf-8'))
-    with open("doc/source/rest.rst", "w") as f:
+    with open("doc/source/rest-description.rst", "w") as f:
         f.write(template.render(scenarios=scenarios).encode('utf-8'))
     _RUN = True

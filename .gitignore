@@ -6,7 +6,8 @@ AUTHORS
 ChangeLog
 etc/gnocchi/gnocchi.conf
 doc/build
-doc/source/rest.rst
+doc/source/rest-description.rst
+doc/source/rest-api-def.rst
 releasenotes/build
 cover
 .coverage

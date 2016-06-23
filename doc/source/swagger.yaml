@@ -1,0 +1,104 @@
+swagger: '2.0'
+info:
+  title: Gnocchi API
+  description: Gnocchi timeserie database and resource indexer API
+  version: "1"
+basePath: /v1
+produces:
+  - application/json
+consumes:
+  - application/json
+paths:
+  /archive_policies:
+    post:
+      summary: Archive policy creation
+      description: |
+        An archive policy is defined by a list of items in the definition field.
+        Each item is composed of the timespan and the level of precision that must
+        be kept when aggregating data, determined using at least 2 of the points,
+        granularity and timespan fields. For example, an item might be defined as
+        12 points over 1 hour (one point every 5 minutes), or 1 point every
+        1 hour over 1 day (24 points).
+      parameters:
+        - name: Archive policy
+          in: body
+          schema:
+            $ref: '#/definitions/ArchivePolicy'
+          description: Archive policy definition
+          required: true
+      tags:
+        - Archive Policies
+      responses:
+        201:
+          description: Archive policy has been created
+          schema:
+            $ref: '#/definitions/ArchivePolicy'
+        400:
+          description: The definition of the archive policy is invalid
+          schema:
+            $ref: '#/definitions/Error'
+        409:
+          description: Archive policy with that name already exists
+          schema:
+            $ref: '#/definitions/Error'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+
+definitions:
+  ArchivePolicy:
+    type: object
+    required:
+      - name
+      - definition
+    properties:
+      name:
+        type: string
+      back_window:
+        type: integer
+        minimum: 0
+        default: 0
+      definition:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          properties:
+            granularity:
+              type: string
+            points:
+              type: integer
+              minimum: 1
+            timespan:
+              type: string
+      aggregation_methods:
+        type: array
+        items:
+          enum:
+            - mean
+            - min
+            - max
+            - sum
+            - std
+            - median
+            - count
+            - first
+            - last
+            - 1pct
+            - 2pct
+            - 3pct
+            - 95pct
+            - 99pct
+  Error:
+    type: object
+    properties:
+      code:
+        type: integer
+        description: HTTP error code
+        minimum: 100
+        maximum: 999
+      title:
+        type: string
+      description:
+        type: string
