@@ -23,6 +23,7 @@ from oslo_log import log
 from oslo_utils import timeutils
 import retrying
 import six
+from stevedore import driver
 
 from gnocchi import archive_policy
 from gnocchi import indexer
@@ -97,7 +98,16 @@ class MetricProcessBase(multiprocessing.Process):
                     retry_on_exception=retry_if_retry_is_raised)
     def _configure(self):
         try:
+            self.backstore = driver.DriverManager(
+                'gnocchi.storage', 'file').driver(self.conf.storage)
+            self.backstore.partition = self.worker_id
+        except storage.StorageError as e:
+            LOG.error("Unable to initialize storage: %s" % e)
+            raise Retry(e)
+
+        try:
             self.store = storage.get_driver(self.conf)
+            self.store.backstore = self.backstore
             self.store.partition = self.worker_id
         except storage.StorageError as e:
             LOG.error("Unable to initialize storage: %s" % e)

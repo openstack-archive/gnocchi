@@ -219,7 +219,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 oldest_point_to_keep)
 
     def add_measures(self, metric, measures):
-        self._store_measures(metric, msgpackutils.dumps(
+        self.backstore._store_measures(metric, msgpackutils.dumps(
             list(map(tuple, measures))))
 
     @staticmethod
@@ -313,7 +313,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             ((metric,) for metric in index.list_metrics()))
 
     def process_measures(self, indexer, block_size, sync=False):
-        metrics_to_process = self._list_metric_with_measures_to_process(
+        metrics_to_process = self.backstore._list_metric_with_measures_to_process(
             block_size, full=sync)
         metrics = indexer.list_metrics(ids=metrics_to_process)
         # This build the list of deleted metrics, i.e. the metrics we have
@@ -326,7 +326,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # measurement files under its feet is not nice!
             try:
                 with self._lock(metric_id)(blocking=sync):
-                    self._delete_unprocessed_measures_for_metric_id(metric_id)
+                    self.backstore._delete_unprocessed_measures_for_metric_id(metric_id)
             except coordination.LockAcquireFailed:
                 LOG.debug("Cannot acquire lock for metric %s, postponing"
                           "unprocessed measures deletion" % metric_id)
@@ -339,7 +339,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             if lock.acquire(blocking=sync):
                 try:
                     LOG.debug("Processing measures for %s" % metric)
-                    with self._process_measure_for_metric(metric) as measures:
+                    with self.backstore._process_measure_for_metric(metric) as measures:
                         # NOTE(mnaser): The metric could have been handled by
                         #               another worker, ignore if no measures.
                         if len(measures) == 0:
