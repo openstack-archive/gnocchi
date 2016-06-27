@@ -274,6 +274,10 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def _unserialize_measures(data):
         return msgpackutils.loads(data)
 
+    @staticmethod
+    def _wait_aio_for(metric):
+        pass
+
     def measures_report(self, details=True):
         metrics, measures, full_details = self._build_report(details)
         report = {'summary': {'metrics': metrics, 'measures': measures}}
@@ -432,6 +436,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
                         self._store_unaggregated_timeserie(metric,
                                                            ts.serialize())
+                        self._wait_aio_for(metric)
                 except Exception:
                     if sync:
                         raise

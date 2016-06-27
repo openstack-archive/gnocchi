@@ -108,6 +108,10 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         # we are safe and good.
         self.OMAP_WRITE_FLAGS = rados.LIBRADOS_OPERATION_SKIPRWLOCKS
 
+        # NOTE(sileht): This is designed to be used only within the metric lock
+        # in the process_new_measures() metrics loop
+        self._completions = defaultdict(list)
+
     def stop(self):
         self.ioctx.aio_flush()
         self.ioctx.close()
@@ -226,8 +230,8 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             # NOTE(sileht): come on Ceph, no return code
             # for this operation ?!!
             self.ioctx.remove_omap_keys(op, tuple(object_names))
-            self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
-                                        flags=self.OMAP_WRITE_FLAGS)
+            comp = self.ioctx.operate_aio_write_op(op, self.MEASURE_PREFIX,
+                                                   flags=self.OMAP_WRITE_FLAGS)
 
         for n in object_names:
             self.ioctx.aio_remove(n)
