@@ -1,0 +1,8 @@
+Code-Review+2: gordon chung <gord@live.ca>
+Workflow+1: gordon chung <gord@live.ca>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 28 Jun 2016 19:28:52 +0000
+Reviewed-on: https://review.openstack.org/335092
+Project: openstack/gnocchi
+Branch: refs/heads/master
