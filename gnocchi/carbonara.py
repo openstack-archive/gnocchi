@@ -128,11 +128,14 @@ class TimeSerie(SerializableMixin):
         return len(self.ts)
 
     @staticmethod
-    def _timestamps_and_values_from_dict(values):
-        timestamps = pandas.to_datetime(list(values.keys()), unit='ns')
-        v = list(values.values())
+    def _timestamps_and_values_from_data(values):
+        if isinstance(values, list):
+            timestamps, v = zip(*values)
+        else:
+            timestamps = list(values.keys())
+            v = list(values.values())
         if v:
-            return timestamps, v
+            return pandas.to_datetime(timestamps, unit='ns'), v
         return (), ()
 
     @classmethod
@@ -145,13 +148,12 @@ class TimeSerie(SerializableMixin):
         :returns: A TimeSerie object
         """
         return cls.from_data(
-            *cls._timestamps_and_values_from_dict(d['values']))
+            *cls._timestamps_and_values_from_data(d['values']))
 
     def to_dict(self):
         return {
-            'values': dict((timestamp.value, float(v))
-                           for timestamp, v
-                           in six.iteritems(self.ts.dropna())),
+            'values': [(timestamp.value, float(v))
+                       for timestamp, v in six.iteritems(self.ts.dropna())]
         }
 
     @staticmethod
@@ -252,7 +254,7 @@ class BoundTimeSerie(TimeSerie):
         :param d: The dict.
         :returns: A TimeSerie object
         """
-        timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
+        timestamps, values = cls._timestamps_and_values_from_data(d['values'])
         return cls.from_data(timestamps, values,
                              block_size=d.get('block_size'),
                              back_window=d.get('back_window'))
@@ -388,7 +390,7 @@ class AggregatedTimeSerie(TimeSerie):
         else:
             # migrate from v1.3, remove with TimeSerieArchive
             timestamps, d['values'] = (
-                cls._timestamps_and_values_from_dict(d['values']))
+                cls._timestamps_and_values_from_data(d['values']))
 
         return cls.from_data(
             sampling=sampling,
