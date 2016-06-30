@@ -169,7 +169,9 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
         self.assertEqual(5.48, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
         # Serialize and unserialize
-        ts = carbonara.AggregatedTimeSerie.unserialize(ts.serialize())
+        ts = carbonara.AggregatedTimeSerie.unserialize(
+             ts.serialize(), ts.get_split_key(ts.first, '1Min'),
+             '74pct', '1Min')
 
         ts.update(carbonara.TimeSerie.from_tuples(
             [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
@@ -613,7 +615,8 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
 
         self.assertEqual(ts,
                          carbonara.AggregatedTimeSerie.unserialize(
-                             ts.serialize()))
+                             ts.serialize(), ts.get_split_key(ts.first, 0.5),
+                             'mean', 0.5))
 
     def test_no_truncation(self):
         ts = carbonara.AggregatedTimeSerie(sampling=60,

@@ -110,7 +110,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                                       aggregation, granularity):
         data = self._get_measures(metric, key, aggregation, granularity)
         try:
-            return carbonara.TimeSerie.unserialize(data)
+            return carbonara.AggregatedTimeSerie.unserialize(
+                data, key, aggregation, granularity)
         except ValueError:
                 LOG.error("Data corruption detected for %s "
                           "aggregated `%s' timeserie, granularity `%s' "
