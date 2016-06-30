@@ -16,11 +16,12 @@
 # under the License.
 """Time series data manipulation, better with pancetta."""
 
-import datetime
 import functools
+import itertools
 import numbers
 import operator
 import re
+import struct
 import time
 
 import iso8601
@@ -150,8 +151,7 @@ class TimeSerie(SerializableMixin):
     def to_dict(self):
         return {
             'values': dict((timestamp.value, float(v))
-                           for timestamp, v
-                           in six.iteritems(self.ts.dropna())),
+                           for timestamp, v in six.iteritems(self.ts.dropna()))
         }
 
     @staticmethod
@@ -340,7 +340,9 @@ class AggregatedTimeSerie(TimeSerie):
         groupby = self.ts.groupby(functools.partial(
             self.get_split_key_datetime, sampling=self.sampling))
         for group, ts in groupby:
-            yield self._split_key_to_string(group), TimeSerie(ts)
+            yield (self._split_key_to_string(group),
+                   AggregatedTimeSerie(self.sampling, self.aggregation_method,
+                                       ts))
 
     @classmethod
     def from_timeseries(cls, timeseries, sampling, aggregation_method,
@@ -377,63 +379,50 @@ class AggregatedTimeSerie(TimeSerie):
         :param d: The dict.
         :returns: A TimeSerie object
         """
-        sampling = d.get('sampling')
-        if 'first_timestamp' in d:
-            prev_timestamp = pandas.Timestamp(d.get('first_timestamp') * 10e8)
-            timestamps = []
-            for delta in d.get('timestamps'):
-                prev_timestamp = datetime.timedelta(
-                    seconds=delta * sampling) + prev_timestamp
-                timestamps.append(prev_timestamp)
-        else:
-            # migrate from v1.3, remove with TimeSerieArchive
-            timestamps, d['values'] = (
-                cls._timestamps_and_values_from_dict(d['values']))
-
+        # FIXME(gordc): this is never really used except in TimeSerieArchive
+        timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
         return cls.from_data(
-            sampling=sampling,
+            sampling=d.get('sampling'),
             aggregation_method=d.get('aggregation_method', 'mean'),
             timestamps=timestamps,
-            values=d.get('values'),
+            values=values,
             max_size=d.get('max_size'))
 
     def to_dict(self):
-        if self.ts.empty:
-            timestamps = []
-            values = []
-            first_timestamp = 0
-        else:
-            first_timestamp = float(
-                self.get_split_key(self.ts.index[0], self.sampling))
-            timestamps = []
-            prev_timestamp = pandas.Timestamp(
-                first_timestamp * 10e8).to_pydatetime()
-            # Use double delta encoding for timestamps
-            for i in self.ts.index:
-                # Convert to pydatetime because it's faster to compute than
-                # Pandas' objects
-                asdt = i.to_pydatetime()
-                timestamps.append(
-                    int((asdt - prev_timestamp).total_seconds()
-                        / self.sampling))
-                prev_timestamp = asdt
-            values = self.ts.values.tolist()
-
-        return {
-            'first_timestamp': first_timestamp,
+        # FIXME(gordc): this is never really used except in test
+        basic = super(AggregatedTimeSerie, self).to_dict()
+        basic.update({
+            'sampling': self.sampling,
             'aggregation_method': self.aggregation_method,
             'max_size': self.max_size,
-            'sampling': self.sampling,
-            'timestamps': timestamps,
-            'values': values,
-        }
+        })
+        return basic
 
     @classmethod
-    def unserialize(cls, data):
-        return cls.from_dict(msgpack.loads(lz4.loads(data), encoding='utf-8'))
+    def unserialize(cls, data, start, agg_method, sampling):
+        x, y = [], []
+        decompress = lz4.loads(data)
+        v_len = len(decompress) / 9
+        deserial = struct.unpack('<' + '?d' * v_len, decompress)
+        for i, val in itertools.compress(itertools.izip(xrange(v_len),
+                                                        deserial[1::2]),
+                                         deserial[::2]):
+            x.append(val)
+            y.append(float(start) + (i * sampling))
+        y = pandas.to_datetime(y, unit='s')
+        return cls.from_data(sampling, agg_method, y, x)
 
     def serialize(self):
-        return lz4.dumps(msgpack.dumps(self.to_dict()))
+        if not self.ts.index.is_monotonic:
+            self.ts = self.ts.sort_index()
+        start = float(self.get_split_key(self.first, self.sampling)) * 10e8
+        e_offset = int((self.last.value - start) // (self.sampling * 10e8)) + 1
+        serial = [False] * e_offset * 2
+        for i, v in self.ts.iteritems():
+            loc = int((i.value - start) // (self.sampling * 10e8))
+            serial[loc * 2] = True
+            serial[loc * 2 + 1] = v
+        return lz4.dumps(struct.pack('<' + '?d' * e_offset, *serial))
 
     def _truncate(self):
         """Truncate the timeserie."""
