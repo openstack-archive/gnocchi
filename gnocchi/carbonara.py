@@ -18,10 +18,12 @@
 
 import datetime
 import functools
+import itertools
 import logging
 import numbers
 import operator
 import re
+import struct
 import time
 
 import iso8601
@@ -150,8 +152,7 @@ class TimeSerie(SerializableMixin):
     def to_dict(self):
         return {
             'values': dict((timestamp.value, float(v))
-                           for timestamp, v
-                           in six.iteritems(self.ts.dropna())),
+                           for timestamp, v in six.iteritems(self.ts.dropna()))
         }
 
     @staticmethod
@@ -341,7 +342,9 @@ class AggregatedTimeSerie(TimeSerie):
         groupby = self.ts.groupby(functools.partial(
             self.get_split_key_datetime, sampling=self.sampling))
         for group, ts in groupby:
-            yield self._split_key_to_string(group), TimeSerie(ts)
+            yield (self._split_key_to_string(group),
+                   AggregatedTimeSerie(self.sampling, self.aggregation_method,
+                                       ts))
 
     @classmethod
     def from_timeseries(cls, timeseries, sampling, aggregation_method,
@@ -430,11 +433,44 @@ class AggregatedTimeSerie(TimeSerie):
         }
 
     @classmethod
-    def unserialize(cls, data):
-        return cls.from_dict(msgpack.loads(lz4.loads(data), encoding='utf-8'))
+    def unserialize(cls, data, start, agg_method, sampling):
+        x, y = [], []
+        start = float(start)
+        decompress = lz4.loads(data)
+        v_len = len(decompress) // 9
+        # NOTE(gordc): use '<' for standardized, little-endian byte order.
+        deserial = struct.unpack('<' + '?d' * v_len, decompress)
+        # alternating split into 2 list and drop items with False flag
+        for i, val in itertools.compress(six.moves.zip(six.moves.range(v_len),
+                                                       deserial[1::2]),
+                                         deserial[::2]):
+            x.append(val)
+            y.append(start + (i * sampling))
+        y = pandas.to_datetime(y, unit='s')
+        return cls.from_data(sampling, agg_method, y, x)
 
-    def serialize(self):
-        return lz4.dumps(msgpack.dumps(self.to_dict()))
+    def serialize(self, start=None):
+        # NOTE(gordc): this binary serializes series based on the split time.
+        # the format is 1B True/False flag which denotes whether subsequent 8B
+        # is a real float or zero padding. every 9B represents one second from
+        # start time. this is intended to be run on data already split.
+        # ie. False,0,True,0 serialization means start datapoint is padding,
+        # and 1s after start time, the aggregate value is 0.
+        if not self.ts.index.is_monotonic:
+            self.ts = self.ts.sort_index()
+        offset_div = self.sampling * 10e8
+        start = (float(start) * 10e8 if start else
+                 float(self.get_split_key(self.first, self.sampling)) * 10e8)
+        # calculate how many seconds from start the series runs until and
+        # initialize list to store alternating delimiter, float entries
+        e_offset = int((self.last.value - start) // (self.sampling * 10e8)) + 1
+        serial = [False] * e_offset * 2
+        for i, v in self.ts.iteritems():
+            # overwrite zero padding with real points and set flag True
+            loc = int((i.value - start) // offset_div)
+            serial[loc * 2] = True
+            serial[loc * 2 + 1] = float(v)
+        return lz4.dumps(struct.pack('<' + '?d' * e_offset, *serial))
 
     def _truncate(self, quick=False):
         """Truncate the timeserie."""
