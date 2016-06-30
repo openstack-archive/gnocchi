@@ -14,10 +14,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import datetime
+import itertools
 import uuid
 
 import mock
-import pandas
+import msgpack
 import six
 
 from gnocchi import carbonara
@@ -27,16 +28,11 @@ from gnocchi.tests import base as tests_base
 from gnocchi import utils
 
 
-def _to_dict_v1_3(self):
+def _serialize_v2(self):
     d = {'values': dict((timestamp.value, float(v))
                         for timestamp, v
                         in six.iteritems(self.ts.dropna()))}
-    sampling = pandas.tseries.offsets.Nano(self.sampling * 10e8)
-    d.update({
-        'aggregation_method': self.aggregation_method,
-        'max_size': self.max_size,
-        'sampling': six.text_type(sampling.n) + sampling.rule_code})
-    return d
+    return msgpack.dumps(d)
 
 
 class TestCarbonaraMigration(tests_base.TestCase):
@@ -48,40 +44,29 @@ class TestCarbonaraMigration(tests_base.TestCase):
         self.metric = storage.Metric(uuid.uuid4(),
                                      self.archive_policies['low'])
 
-        archive = carbonara.TimeSerieArchive.from_definitions(
-            [(v.granularity, v.points)
-             for v in self.metric.archive_policy.definition]
-        )
-
-        archive_max = carbonara.TimeSerieArchive.from_definitions(
-            [(v.granularity, v.points)
-             for v in self.metric.archive_policy.definition],
-            aggregation_method='max',
-        )
-
-        for a in (archive, archive_max):
-            a.update(carbonara.TimeSerie.from_data(
-                [datetime.datetime(2014, 1, 1, 12, 0, 0),
-                 datetime.datetime(2014, 1, 1, 12, 0, 4),
-                 datetime.datetime(2014, 1, 1, 12, 0, 9)],
-                [4, 5, 6]))
-
         self.storage._create_metric(self.metric)
 
         # serialise in old format
-        with mock.patch('gnocchi.carbonara.AggregatedTimeSerie.to_dict',
+        with mock.patch('gnocchi.carbonara.AggregatedTimeSerie.serialize',
                         autospec=True) as f:
-            f.side_effect = _to_dict_v1_3
+            f.side_effect = _serialize_v2
 
-            self.storage._store_metric_archive(
-                self.metric,
-                archive.agg_timeseries[0].aggregation_method,
-                archive.serialize())
+            for d, agg in itertools.product(
+                    self.metric.archive_policy.definition, ['mean', 'max']):
+                ts = carbonara.AggregatedTimeSerie(
+                    sampling=d.granularity, aggregation_method=agg,
+                    max_size=d.points)
 
-            self.storage._store_metric_archive(
-                self.metric,
-                archive_max.agg_timeseries[0].aggregation_method,
-                archive_max.serialize())
+                ts.update(carbonara.TimeSerie.from_data(
+                    [datetime.datetime(2014, 1, 1, 12, 0, 0),
+                     datetime.datetime(2014, 1, 1, 12, 0, 4),
+                     datetime.datetime(2014, 1, 1, 12, 0, 9)],
+                    [4, 5, 6]))
+
+                for key, split in ts.split():
+                    self.storage._store_metric_measures(
+                        self.metric, key, agg, d.granularity,
+                        split.serialize(), version=None)
 
     def upgrade(self):
         with mock.patch.object(self.index, 'list_metrics') as f:
@@ -89,9 +74,20 @@ class TestCarbonaraMigration(tests_base.TestCase):
             self.storage.upgrade(self.index)
 
     def test_get_measures(self):
-        # This is to make gordc safer
-        self.assertIsNotNone(self.storage._get_metric_archive(
-            self.metric, "mean"))
+        with mock.patch.object(
+                self.storage, '_get_measures_and_unserialize',
+                side_effect=self.storage._get_measures_and_unserialize_v2):
+            self.assertEqual([
+                (utils.datetime_utc(2014, 1, 1), 86400, 5),
+                (utils.datetime_utc(2014, 1, 1, 12), 3600, 5),
+                (utils.datetime_utc(2014, 1, 1, 12), 300, 5)
+            ], self.storage.get_measures(self.metric))
+
+            self.assertEqual([
+                (utils.datetime_utc(2014, 1, 1), 86400, 6),
+                (utils.datetime_utc(2014, 1, 1, 12), 3600, 6),
+                (utils.datetime_utc(2014, 1, 1, 12), 300, 6)
+            ], self.storage.get_measures(self.metric, aggregation='max'))
 
         self.upgrade()
 
@@ -107,10 +103,16 @@ class TestCarbonaraMigration(tests_base.TestCase):
             (utils.datetime_utc(2014, 1, 1, 12), 300, 6)
         ], self.storage.get_measures(self.metric, aggregation='max'))
 
-        self.assertRaises(
-            storage.AggregationDoesNotExist,
-            self.storage._get_metric_archive,
-            self.metric, "mean")
+        with mock.patch.object(
+                self.storage, '_get_measures_and_unserialize',
+                side_effect=self.storage._get_measures_and_unserialize_v2):
+            self.assertRaises(
+                storage.AggregationDoesNotExist,
+                self.storage.get_measures, self.metric)
+
+            self.assertRaises(
+                storage.AggregationDoesNotExist,
+                self.storage.get_measures, self.metric, aggregation='max')
 
     def test_delete_metric_not_upgraded(self):
         # Make sure that we delete everything (e.g. objects + container)

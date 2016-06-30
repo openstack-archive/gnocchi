@@ -16,6 +16,7 @@
 # under the License.
 import collections
 import datetime
+import itertools
 import operator
 import uuid
 
@@ -69,7 +70,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         return self.coord.get_lock(lock_name)
 
     @staticmethod
-    def _get_measures(metric, timestamp_key, aggregation, granularity):
+    def _get_measures(metric, timestamp_key, aggregation, granularity,
+                      version=3):
         raise NotImplementedError
 
     @staticmethod
@@ -81,8 +83,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         raise NotImplementedError
 
     @staticmethod
-    def _store_metric_measures(metric, timestamp_key,
-                               aggregation, granularity, data):
+    def _store_metric_measures(metric, timestamp_key, aggregation,
+                               granularity, data, version=3):
         raise NotImplementedError
 
     @staticmethod
@@ -111,12 +113,13 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                                       aggregation, granularity):
         data = self._get_measures(metric, key, aggregation, granularity)
         try:
-            return carbonara.TimeSerie.unserialize(data)
+            return carbonara.AggregatedTimeSerie.unserialize(
+                data, key, aggregation, granularity)
         except ValueError:
-                LOG.error("Data corruption detected for %s "
-                          "aggregated `%s' timeserie, granularity `%s' "
-                          "around time `%s', ignoring."
-                          % (metric.id, aggregation, granularity, key))
+            LOG.error("Data corruption detected for %s "
+                      "aggregated `%s' timeserie, granularity `%s' "
+                      "around time `%s', ignoring."
+                      % (metric.id, aggregation, granularity, key))
 
     def _get_measures_timeserie(self, metric,
                                 aggregation, granularity,
@@ -247,7 +250,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     @staticmethod
     def _delete_metric_measures(metric, timestamp_key,
-                                aggregation, granularity):
+                                aggregation, granularity, version=3):
         raise NotImplementedError
 
     @staticmethod
@@ -264,32 +267,40 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def _check_for_metric_upgrade(self, metric):
         lock = self._lock(metric.id)
         with lock:
-            for agg_method in metric.archive_policy.aggregation_methods:
+            for agg_method, d in itertools.product(
+                    metric.archive_policy.aggregation_methods,
+                    metric.archive_policy.definition):
                 LOG.debug(
                     "Checking if the metric %s needs migration for %s"
                     % (metric, agg_method))
+
                 try:
-                    data = self._get_metric_archive(metric, agg_method)
+                    all_keys = self._list_split_keys_for_metric(
+                        metric, agg_method, d.granularity)
                 except storage.MetricDoesNotExist:
                     # Just try the next metric, this one has no measures
                     break
-                except storage.AggregationDoesNotExist:
-                    # This should not happen, but you never know.
-                    LOG.warning(
-                        "Metric %s does not have an archive "
-                        "for aggregation %s, "
-                        "no migration can be done" % (metric, agg_method))
                 else:
                     LOG.info("Migrating metric %s to new format" % metric)
-                    archive = carbonara.TimeSerieArchive.unserialize(data)
-                    for ts in archive.agg_timeseries:
-                        # Store each AggregatedTimeSerie independently
-                        for key, split in ts.split():
-                            self._store_metric_measures(metric, key,
-                                                        ts.aggregation_method,
-                                                        ts.sampling,
-                                                        split.serialize())
-            self._delete_metric_archives(metric)
+                    timeseries = filter(
+                        lambda x: x is not None,
+                        self._map_in_thread(
+                            self._get_measures_and_unserialize_v2,
+                            ((metric, key, agg_method, d.granularity)
+                             for key in all_keys))
+                    )
+                    ts = carbonara.AggregatedTimeSerie.from_timeseries(
+                        sampling=d.granularity,
+                        aggregation_method=agg_method,
+                        timeseries=timeseries, max_size=d.points)
+                    for key, split in ts.split():
+                        self._store_metric_measures(
+                            metric, key, ts.aggregation_method,
+                            ts.sampling, split.serialize())
+                    for key in all_keys:
+                        self._delete_metric_measures(
+                            metric, key, agg_method,
+                            d.granularity, version=None)
             LOG.info("Migrated metric %s to new format" % metric)
 
     def upgrade(self, index):
@@ -502,3 +513,16 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # We use 'list' to iterate all threads here to raise the first
             # exception now, not much choice
             return list(executor.map(lambda args: method(*args), list_of_args))
+
+    def _get_measures_and_unserialize_v2(self, metric, key,
+                                         aggregation, granularity):
+        """Unserialization method for upgrading v2 objects. Upgrade only."""
+        data = self._get_measures(
+            metric, key, aggregation, granularity, version=None)
+        try:
+            return carbonara.TimeSerie.unserialize(data)
+        except ValueError:
+            LOG.error("Data corruption detected for %s "
+                      "aggregated `%s' timeserie, granularity `%s' "
+                      "around time `%s', ignoring."
+                      % (metric.id, aggregation, granularity, key))
