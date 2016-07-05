@@ -144,7 +144,7 @@ class TestStorageDriver(tests_base.TestCase):
         count = 0
         for call in c.mock_calls:
             # policy is 60 points and split is 48. should only update 2nd half
-            if mock.call(m_sql, mock.ANY, 'mean', 60.0, mock.ANY) == call:
+            if m_sql == call[1][0] and 'mean' == call[1][2] and 60.0 == call[1][3]:
                 count += 1
         self.assertEqual(1, count)
 

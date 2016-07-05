@@ -185,16 +185,19 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             timeseries=timeseries,
             max_size=points)
 
+    def _get_measures_to_update(self, metric, agg, apolicy, timeserie):
+        return self._get_measures_timeserie(metric, agg, apolicy.granularity,
+                                            timeserie.first, timeserie.last)
+
     def _add_measures(self, aggregation, archive_policy_def,
                       metric, timeserie):
-        ts = self._get_measures_timeserie(metric, aggregation,
-                                          archive_policy_def.granularity,
-                                          timeserie.first, timeserie.last)
+        ts = self._get_measures_to_update(metric, aggregation,
+                                          archive_policy_def, timeserie)
         ts.update(timeserie)
         for key, split in ts.split():
             self._store_metric_measures(metric, key, aggregation,
                                         archive_policy_def.granularity,
-                                        split.serialize())
+                                        split)
 
         if ts.last and archive_policy_def.timespan:
             oldest_point_to_keep = ts.last - datetime.timedelta(
@@ -288,7 +291,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                             self._store_metric_measures(metric, key,
                                                         ts.aggregation_method,
                                                         ts.sampling,
-                                                        split.serialize())
+                                                        split)
             self._delete_metric_archives(metric)
             LOG.info("Migrated metric %s to new format" % metric)
 
