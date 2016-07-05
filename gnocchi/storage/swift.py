@@ -18,6 +18,7 @@ import contextlib
 import datetime
 import uuid
 
+import lz4
 from oslo_config import cfg
 from oslo_log import log
 import retrying
@@ -192,7 +193,7 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         self.swift.put_object(
             self._container_name(metric),
             self._object_name(timestamp_key, aggregation, granularity),
-            data)
+            lz4.dumps(data.serialize(padded=True)))
 
     def _delete_metric_measures(self, metric, timestamp_key, aggregation,
                                 granularity):
@@ -237,7 +238,7 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
                     raise
                 raise storage.AggregationDoesNotExist(metric, aggregation)
             raise
-        return contents
+        return lz4.loads(contents)
 
     def _list_split_keys_for_metric(self, metric, aggregation, granularity):
         container = self._container_name(metric)
