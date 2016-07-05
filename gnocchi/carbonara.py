@@ -25,7 +25,6 @@ import struct
 import time
 
 import iso8601
-import lz4
 import msgpack
 from oslo_log import log
 import pandas
@@ -285,6 +284,7 @@ class AggregatedTimeSerie(TimeSerie):
     _AGG_METHOD_PCT_RE = re.compile(r"([1-9][0-9]?)pct")
 
     POINTS_PER_SPLIT = 14400
+    SERIAL_LEN = 9
 
     def __init__(self, sampling, aggregation_method,
                  ts=None, max_size=None):
@@ -401,9 +401,8 @@ class AggregatedTimeSerie(TimeSerie):
     @classmethod
     def unserialize(cls, data, start, agg_method, sampling):
         x, y = [], []
-        decompress = lz4.loads(data)
-        v_len = len(decompress) // 9
-        deserial = struct.unpack('<' + '?d' * v_len, decompress)
+        v_len = len(data) // cls.SERIAL_LEN
+        deserial = struct.unpack('<' + '?d' * v_len, data)
         for i, val in itertools.compress(itertools.izip(xrange(v_len),
                                                         deserial[1::2]),
                                          deserial[::2]):
@@ -412,17 +411,29 @@ class AggregatedTimeSerie(TimeSerie):
         y = pandas.to_datetime(y, unit='s')
         return cls.from_data(sampling, agg_method, y, x)
 
-    def serialize(self):
+    def serialize(self, padded=True):
         if not self.ts.index.is_monotonic:
             self.ts = self.ts.sort_index()
-        start = float(self.get_split_key(self.first, self.sampling)) * 10e8
+        start = (float(self.get_split_key(self.first, self.sampling)) * 10e8
+                 if padded else self.first.value)
         e_offset = int((self.last.value - start) // (self.sampling * 10e8)) + 1
         serial = [False] * e_offset * 2
         for i, v in self.ts.iteritems():
             loc = int((i.value - start) // (self.sampling * 10e8))
             serial[loc * 2] = True
             serial[loc * 2 + 1] = float(v)
-        return lz4.dumps(struct.pack('<' + '?d' * e_offset, *serial))
+        return struct.pack('<' + '?d' * e_offset, *serial)
+
+    def offset_from_split(self):
+        split = float(self.get_split_key(self.first, self.sampling)) * 10e8
+        return int((self.first.value - split) // (self.sampling * 10e8)
+                   * self.SERIAL_LEN)
+
+    @staticmethod
+    def padding(offset):
+        offset = offset // AggregatedTimeSerie.SERIAL_LEN
+        pad = [False] * offset * 2
+        return struct.pack('<' + '?d' * offset, *pad)
 
     def _truncate(self):
         """Truncate the timeserie."""
