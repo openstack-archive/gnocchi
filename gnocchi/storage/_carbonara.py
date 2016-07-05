@@ -187,14 +187,16 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def _add_measures(self, aggregation, archive_policy_def,
                       metric, timeserie):
-        ts = self._get_measures_timeserie(metric, aggregation,
-                                          archive_policy_def.granularity,
-                                          timeserie.first, timeserie.last)
+        #ts = self._get_measures_timeserie(metric, aggregation,
+        #                                  archive_policy_def.granularity,
+        #                                  timeserie.first, timeserie.last)
+        ts = carbonara.AggregatedTimeSerie(archive_policy_def.granularity, aggregation,
+                                           max_size=archive_policy_def.points)
         ts.update(timeserie)
         for key, split in ts.split():
             self._store_metric_measures(metric, key, aggregation,
                                         archive_policy_def.granularity,
-                                        split.serialize())
+                                        split)
 
         if ts.last and archive_policy_def.timespan:
             oldest_point_to_keep = ts.last - datetime.timedelta(
@@ -298,8 +300,10 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             ((metric,) for metric in index.list_metrics()))
 
     def process_new_measures(self, indexer, block_size, sync=False):
-        metrics_to_process = self._list_metric_with_measures_to_process(
-            block_size, full=sync)
+        with timeutils.StopWatch() as sw:
+            metrics_to_process = self._list_metric_with_measures_to_process(
+                block_size, full=sync)
+            gtime = sw.elapsed()
         metrics = indexer.list_metrics(ids=metrics_to_process)
         # This build the list of deleted metrics, i.e. the metrics we have
         # measures to process for but that are not in the indexer anymore.
@@ -328,21 +332,24 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         # NOTE(mnaser): The metric could have been handled by
                         #               another worker, ignore if no measures.
                         if len(measures) == 0:
+                            LOG.info('===NO OP===')
                             LOG.debug("Skipping %s (already processed)"
                                       % metric)
                             continue
 
                         measures = sorted(measures, key=operator.itemgetter(0))
+                        rtime = 0
                         try:
                             with timeutils.StopWatch() as sw:
                                 raw_measures = (
                                     self._get_unaggregated_timeserie(
                                         metric)
                                 )
+                                rtime = sw.elapsed()
                                 LOG.debug(
                                     "Retrieve unaggregated measures "
                                     "for %s in %.2fs"
-                                    % (metric.id, sw.elapsed()))
+                                    % (metric.id, rtime))
                         except storage.MetricDoesNotExist:
                             try:
                                 self._create_metric(metric)
@@ -410,8 +417,11 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                                    (number_of_operations * len(measures))
                                    / elapsed))
 
-                        self._store_unaggregated_timeserie(metric,
-                                                           ts.serialize())
+                        with timeutils.StopWatch() as bs:
+                            self._store_unaggregated_timeserie(metric,
+                                                               ts.serialize())
+                        LOG.warning('===worker %s total===, %s, %s, %s, %s', self.partition,
+                                    gtime, rtime, elapsed, bs.elapsed())
                 except Exception:
                     if sync:
                         raise

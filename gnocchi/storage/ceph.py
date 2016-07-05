@@ -260,8 +260,13 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                                aggregation, granularity, data):
         name = self._get_object_name(metric, timestamp_key,
                                      aggregation, granularity)
+        serial = data.serialize()
+        offset = data.offset_from_split()
         with self._get_ioctx() as ioctx:
-            ioctx.write_full(name, data)
+            try:
+                ioctx.write(name, serial, offset=offset)
+            except rados.ObjectNotFound:
+                ioctx.write_full(name, data.padding(offset) + serial)
             ioctx.set_xattr("gnocchi_%s_container" % metric.id, name, "")
 
     def _delete_metric_measures(self, metric, timestamp_key, aggregation,
