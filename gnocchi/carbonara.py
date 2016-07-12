@@ -310,6 +310,7 @@ class AggregatedTimeSerie(TimeSerie):
         self.sampling = self._to_offset(sampling).nanos / 10e8
         self.max_size = max_size
         self.aggregation_method = aggregation_method
+        self._truncate()
 
     @classmethod
     def from_data(cls, sampling, aggregation_method, timestamps=None,
