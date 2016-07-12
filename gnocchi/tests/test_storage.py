@@ -536,9 +536,9 @@ class TestStorageDriver(tests_base.TestCase):
         name = str(uuid.uuid4())
         ap = archive_policy.ArchivePolicy(name, 0, [(3, 5)])
         self.index.create_archive_policy(ap)
-        m = storage.Metric(uuid.uuid4(), ap)
-        self.index.create_metric(m.id, str(uuid.uuid4()),
-                                 str(uuid.uuid4()), name)
+        m = self.index.create_metric(uuid.uuid4(), str(uuid.uuid4()),
+                                     str(uuid.uuid4()), name)
+        m = self.index.list_metrics(ids=[m.id])[0]
         self.storage.add_measures(m, [
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 0), 1),
             storage.Measure(datetime.datetime(2014, 1, 1, 12, 0, 5), 1),
