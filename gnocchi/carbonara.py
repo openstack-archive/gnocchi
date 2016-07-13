@@ -19,7 +19,6 @@
 import functools
 import itertools
 import numbers
-import operator
 import re
 import struct
 import time
@@ -372,34 +371,6 @@ class AggregatedTimeSerie(TimeSerie):
         )
 
     @classmethod
-    def from_dict(cls, d):
-        """Build a time series from a dict.
-
-        The dict format must be datetime as key and values as values.
-
-        :param d: The dict.
-        :returns: A TimeSerie object
-        """
-        # FIXME(gordc): this is never really used except in TimeSerieArchive
-        timestamps, values = cls._timestamps_and_values_from_dict(d['values'])
-        return cls.from_data(
-            sampling=d.get('sampling'),
-            aggregation_method=d.get('aggregation_method', 'mean'),
-            timestamps=timestamps,
-            values=values,
-            max_size=d.get('max_size'))
-
-    def to_dict(self):
-        # FIXME(gordc): this is never really used except in test
-        basic = super(AggregatedTimeSerie, self).to_dict()
-        basic.update({
-            'sampling': self.sampling,
-            'aggregation_method': self.aggregation_method,
-            'max_size': self.max_size,
-        })
-        return basic
-
-    @classmethod
     def unserialize(cls, data, start, agg_method, sampling):
         x, y = [], []
         start = float(start)
@@ -610,69 +581,3 @@ class AggregatedTimeSerie(TimeSerie):
                                             ascending=[0, 1]).itertuples())
         return [(timestamp, granularity, value)
                 for __, timestamp, granularity, value in points]
-
-
-class TimeSerieArchive(SerializableMixin):
-
-    def __init__(self, agg_timeseries):
-        """A raw data buffer and a collection of downsampled timeseries.
-
-        Used to represent the set of AggregatedTimeSeries for the range of
-        granularities supported for a metric (for a particular aggregation
-        function).
-
-        """
-        self.agg_timeseries = sorted(agg_timeseries,
-                                     key=operator.attrgetter("sampling"))
-
-    @classmethod
-    def from_definitions(cls, definitions, aggregation_method='mean'):
-        """Create a new collection of archived time series.
-
-        :param definition: A list of tuple (sampling, max_size)
-        :param aggregation_method: Aggregation function to use.
-        """
-        # Limit the main timeserie to a timespan mapping
-        return cls(
-            [AggregatedTimeSerie(
-                sampling=sampling,
-                aggregation_method=aggregation_method,
-                max_size=size)
-             for sampling, size in definitions]
-        )
-
-    def fetch(self, from_timestamp=None, to_timestamp=None):
-        """Fetch aggregated time value.
-
-        Returns a sorted list of tuples (timestamp, granularity, value).
-        """
-        result = []
-        end_timestamp = to_timestamp
-        for ts in reversed(self.agg_timeseries):
-            points = ts[from_timestamp:to_timestamp]
-            try:
-                # Do not include stop timestamp
-                del points[end_timestamp]
-            except KeyError:
-                pass
-            result.extend([(timestamp, ts.sampling, value)
-                           for timestamp, value
-                           in six.iteritems(points)])
-        return result
-
-    def update(self, timeserie):
-        for agg in self.agg_timeseries:
-            agg.update(timeserie)
-
-    def to_dict(self):
-        return {
-            "archives": [ts.to_dict() for ts in self.agg_timeseries],
-        }
-
-    def __eq__(self, other):
-        return (isinstance(other, TimeSerieArchive)
-                and self.agg_timeseries == other.agg_timeseries)
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls([AggregatedTimeSerie.from_dict(a) for a in d['archives']])
