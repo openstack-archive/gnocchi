@@ -138,31 +138,13 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             all_keys = self._list_split_keys_for_metric(
                 metric, aggregation, granularity)
         except storage.MetricDoesNotExist:
-            # This can happen if it's an old metric with a TimeSerieArchive
-            all_keys = None
-
-        if not all_keys:
-            # It does not mean we have no data: it can be an old metric with a
-            # TimeSerieArchive.
-            try:
-                data = self._get_metric_archive(metric, aggregation)
-            except (storage.MetricDoesNotExist,
-                    storage.AggregationDoesNotExist):
-                # It really does not exist
-                for d in metric.archive_policy.definition:
-                    if d.granularity == granularity:
-                        return carbonara.AggregatedTimeSerie(
-                            sampling=granularity,
-                            aggregation_method=aggregation,
-                            max_size=d.points)
-                raise storage.GranularityDoesNotExist(metric, granularity)
-            else:
-                archive = carbonara.TimeSerieArchive.unserialize(data)
-                # It's an old metric with an TimeSerieArchive!
-                for ts in archive.agg_timeseries:
-                    if ts.sampling == granularity:
-                        return ts
-                raise storage.GranularityDoesNotExist(metric, granularity)
+            for d in metric.archive_policy.definition:
+                if d.granularity == granularity:
+                    return carbonara.AggregatedTimeSerie(
+                        sampling=granularity,
+                        aggregation_method=aggregation,
+                        max_size=d.points)
+            raise storage.GranularityDoesNotExist(metric, granularity)
 
         if from_timestamp:
             from_timestamp = carbonara.AggregatedTimeSerie.get_split_key(
@@ -235,7 +217,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         with self._lock(metric.id)(blocking=sync):
             # If the metric has never been upgraded, we need to delete this
             # here too
-            self._delete_metric_archives(metric)
             self._delete_metric(metric)
 
     def _delete_metric_measures_before(self, metric, aggregation_method,
