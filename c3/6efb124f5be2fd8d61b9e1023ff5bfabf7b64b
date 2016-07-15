@@ -1,0 +1,11 @@
+Code-Review+1: Pradeep Kilambi <pkilambi@redhat.com>
+Code-Review+1: Alan Pevec <alan.pevec@redhat.com>
+Code-Review+1: zhangguoqing <zhang.guoqing@99cloud.net>
+Code-Review+2: gordon chung <gord@live.ca>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 15 Jul 2016 09:21:08 +0000
+Reviewed-on: https://review.openstack.org/341766
+Project: openstack/gnocchi
+Branch: refs/heads/master
