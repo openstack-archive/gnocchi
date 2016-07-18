@@ -1135,3 +1135,15 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertEqual([('after', 'deletion_error'),
                           ('before', 'deleting')],
                          sorted(states.items()))
+
+        # We can cleanup the mess !
+        self.index.delete_resource_type("indexer_test")
+
+        # Ensure it's deleted
+        self.assertRaises(indexer.NoSuchResourceType,
+                          self.index.get_resource_type,
+                          "indexer_test")
+
+        self.assertRaises(indexer.NoSuchResourceType,
+                          self.index.delete_resource_type,
+                          "indexer_test")
