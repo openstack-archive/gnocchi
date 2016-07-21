@@ -262,35 +262,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         return report
 
     def _check_for_metric_upgrade(self, metric):
-        lock = self._lock(metric.id)
-        with lock:
-            for agg_method in metric.archive_policy.aggregation_methods:
-                LOG.debug(
-                    "Checking if the metric %s needs migration for %s"
-                    % (metric, agg_method))
-                try:
-                    data = self._get_metric_archive(metric, agg_method)
-                except storage.MetricDoesNotExist:
-                    # Just try the next metric, this one has no measures
-                    break
-                except storage.AggregationDoesNotExist:
-                    # This should not happen, but you never know.
-                    LOG.warning(
-                        "Metric %s does not have an archive "
-                        "for aggregation %s, "
-                        "no migration can be done" % (metric, agg_method))
-                else:
-                    LOG.info("Migrating metric %s to new format" % metric)
-                    archive = carbonara.TimeSerieArchive.unserialize(data)
-                    for ts in archive.agg_timeseries:
-                        # Store each AggregatedTimeSerie independently
-                        for key, split in ts.split():
-                            self._store_metric_measures(metric, key,
-                                                        ts.aggregation_method,
-                                                        ts.sampling,
-                                                        split.serialize())
-            self._delete_metric_archives(metric)
-            LOG.info("Migrated metric %s to new format" % metric)
+        # TODO(gordc): add upgrade for v3
+        pass
 
     def upgrade(self, index):
         self._map_in_thread(
