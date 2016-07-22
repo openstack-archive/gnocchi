@@ -7,6 +7,6 @@ do
     export GNOCCHI_TEST_STORAGE_DRIVER=$storage
     for indexer in ${GNOCCHI_TEST_INDEXER_DRIVERS}
     do
-        pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
+        pifpaf --debug -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
     done
 done
