@@ -49,24 +49,27 @@ class TestCarbonaraMigration(tests_base.TestCase):
         # serialise in old format
         with mock.patch('gnocchi.carbonara.AggregatedTimeSerie.serialize',
                         autospec=True) as f:
-            f.side_effect = _serialize_v2
+            with mock.patch('gnocchi.carbonara.AggregatedTimeSerie.'
+                            'POINTS_PER_SPLIT', 14400):
+                f.side_effect = _serialize_v2
 
-            for d, agg in itertools.product(
-                    self.metric.archive_policy.definition, ['mean', 'max']):
-                ts = carbonara.AggregatedTimeSerie(
-                    sampling=d.granularity, aggregation_method=agg,
-                    max_size=d.points)
+                for d, agg in itertools.product(
+                        self.metric.archive_policy.definition,
+                        ['mean', 'max']):
+                    ts = carbonara.AggregatedTimeSerie(
+                        sampling=d.granularity, aggregation_method=agg,
+                        max_size=d.points)
 
-                ts.update(carbonara.TimeSerie.from_data(
-                    [datetime.datetime(2014, 1, 1, 12, 0, 0),
-                     datetime.datetime(2014, 1, 1, 12, 0, 4),
-                     datetime.datetime(2014, 1, 1, 12, 0, 9)],
-                    [4, 5, 6]))
+                    ts.update(carbonara.TimeSerie.from_data(
+                        [datetime.datetime(2014, 1, 1, 12, 0, 0),
+                         datetime.datetime(2014, 1, 1, 12, 0, 4),
+                         datetime.datetime(2014, 1, 1, 12, 0, 9)],
+                        [4, 5, 6]))
 
-                for key, split in ts.split():
-                    self.storage._store_metric_measures(
-                        self.metric, key, agg, d.granularity,
-                        split.serialize(), offset=0, version=None)
+                    for key, split in ts.split():
+                        self.storage._store_metric_measures(
+                            self.metric, key, agg, d.granularity,
+                            split.serialize(), offset=0, version=None)
 
     def upgrade(self):
         with mock.patch.object(self.index, 'list_metrics') as f:
