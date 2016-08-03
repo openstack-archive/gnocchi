@@ -798,6 +798,17 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                 raise indexer.NoSuchResource(resource_id)
 
     @retry_on_deadlock
+    def delete_resources(self, resource_ids):
+        with self.facade.writer() as session:
+            for resource_id in resource_ids:
+                session.query(Metric).filter(
+                    Metric.resource_id == resource_id).update(
+                        {"status": "delete"})
+                if session.query(Resource).filter(
+                        Resource.id == resource_id).delete() == 0:
+                    raise indexer.NoSuchResource(resource_id)
+
+    @retry_on_deadlock
     def get_resource(self, resource_type, resource_id, with_metrics=False):
         with self.facade.independent_reader() as session:
             resource_cls = self._resource_type_to_classes(

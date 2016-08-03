@@ -1185,6 +1185,42 @@ class ResourceTest(RestTest):
                      + self.attributes['id'],
                      status=404)
 
+    def test_delete_resources(self):
+        attribute_list = [{"id": str(uuid.uuid4()),
+                           "started_at": "2014-01-03T02:02:02+00:00",
+                           "user_id": str(uuid.uuid4()),
+                           "project_id": str(uuid.uuid4()),
+                           "name": "my-name"
+                           } for _ in xrange(10)]
+
+        for attribute in attribute_list:
+            self.app.post_json("/v1/resource/" + self.resource_type,
+                               params=attribute)
+
+        for attribute in attribute_list:
+            self.app.get("/v1/resource/" + self.resource_type + "/"
+                         + attribute['id'],
+                         status=200)
+
+        ids = [attr['id'] for attr in attribute_list]
+
+        with self.app.use_admin_user():
+            self.app.delete_json(
+                "/v1/resource/" + self.resource_type,
+                params={"ids": ids},
+                status=204)
+
+        with self.app.use_another_user():
+            self.app.delete_json(
+                "/v1/resource/" + self.resource_type,
+                params={"ids": ids},
+                status=404)
+
+        for attribute in attribute_list:
+            self.app.get("/v1/resource/" + self.resource_type + "/"
+                         + attribute['id'],
+                         status=404)
+
     def test_delete_resource_with_metrics(self):
         metric = self.app.post_json(
             "/v1/metric",
