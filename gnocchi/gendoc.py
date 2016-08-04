@@ -52,6 +52,23 @@ def _extract_body(req_or_resp):
     return "\n      ".join(body.split("\n"))
 
 
+def _url_mapping(request):
+    url_map = {
+        "DELETE": {"method": "POST", "suffix": "?_method=delete"},
+        "PUT": {"method": "POST", "suffix": "?_method=put"}
+    }
+
+    for k, v in url_map.items():
+        if request.path_qs.endswith(
+                v["suffix"]) and request.method == v["method"]:
+            request.method = k
+            request.__dict__["converted_path"] = request.path_qs.strip(
+                v["suffix"]
+            )
+
+            return request
+
+
 def _format_headers(headers):
     return "\n".join(
         "      %s: %s" % (k, v)
@@ -82,7 +99,7 @@ def _request_to_httpdomain(request):
       %(body)s""" % {
         'body': _extract_body(request),
         'method': request.method,
-        'path': request.path_qs,
+        'path': request.__dict__["converted_path"] or request.path_qs,
         'http_version': request.http_version,
         'headers': _format_headers(request.headers),
     }
@@ -120,8 +137,18 @@ def setup(app):
                                            six.text_type(request)))
         with webapp.use_admin_user():
             response = webapp.request(request)
+
+        # if find url_mapping, get a space to put converted_path
+        request.__dict__["converted_path"] = None
         entry['response'] = response
         entry['doc'] = _format_request_reply(request, response)
+
+        converted_request = _url_mapping(request)
+        if converted_request:
+            entry['url_mapping_converted_doc'] = _format_request_reply(
+                converted_request, response
+            )
+
     with open("doc/source/rest.j2", "r") as f:
         template = jinja2.Template(f.read().decode('utf-8'))
     with open("doc/source/rest.rst", "w") as f:
