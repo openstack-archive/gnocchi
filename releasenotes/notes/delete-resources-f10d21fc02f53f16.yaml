@@ -1,0 +1,6 @@
+---
+feature:
+  - Gnocchi is only allowed to delete resources one
+    by one in previous release. In this release,
+    an REST API is provided to delete multiple resources
+    at once.
