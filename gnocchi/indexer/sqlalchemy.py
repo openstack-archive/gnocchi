@@ -785,17 +785,23 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         session.expire(r, ['metrics'])
 
     @retry_on_deadlock
-    def delete_resource(self, resource_id):
+    def delete_resource(self, resources):
         with self.facade.writer() as session:
             # We are going to delete the resource; the on delete will set the
             # resource_id of the attached metrics to NULL, we just have to mark
             # their status as 'delete'
+            if not isinstance(resources, list):
+                resources = [resources]
+
             session.query(Metric).filter(
-                Metric.resource_id == resource_id).update(
-                    {"status": "delete"})
+                Metric.resource_id.in_(resources)
+            ).update({"status": "delete"},
+                     synchronize_session=False)
+
             if session.query(Resource).filter(
-                    Resource.id == resource_id).delete() == 0:
-                raise indexer.NoSuchResource(resource_id)
+                    Resource.id.in_(resources)
+            ).delete(synchronize_session=False) == 0:
+                raise indexer.NoSuchResource(Resource.id)
 
     @retry_on_deadlock
     def get_resource(self, resource_type, resource_id, with_metrics=False):
