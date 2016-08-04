@@ -978,6 +978,31 @@ class ResourcesController(rest.RestController):
         except indexer.IndexerException as e:
             abort(400, e)
 
+    @pecan.expose('json')
+    def delete(self, **kwargs):
+        # NOTE(sileht): Don't allow empty filter, this is going to delete
+        # the entire database.
+        attr_filter = deserialize_and_validate(
+            SearchResourceTypeController.ResourceSearchSchema)
+        if not attr_filter:
+            abort(400, "the query must be provided")
+
+        user, project = get_user_and_project()
+        policy_filter = _get_list_resource_policy_filter(
+            "delete resources", self._resource_type, user, project)
+
+        if policy_filter:
+            attr_filter = {"and": [policy_filter, attr_filter]}
+
+        try:
+            delete_num = pecan.request.indexer.delete_resources(
+                self._resource_type, attribute_filter=attr_filter)
+        except indexer.IndexerException as e:
+            abort(400, e)
+
+        pecan.response.status = 200
+        return {"deleted": delete_num}
+
 
 class ResourcesByTypeController(rest.RestController):
     @pecan.expose('json')

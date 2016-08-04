@@ -1,0 +1,6 @@
+---
+fixes:
+  - Gnocchi is only allow to delete resources one
+    by one in previous release. In this release,
+    an REST API is provided for delete a batch of
+    resources.
