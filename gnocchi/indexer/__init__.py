@@ -107,6 +107,21 @@ class NoSuchResource(IndexerException):
         self.resource = resource
 
 
+class NoSuchResources(IndexerException):
+    """Error raised when resources does not exist."""
+    def __init__(self, resources):
+        self.resources = resources
+        super(NoSuchResources, self).__init__("Resources %s do not exist" %
+                                              resources)
+
+class NoResourcesFoundByAttr(IndexerException):
+    """Error raised when no resources are found"""
+    def __init__(self, attr_filter):
+        self.attr_filter = attr_filter
+        super(NoResourcesFoundByAttr, self).__init__(
+            "No resources are found by attr_filter: %s" % self.attr_filter)
+
+
 class NoSuchArchivePolicy(IndexerException):
     """Error raised when an archive policy does not exist."""
     def __init__(self, archive_policy):
