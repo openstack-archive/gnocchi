@@ -988,7 +988,7 @@ class ResourceController(rest.RestController):
         enforce("delete resource", resource)
         etag_precondition_check(resource)
         try:
-            pecan.request.indexer.delete_resource(self.id)
+            pecan.request.indexer.delete_resources([self.id])
         except indexer.NoSuchResource as e:
             abort(404, e)
 
@@ -1067,6 +1067,27 @@ class ResourcesController(rest.RestController):
             )
         except indexer.IndexerException as e:
             abort(400, e)
+
+    @pecan.expose('json')
+    def delete(self, **kwargs):
+        resource_ids = kwargs.get('resource_ids', [])
+
+        indexed_resources = pecan.request.indexer.list_resources(
+            self._resource_type,
+            attribute_filter={"in": {"id": resource_ids}})
+
+        input_ids = set(resource_ids)
+        indexed_ids = set(str(r.id) for r in indexed_resources)
+
+        if input_ids > indexed_ids:
+            abort(404, indexer.NoSuchResources(
+                input_ids-indexed_ids))
+
+        for resource in indexed_resources:
+            enforce("delete resource", resource)
+
+        pecan.request.indexer.delete_resources(resource_ids)
+        pecan.response.status = 204
 
 
 class ResourcesByTypeController(rest.RestController):
