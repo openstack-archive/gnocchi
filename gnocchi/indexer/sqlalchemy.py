@@ -790,12 +790,18 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             # We are going to delete the resource; the on delete will set the
             # resource_id of the attached metrics to NULL, we just have to mark
             # their status as 'delete'
+            if type(resource_id) != list:
+                resource_id = [resource_id]
+
             session.query(Metric).filter(
-                Metric.resource_id == resource_id).update(
-                    {"status": "delete"})
+                Metric.resource_id.in_(resource_id)
+            ).update({"status": "delete"},
+                     synchronize_session='fetch')
+
             if session.query(Resource).filter(
-                    Resource.id == resource_id).delete() == 0:
-                raise indexer.NoSuchResource(resource_id)
+                    Resource.id.in_(resource_id)
+            ).delete(synchronize_session='fetch') == 0:
+                raise indexer.NoSuchResource(Resource.id)
 
     @retry_on_deadlock
     def get_resource(self, resource_type, resource_id, with_metrics=False):
