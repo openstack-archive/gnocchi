@@ -785,17 +785,31 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         session.expire(r, ['metrics'])
 
     @retry_on_deadlock
-    def delete_resource(self, resource_id):
+    def delete_resources(self, resources):
         with self.facade.writer() as session:
             # We are going to delete the resource; the on delete will set the
             # resource_id of the attached metrics to NULL, we just have to mark
             # their status as 'delete'
-            session.query(Metric).filter(
-                Metric.resource_id == resource_id).update(
-                    {"status": "delete"})
-            if session.query(Resource).filter(
-                    Resource.id == resource_id).delete() == 0:
-                raise indexer.NoSuchResource(resource_id)
+
+            metrics = session.query(Metric).filter(
+                Metric.resource_id.in_(resources)
+            )
+
+            for metric in metrics:
+                metric.update({"status": "delete"})
+
+            indexed_resources = session.query(Resource).filter(
+                Resource.id.in_(resources)
+            )
+
+            deleted_resources = []
+            for resource in indexed_resources:
+                session.delete(resource)
+                deleted_resources.append(str(resource.id))
+
+            if set(resources) > set(deleted_resources):
+                unknown_resource = set(resources) - set(deleted_resources)
+                raise indexer.NoSuchResource(unknown_resource)
 
     @retry_on_deadlock
     def get_resource(self, resource_type, resource_id, with_metrics=False):
@@ -1080,7 +1094,10 @@ class QueryTransformer(object):
 
                 if converter:
                     try:
-                        value = converter(value)
+                        if isinstance(value, list):
+                            value = [converter(v) for v in value]
+                        else:
+                            value = converter(value)
                     except Exception:
                         raise indexer.QueryValueError(value, field_name)
 
