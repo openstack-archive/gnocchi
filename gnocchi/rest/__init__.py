@@ -1068,6 +1068,30 @@ class ResourcesController(rest.RestController):
         except indexer.IndexerException as e:
             abort(400, e)
 
+    @pecan.expose('json')
+    def post_delete(self, **kwargs):
+        ids = set(kwargs.get('ids', []))
+        resources = {}
+        indexed_resources = pecan.request.indexer.list_resources(
+            self._resource_type)
+
+        resources = [
+            (str(resource.id), resource)
+            for resource in indexed_resources if str(resource.id) in ids
+        ]
+        resources = dict(resources)
+
+        resources_ids = set(resources.keys())
+        if ids > resources_ids:
+            abort(404, indexer.NoSuchResource(list(ids-resources_ids)))
+
+        resources_value = resources.values()
+        for value in resources_value:
+            enforce("delete resource", value)
+
+        pecan.request.indexer.delete_resource(list(ids))
+        pecan.response.status = 204
+
 
 class ResourcesByTypeController(rest.RestController):
     @pecan.expose('json')
