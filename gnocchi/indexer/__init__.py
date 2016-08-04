@@ -107,6 +107,18 @@ class NoSuchResource(IndexerException):
         self.resource = resource
 
 
+class NoSuchResources(IndexerException):
+    """Error raised when resources does not exist."""
+    def __init__(self, resources):
+        self.resources = resources
+        if len(resources) > 1:
+            super(NoSuchResources, self).__init__(
+                "Resources %s do not exist" % resources)
+        else:
+            super(NoSuchResources, self).__init__(
+                "Resource %s does not exist" % resources)
+
+
 class NoSuchArchivePolicy(IndexerException):
     """Error raised when an archive policy does not exist."""
     def __init__(self, archive_policy):
