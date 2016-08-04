@@ -785,23 +785,41 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         session.expire(r, ['metrics'])
 
     @retry_on_deadlock
-    def delete_resource(self, resource_id):
+    def delete_resources(self, resources):
         with self.facade.writer() as session:
             # We are going to delete the resource; the on delete will set the
             # resource_id of the attached metrics to NULL, we just have to mark
             # their status as 'delete'
+
+            # By using synchronize_session = False,
+            # the updated objects may still reamin in session
+            # with stale values.
+            # But since we wont refer to the deleted metrics in following code,
+            # thus everything will be fine and deleted after session expired.
             session.query(Metric).filter(
-                Metric.resource_id == resource_id).update(
-                    {"status": "delete"})
-            if session.query(Resource).filter(
-                    Resource.id == resource_id).delete() == 0:
-                raise indexer.NoSuchResource(resource_id)
+                Metric.resource_id.in_(resources)
+            ).update({"status": "delete"},
+                     synchronize_session=False)
+
+            indexed_resources = session.query(Resource).filter(
+                Resource.id.in_(resources)
+            )
+
+            deleted_resources = []
+            for resource in indexed_resources:
+                session.delete(resource)
+                deleted_resources.append(str(resource.id))
+
+            if set(resources) > set(deleted_resources):
+                unknown_resources = set(resources) - set(deleted_resources)
+                raise indexer.NoSuchResources(unknown_resources)
 
     @retry_on_deadlock
     def get_resource(self, resource_type, resource_id, with_metrics=False):
         with self.facade.independent_reader() as session:
             resource_cls = self._resource_type_to_classes(
                 session, resource_type)['resource']
+
             q = session.query(
                 resource_cls).filter(
                     resource_cls.id == resource_id)
@@ -1080,7 +1098,13 @@ class QueryTransformer(object):
 
                 if converter:
                     try:
-                        value = converter(value)
+                        # the origin code will throw an exception
+                        # if value of attribute_filter is a list
+                        # therefore kept this.
+                        if isinstance(value, list):
+                            value = [converter(v) for v in value]
+                        else:
+                            value = converter(value)
                     except Exception:
                         raise indexer.QueryValueError(value, field_name)
 
