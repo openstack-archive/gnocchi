@@ -67,6 +67,17 @@ endpoint:
 
 {{ scenarios['get-measures']['doc'] }}
 
+Depending on the driver, there may be some lag after POSTing measures before
+they are processed and queryable. To ensure your query returns all measures it
+knows about, you can force any unprocessed measures to be handled:
+
+{{ scenarios['get-measures-force-index']['doc'] }}
+
+.. note::
+
+   Depending on the amount of data that is unprocessed, `force-index` may add
+   some overhead to your query.
+
 The list of points returned is composed of tuples with (timestamp, granularity,
 value) sorted by timestamp. The granularity is the timespan covered by
 aggregation for this point.

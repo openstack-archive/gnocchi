@@ -546,8 +546,11 @@ class MetricController(rest.RestController):
 
     @pecan.expose('json')
     def get_measures(self, start=None, stop=None, aggregation='mean',
-                     granularity=None, **param):
+                     granularity=None, force_index=False, **param):
         self.enforce_metric("get measures")
+        if strutils.bool_from_string(force_index):
+            pecan.request.storage.process_new_measures(pecan.request.indexer,
+                                                       [self.metric.id])
         if not (aggregation
                 in archive_policy.ArchivePolicy.VALID_AGGREGATION_METHODS
                 or aggregation in self.custom_agg):
