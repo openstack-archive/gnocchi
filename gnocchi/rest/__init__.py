@@ -411,14 +411,16 @@ class AggregatedMetricController(rest.RestController):
 
     @pecan.expose('json')
     def get_measures(self, start=None, stop=None, aggregation='mean',
+                     reaggregation=None,
                      granularity=None, needed_overlap=100.0):
         return self.get_cross_metric_measures_from_ids(
             self.metric_ids, start, stop,
-            aggregation, granularity, needed_overlap)
+            aggregation, reaggregation, granularity, needed_overlap)
 
     @classmethod
     def get_cross_metric_measures_from_ids(cls, metric_ids, start=None,
                                            stop=None, aggregation='mean',
+                                           reaggregation=None,
                                            granularity=None,
                                            needed_overlap=100.0):
         # Check RBAC policy
@@ -430,11 +432,13 @@ class AggregatedMetricController(rest.RestController):
             abort(404, storage.MetricDoesNotExist(
                 missing_metric_ids.pop()))
         return cls.get_cross_metric_measures_from_objs(
-            metrics, start, stop, aggregation, granularity, needed_overlap)
+            metrics, start, stop, aggregation, reaggregation,
+            granularity, needed_overlap)
 
     @staticmethod
     def get_cross_metric_measures_from_objs(metrics, start=None, stop=None,
                                             aggregation='mean',
+                                            reaggregation=None,
                                             granularity=None,
                                             needed_overlap=100.0):
         try:
@@ -483,7 +487,7 @@ class AggregatedMetricController(rest.RestController):
             else:
                 measures = pecan.request.storage.get_cross_metric_measures(
                     metrics, start, stop, aggregation,
-                    None,
+                    reaggregation,
                     granularity,
                     needed_overlap)
             # Replace timestamp keys by their string versions
@@ -1341,6 +1345,7 @@ class AggregationResourceController(rest.RestController):
 
     @pecan.expose('json')
     def post(self, start=None, stop=None, aggregation='mean',
+             reaggregation=None,
              granularity=None, needed_overlap=100.0,
              groupby=None):
         # First, set groupby in the right format: a sorted list of unique
@@ -1365,7 +1370,8 @@ class AggregationResourceController(rest.RestController):
                                   (r.get_metric(self.metric_name)
                                    for r in resources)))
             return AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
-                metrics, start, stop, aggregation, granularity, needed_overlap)
+                metrics, start, stop, aggregation,
+                reaggregation, granularity, needed_overlap)
 
         def groupper(r):
             return tuple((attr, r[attr]) for attr in groupby)
@@ -1378,7 +1384,7 @@ class AggregationResourceController(rest.RestController):
             results.append({
                 "group": dict(key),
                 "measures": AggregatedMetricController.get_cross_metric_measures_from_objs(  # noqa
-                    metrics, start, stop, aggregation,
+                    metrics, start, stop, aggregation, reaggregation,
                     granularity, needed_overlap)
             })
 
@@ -1407,9 +1413,10 @@ class AggregationController(rest.RestController):
     @pecan.expose('json')
     def get_metric(self, metric=None, start=None,
                    stop=None, aggregation='mean',
+                   reaggregation=None,
                    granularity=None, needed_overlap=100.0):
         return AggregatedMetricController.get_cross_metric_measures_from_ids(
-            arg_to_list(metric), start, stop, aggregation,
+            arg_to_list(metric), start, stop, aggregation, reaggregation,
             granularity, needed_overlap)
 
 
