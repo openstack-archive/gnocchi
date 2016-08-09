@@ -28,7 +28,6 @@ import struct
 import time
 
 import iso8601
-import msgpack
 import pandas
 import six
 
@@ -526,8 +525,8 @@ class AggregatedTimeSerie(TimeSerie):
             t1 = time.time()
             print(title)
             print(" Bytes per point: %.2f" % (len(s) / float(points)))
-            print(" Compression speed: %.2f MB/s"
-                  % ((len(msgpack.dumps(ts.to_dict()))
+            print(" Serialization speed: %.2f MB/s"
+                  % (((points * 2 * 8)
                       / ((t1 - t0) / compress_times)) / (1024.0 * 1024.0)))
 
     @staticmethod
