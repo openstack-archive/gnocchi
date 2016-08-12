@@ -16,3 +16,4 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`search`
+    2.2
