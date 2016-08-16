@@ -1,0 +1,2 @@
+libpq-dev [platform:dpkg]
+postgresql [platform:dpkg]
