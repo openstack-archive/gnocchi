@@ -1,0 +1,3 @@
+libpq-dev [platform:dpkg]
+postgresql [platform:dpkg]
+mysql-client [platform:dpkg]
