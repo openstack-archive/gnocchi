@@ -26,7 +26,6 @@ from gnocchi import carbonara
 from gnocchi import indexer
 from gnocchi import storage
 from gnocchi.storage import _carbonara
-from gnocchi.storage import null
 from gnocchi.tests import base as tests_base
 from gnocchi import utils
 
