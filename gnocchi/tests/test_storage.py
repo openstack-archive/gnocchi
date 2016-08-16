@@ -50,11 +50,6 @@ class TestStorageDriver(tests_base.TestCase):
             metrics = [str(self.metric.id)]
         self.storage.process_background_tasks(self.index, metrics, sync=True)
 
-    def test_get_driver(self):
-        self.conf.set_override('driver', 'null', 'storage')
-        driver = storage.get_driver(self.conf)
-        self.assertIsInstance(driver, null.NullStorage)
-
     def test_corrupted_data(self):
         if not isinstance(self.storage, _carbonara.CarbonaraBasedStorage):
             self.skipTest("This driver is not based on Carbonara")
