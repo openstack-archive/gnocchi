@@ -41,7 +41,7 @@ LOG = log.getLogger(__name__)
 
 
 def upgrade():
-    conf = cfg.ConfigOpts()
+    conf = service.prepare_service()
     conf.register_cli_opts([
         cfg.BoolOpt("skip-index", default=False,
                     help="Skip index upgrade."),
@@ -52,7 +52,6 @@ def upgrade():
         cfg.BoolOpt("create-legacy-resource-types", default=False,
                     help="Creation of Ceilometer legacy resource types.")
     ])
-    conf = service.prepare_service(conf=conf)
     index = indexer.get_driver(conf)
     index.connect()
     if not conf.skip_index:
