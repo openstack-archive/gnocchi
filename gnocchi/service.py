@@ -30,10 +30,12 @@ from gnocchi import opts
 LOG = log.getLogger(__name__)
 
 
-def prepare_service(args=None, conf=None,
-                    default_config_files=None):
-    if conf is None:
-        conf = cfg.ConfigOpts()
+def prepare_service(args=None, cli_opt=None, default_config_files=None):
+    conf = cfg.ConfigOpts()
+
+    if cli_opt is not None:
+        conf.register_cli_opt(cli_opt)
+   
     opts.set_defaults()
     # FIXME(jd) Use the pkg_entry info to register the options of these libs
     log.register_options(conf)
