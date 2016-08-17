@@ -27,13 +27,12 @@ from gnocchi import utils
 
 
 def injector():
-    conf = cfg.ConfigOpts()
-    conf.register_cli_opts([
+    extra_opt = [
         cfg.IntOpt("metrics", default=None),
         cfg.IntOpt("batch-of-measures", default=1000),
         cfg.IntOpt("measures-per-batch", default=10),
-    ])
-    conf = service.prepare_service(conf=conf)
+    ]
+    conf = service.prepare_service(cli_opt=extra_opt)
     index = indexer.get_driver(conf)
     index.connect()
     s = storage.get_driver(conf)
