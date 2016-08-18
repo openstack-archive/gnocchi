@@ -51,6 +51,7 @@ LOG = log.getLogger(__name__)
 
 class CarbonaraBasedStorage(storage.StorageDriver):
     MEASURE_PREFIX = "measure"
+    UPGRADE_LIMIT = 1000
 
     def __init__(self, conf):
         super(CarbonaraBasedStorage, self).__init__(conf)
@@ -298,9 +299,15 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             LOG.info("Migrated metric %s to new format" % metric)
 
     def upgrade(self, index):
-        self._map_in_thread(
-            self._check_for_metric_upgrade,
-            ((metric,) for metric in index.list_metrics()))
+        marker = None
+        while True:
+            metrics = [(metric,) for metric in
+                       index.list_metrics(limit=self.UPGRADE_LIMIT,
+                                          marker=marker)]
+            self._map_in_thread(self._check_for_metric_upgrade, metrics)
+            if len(metrics) < self.UPGRADE_LIMIT:
+                break
+            marker = metrics[-1][0].id
 
     def process_new_measures(self, indexer, metrics_to_process, sync=False):
         metrics = indexer.list_metrics(ids=metrics_to_process)
