@@ -53,6 +53,18 @@ class TestCarbonaraMigration(tests_base.TestCase):
                             'POINTS_PER_SPLIT', 14400):
                 f.side_effect = _serialize_v2
 
+                # NOTE(jd) This is just to have an unaggregated timserie for
+                # the upgrade code, I don't think the values are correct lol
+                ts = carbonara.BoundTimeSerie(
+                    block_size=self.metric.archive_policy.max_block_size,
+                    back_window=self.metric.archive_policy.back_window)
+                ts.set_values([
+                    storage.Measure(
+                        datetime.datetime(2016, 7, 17, 23, 59, 0), 23),
+                ])
+                self.storage._store_unaggregated_timeserie(self.metric,
+                                                           ts.serialize())
+
                 for d, agg in itertools.product(
                         self.metric.archive_policy.definition,
                         ['mean', 'max']):
@@ -72,7 +84,10 @@ class TestCarbonaraMigration(tests_base.TestCase):
 
                     for key, split in ts.split():
                         self.storage._store_metric_measures(
-                            self.metric, key, agg, d.granularity,
+                            self.metric,
+                            carbonara.AggregatedTimeSerie.split_key_to_string(
+                                key),
+                            agg, d.granularity,
                             split.serialize(), offset=0, version=None)
 
     def upgrade(self):
