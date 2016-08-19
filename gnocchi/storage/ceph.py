@@ -24,7 +24,6 @@ from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import importutils
 
-from gnocchi import carbonara
 from gnocchi import storage
 from gnocchi.storage import _carbonara
 

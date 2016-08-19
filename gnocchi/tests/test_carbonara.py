@@ -16,6 +16,7 @@
 import datetime
 import math
 
+import fixtures
 from oslo_utils import timeutils
 from oslotest import base
 # TODO(jd) We shouldn't use pandas here
@@ -27,6 +28,7 @@ from gnocchi import carbonara
 
 class TestBoundTimeSerie(base.BaseTestCase):
     def test_benchmark(self):
+        self.useFixture(fixtures.Timeout(120, gentle=True))
         carbonara.AggregatedTimeSerie.benchmark()
 
     @staticmethod
@@ -172,8 +174,9 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
         self.assertEqual(5.48, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
         # Serialize and unserialize
-        ts = carbonara.AggregatedTimeSerie.unserialize(
-            ts.serialize(), ts.get_split_key(ts.first, 60), '74pct', 60)
+        o, s = ts.serialize()
+        ts_compressed = carbonara.AggregatedTimeSerie.unserialize(
+            s, ts.get_split_key(ts.first, 60), '74pct', ts.sampling)
 
         ts.update(carbonara.TimeSerie.from_tuples(
             [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
@@ -611,9 +614,10 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 2, 12, 532), 1),
         ], before_truncate_callback=ts.update)
 
+        o, s = ts.serialize()
         self.assertEqual(ts,
                          carbonara.AggregatedTimeSerie.unserialize(
-                             ts.serialize(), ts.get_split_key(ts.first, 0.5),
+                             s, ts.get_split_key(ts.first, 0.5),
                              'mean', 0.5))
 
     def test_no_truncation(self):
