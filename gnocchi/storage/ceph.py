@@ -290,10 +290,6 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             else:
                 raise storage.MetricDoesNotExist(metric)
 
-    def _get_measures_to_update(self, metric, agg, apolicy, timeserie):
-        return carbonara.AggregatedTimeSerie(
-            apolicy.granularity, agg, max_size=apolicy.points)
-
     def _list_split_keys_for_metric(self, metric, aggregation, granularity):
         try:
             xattrs = self.ioctx.get_xattrs("gnocchi_%s_container" % metric.id)
