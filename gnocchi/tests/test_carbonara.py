@@ -918,9 +918,10 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                       / carbonara.AggregatedTimeSerie.POINTS_PER_SPLIT),
             len(grouped_points))
         self.assertEqual("0.0",
-                         grouped_points[0][0])
+                         carbonara.AggregatedTimeSerie.split_key_to_string(
+                             grouped_points[0][0]))
         # 3600 × 5s = 5 hours
-        self.assertEqual("18000.0",
+        self.assertEqual(datetime.datetime(1970, 1, 1, 5),
                          grouped_points[1][0])
         self.assertEqual(carbonara.AggregatedTimeSerie.POINTS_PER_SPLIT,
                          len(grouped_points[0][1]))
