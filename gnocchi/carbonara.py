@@ -326,7 +326,7 @@ class AggregatedTimeSerie(TimeSerie):
             timestamp, freq=sampling * cls.POINTS_PER_SPLIT * 10e8)
 
     @staticmethod
-    def _split_key_to_string(timestamp):
+    def split_key_to_string(timestamp):
         ts = timestamp.to_datetime()
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=iso8601.iso8601.UTC)
@@ -334,14 +334,14 @@ class AggregatedTimeSerie(TimeSerie):
 
     @classmethod
     def get_split_key(cls, timestamp, sampling):
-        return cls._split_key_to_string(
+        return cls.split_key_to_string(
             cls.get_split_key_datetime(timestamp, sampling))
 
     def split(self):
         groupby = self.ts.groupby(functools.partial(
             self.get_split_key_datetime, sampling=self.sampling))
         for group, ts in groupby:
-            yield (self._split_key_to_string(group),
+            yield (group,
                    AggregatedTimeSerie(self.sampling, self.aggregation_method,
                                        ts))
 
@@ -388,6 +388,11 @@ class AggregatedTimeSerie(TimeSerie):
         return cls.from_data(sampling, agg_method, y, x)
 
     def serialize(self, start=None, padded=True):
+        """Serialize an aggregated timeserie.
+
+        :param start: timestamp to start serialization
+        :param padded: pad the beginning of the serialization with zeroes
+        """
         # NOTE(gordc): this binary serializes series based on the split time.
         # the format is 1B True/False flag which denotes whether subsequent 8B
         # is a real float or zero padding. every 9B represents one second from
@@ -397,9 +402,9 @@ class AggregatedTimeSerie(TimeSerie):
         if not self.ts.index.is_monotonic:
             self.ts = self.ts.sort_index()
         offset_div = self.sampling * 10e8
-        start = ((float(start) * 10e8 if start else
-                  float(self.get_split_key(self.first, self.sampling)) * 10e8)
-                 if padded else self.first.value)
+        start = ((pandas.Timestamp(start) if start else
+                  self.get_split_key_datetime(self.first, self.sampling))
+                 if padded else self.first).value
         # calculate how many seconds from start the series runs until and
         # initialize list to store alternating delimiter, float entries
         e_offset = int((self.last.value - start) // (self.sampling * 10e8)) + 1
