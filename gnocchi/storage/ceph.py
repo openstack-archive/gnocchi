@@ -24,7 +24,6 @@ from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import importutils
 
-from gnocchi import carbonara
 from gnocchi import storage
 from gnocchi.storage import _carbonara
 
@@ -289,10 +288,6 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 raise storage.AggregationDoesNotExist(metric, aggregation)
             else:
                 raise storage.MetricDoesNotExist(metric)
-
-    def _get_measures_to_update(self, metric, agg, apolicy, timeserie):
-        return carbonara.AggregatedTimeSerie(
-            apolicy.granularity, agg, max_size=apolicy.points)
 
     def _list_split_keys_for_metric(self, metric, aggregation, granularity,
                                     version=None):
