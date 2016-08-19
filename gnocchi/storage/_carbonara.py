@@ -230,25 +230,21 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                     split, archive_policy_def.granularity)))
         key_as_str = carbonara.AggregatedTimeSerie.split_key_to_string(key)
         if write_full:
-            offset = 0
             try:
-                writee = self._get_measures_and_unserialize(
+                existing = self._get_measures_and_unserialize(
                     metric, key_as_str, aggregation,
                     archive_policy_def.granularity)
             except storage.AggregationDoesNotExist:
-                writee = split
+                pass
             else:
-                if writee is None:
-                    writee = split
-                else:
-                    # FIXME(jd) not update but rather concat ts + split
-                    writee.update(split)
-        else:
-            writee = split
-            offset = writee.offset_from_split()
+                if existing is not None:
+                    split.merge(existing)
+
+        offset, data = split.serialize(key, compressed=write_full)
+
         return self._store_metric_measures(
             metric, key_as_str, aggregation, archive_policy_def.granularity,
-            writee.serialize(key, write_full), offset=offset)
+            data, offset=offset)
 
     def _add_measures(self, aggregation, archive_policy_def,
                       metric, timeserie, oldest_mutable_timestamp):
