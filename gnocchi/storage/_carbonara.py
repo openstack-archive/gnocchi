@@ -297,17 +297,17 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                             metric, key, agg_method,
                             d.granularity, version=None)
             LOG.info("Migrated metric %s to new format" % metric)
+        return metric.id
 
     def upgrade(self, index):
         marker = None
         while True:
-            metrics = [(metric,) for metric in
+            metrics = [self._check_for_metric_upgrade(metric) for metric in
                        index.list_metrics(limit=self.UPGRADE_BATCH_SIZE,
                                           marker=marker)]
-            self._map_in_thread(self._check_for_metric_upgrade, metrics)
             if len(metrics) == 0:
                 break
-            marker = metrics[-1][0].id
+            marker = metrics[-1]
 
     def process_new_measures(self, indexer, metrics_to_process, sync=False):
         metrics = indexer.list_metrics(ids=metrics_to_process)
