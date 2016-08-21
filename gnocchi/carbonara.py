@@ -452,15 +452,16 @@ class AggregatedTimeSerie(TimeSerie):
         # aggregate value is 0. calculate how many seconds from start the
         # series runs until and initialize list to store alternating
         # delimiter, float entries
+        first = self.first.value
         e_offset = int(
-            (self.last.value - self.first.value) // offset_div) + 1
+            (self.last.value - first) // offset_div) + 1
         serial = [False] * e_offset * 2
         first = self.first.value # NOTE(jd) needed because faster
         for i, v in self.ts.iteritems():
             # overwrite zero padding with real points and set flag True
-            loc = int((i.value - first) // offset_div)
-            serial[loc * 2] = True
-            serial[loc * 2 + 1] = float(v)
+            loc = int((i.value - first) // offset_div) * 2
+            serial[loc] = True
+            serial[loc + 1] = v
         offset = (
             int((self.first.value - start.value) // offset_div)
             * self.PADDED_SERIAL_LEN
