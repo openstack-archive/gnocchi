@@ -1,0 +1,9 @@
+Code-Review+2: gordon chung <gord@live.ca>
+Code-Review+1: xiaozhuangqing <zhuangqing.xiao@easystack.cn>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sun, 21 Aug 2016 08:46:30 +0000
+Reviewed-on: https://review.openstack.org/355933
+Project: openstack/gnocchi
+Branch: refs/heads/master
