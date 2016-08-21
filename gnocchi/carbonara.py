@@ -458,7 +458,7 @@ class AggregatedTimeSerie(TimeSerie):
             # overwrite zero padding with real points and set flag True
             loc = int((i.value - self.first.value) // offset_div)
             serial[loc * 2] = True
-            serial[loc * 2 + 1] = float(v)
+            serial[loc * 2 + 1] = v
         offset = (
             int((self.first.value - start.value) // offset_div)
             * self.PADDED_SERIAL_LEN
