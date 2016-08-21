@@ -528,7 +528,7 @@ class AggregatedTimeSerie(TimeSerie):
             print(title)
             print(" Bytes per point: %.2f" % (len(s) / float(points)))
             print(" Serialization speed: %.2f MB/s"
-                  % (((points * 2 * 8)
+                  % (((points * cls.SERIAL_LEN)
                       / ((t1 - t0) / compress_times)) / (1024.0 * 1024.0)))
 
     @staticmethod
