@@ -19,7 +19,6 @@ service_available_group = cfg.OptGroup(name="service_available",
 
 service_available_opts = [
     cfg.BoolOpt("gnocchi",
-                default=True,
                 help="Whether or not Gnocchi is expected to be available"),
 ]
 
