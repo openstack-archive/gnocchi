@@ -17,7 +17,7 @@ six
 stevedore
 voluptuous
 werkzeug
-trollius; python_version < '3.4'
+trollius
 retrying
 WebOb>=1.4.1
 Paste
