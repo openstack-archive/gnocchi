@@ -56,6 +56,9 @@ class Resource(object):
                 and self.started_at == other.started_at
                 and self.ended_at == other.ended_at)
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     @property
     def etag(self):
         etag = hashlib.sha1()

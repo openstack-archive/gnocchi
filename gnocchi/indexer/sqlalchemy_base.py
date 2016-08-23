@@ -199,6 +199,9 @@ class Metric(Base, GnocchiBase, storage.Metric):
                  and self.resource_id == other.resource_id)
                 or (storage.Metric.__eq__(self, other)))
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     __hash__ = storage.Metric.__hash__
 
 

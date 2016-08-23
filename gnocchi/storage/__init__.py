@@ -83,6 +83,9 @@ class Metric(object):
                 and self.name == other.name
                 and self.resource_id == other.resource_id)
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     __hash__ = object.__hash__
 
 
