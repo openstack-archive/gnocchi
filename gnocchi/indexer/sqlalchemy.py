@@ -858,7 +858,6 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                        marker=None,
                        sorts=None):
         sorts = sorts or []
-
         with self.facade.independent_reader() as session:
             if history:
                 target_cls = self._get_history_result_mapper(

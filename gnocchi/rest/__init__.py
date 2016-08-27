@@ -756,6 +756,18 @@ class ResourceTypeController(rest.RestController):
         enforce("get resource type", rt)
         return rt
 
+    """
+    @pecan.expose('json')
+    def patch(self):
+        try:
+            rt = pecan.request.indexer.get_resource_type(self._name)
+        except indexer.NoSuchResourceType as e:
+            abort(404, e)
+        enforce("update resource type", rt)
+        body = deserialize_and_validate(voluptuous.Schema({
+            voluptuous.All([{
+    """
+
     @pecan.expose()
     def delete(self):
         try:
