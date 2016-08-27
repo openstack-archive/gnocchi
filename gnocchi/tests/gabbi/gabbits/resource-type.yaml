@@ -57,7 +57,7 @@ tests:
           # - "Invalid input: extra keys not allowed @ data[u'attributes'][u'foo'][u'noexist']"
           # - "Invalid input: not a valid value for dictionary value @ data[u'attributes'][u'foo'][u'type']"
           - "Invalid input:"
-
+          
 # Create a type
 
     - name: post resource type
