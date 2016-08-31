@@ -334,6 +334,8 @@ tests:
             required: False
             min_length: 0
             max_length: 255
+        - op: remove
+          path: /attributes/foobar
       status: 200
       response_json_paths:
           $.name: my_custom_resource
@@ -343,11 +345,6 @@ tests:
                   required: True
                   min_length: 2
                   max_length: 5
-              foobar:
-                  type: string
-                  required: False
-                  min_length: 0
-                  max_length: 255
               uuid:
                   type: uuid
                   required: True
@@ -380,11 +377,6 @@ tests:
                   required: True
                   min_length: 2
                   max_length: 5
-              foobar:
-                  type: string
-                  required: False
-                  min_length: 0
-                  max_length: 255
               uuid:
                   type: uuid
                   required: True
@@ -439,6 +431,17 @@ tests:
             required: False
             min_length: 0
             max_length: 255
+      status: 400
+
+    - name: patch a resource attribute type unknown
+      url: /v1/resource_type/my_custom_resource
+      method: patch
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: delete
+          path: /attributes/unknown
       status: 400
 
 # Ensure we can't delete the type
