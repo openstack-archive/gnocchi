@@ -46,7 +46,8 @@ class ModelsMigrationsSync(
             'url',
             sqlalchemy.SQLAlchemyIndexer._create_new_database(
                 self.conf.indexer.url),
-            'indexer')
+            'indexer',
+            enforce_type=True)
         self.index = indexer.get_driver(self.conf)
         self.index.connect()
         self.index.upgrade(nocreate=True, create_legacy_resource_types=True)

@@ -35,13 +35,17 @@ class TestStatsd(tests_base.TestCase):
         super(TestStatsd, self).setUp()
 
         self.conf.set_override("resource_id",
-                               uuid.uuid4(), "statsd")
+                               uuid.uuid4(), "statsd",
+                               enforce_type=True)
         self.conf.set_override("user_id",
-                               self.STATSD_USER_ID, "statsd")
+                               self.STATSD_USER_ID, "statsd",
+                               enforce_type=True)
         self.conf.set_override("project_id",
-                               self.STATSD_PROJECT_ID, "statsd")
+                               self.STATSD_PROJECT_ID, "statsd",
+                               enforce_type=True)
         self.conf.set_override("archive_policy_name",
-                               self.STATSD_ARCHIVE_POLICY_NAME, "statsd")
+                               self.STATSD_ARCHIVE_POLICY_NAME, "statsd",
+                               enforce_type=True)
 
         # NOTE(jd) Always use self.stats.storage and self.stats.indexer to
         # pick at the right storage/indexer used by the statsd server, and not
