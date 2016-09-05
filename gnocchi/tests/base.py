@@ -406,7 +406,8 @@ class TestCase(base.BaseTestCase):
                                             default_config_files=[])
         self.conf.set_override('policy_file',
                                self.path_get('etc/gnocchi/policy.json'),
-                               group="oslo_policy")
+                               group="oslo_policy",
+                               enforce_type=True)
 
         self.index = indexer.get_driver(self.conf)
         self.index.connect()
@@ -439,7 +440,8 @@ class TestCase(base.BaseTestCase):
         self.conf.set_override(
             'driver',
             os.getenv("GNOCCHI_TEST_STORAGE_DRIVER", "file"),
-            'storage')
+            'storage',
+            enforce_type=True)
 
     def setUp(self):
         super(TestCase, self).setUp()
@@ -455,7 +457,8 @@ class TestCase(base.BaseTestCase):
             tempdir = self.useFixture(fixtures.TempDir())
             self.conf.set_override('file_basepath',
                                    tempdir.path,
-                                   'storage')
+                                   'storage',
+                                   enforce_type=True)
 
         self.storage = storage.get_driver(self.conf)
         # NOTE(jd) Do not upgrade the storage. We don't really need the storage
