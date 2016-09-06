@@ -52,6 +52,8 @@ ceilometer_resources = {
     "volume": {
         "display_name": {"type": "string", "min_length": 0, "max_length": 255,
                          "required": False},
+        "volume_type": {"type": "string", "min_length": 0, "max_length": 255,
+                        "required": False},
     },
     "swift_account": {},
     "ceph_account": {},
