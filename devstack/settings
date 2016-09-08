@@ -18,7 +18,7 @@ GNOCCHI_COORDINATOR_URL=${GNOCCHI_COORDINATOR_URL:-redis://localhost:6379}
 # - werkzeug : Run gnocchi-api
 # - uwsgi : Run Gnocchi under uwsgi
 # - <empty>: Fallback to GNOCCHI_USE_MOD_WSGI or ENABLE_HTTPD_MOD_WSGI_SERVICES
-GNOCCHI_DEPLOY=${GNOCCHI_DEPLOY}
+GNOCCHI_DEPLOY=mod_wsgi
 
 # Toggle for deploying Gnocchi with/without Keystone
 GNOCCHI_USE_KEYSTONE=$(trueorfalse True GNOCCHI_USE_KEYSTONE)
