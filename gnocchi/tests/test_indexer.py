@@ -950,6 +950,37 @@ class TestIndexerDriver(tests_base.TestCase):
             })
         self.assertEqual(0, len(resources))
 
+    def test_delete_metrics_with_resources(self):
+        r1 = uuid.uuid4()
+        r2 = uuid.uuid4()
+        user = str(uuid.uuid4())
+        project = str(uuid.uuid4())
+        metrics = {'foo': {'archive_policy_name': 'medium'}}
+        g1 = self.index.create_resource('generic', r1, user, project,
+                                        user, project, metrics=metrics)
+        g2 = self.index.create_resource('generic', r2, user, project,
+                                        user, project, metrics=metrics)
+
+        metrics = self.index.list_metrics(ids=[g1['metrics'][0]['id'],
+                                               g2['metrics'][0]['id']])
+        self.assertEqual(2, len(metrics))
+        for m in metrics:
+            self.assertEqual('active', m['status'])
+
+        self.index.delete_resource(r1)
+        self.index.delete_resource(r2)
+
+        resources = self.index.list_resources(
+            'generic',
+            attribute_filter={"=": {"user_id": user}})
+        self.assertEqual(0, len(resources))
+
+        metrics = self.index.list_metrics(ids=[g1['metrics'][0]['id'],
+                                               g2['metrics'][0]['id']])
+        self.assertEqual(2, len(metrics))
+        for m in metrics:
+            self.assertEqual('delete', m['status'])
+
     def test_get_metric(self):
         e1 = uuid.uuid4()
         user = str(uuid.uuid4())
