@@ -48,6 +48,9 @@ OPTS = [
     cfg.StrOpt('swift_user',
                default="admin:admin",
                help='Swift user.'),
+    cfg.StrOpt('swift_user_domain_name',
+               default='Default',
+               help='Swift user domain name.'),
     cfg.StrOpt('swift_key',
                secret=True,
                default="admin",
@@ -84,7 +87,8 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
             key=conf.swift_key,
             tenant_name=conf.swift_tenant_name,
             timeout=conf.swift_timeout,
-            os_options={'endpoint_type': conf.swift_endpoint_type},
+            os_options={'endpoint_type': conf.swift_endpoint_type,
+                        'user_domain_name': conf.swift_user_domain_name},
             retries=1)
         self._container_prefix = conf.swift_container_prefix
         self.swift.put_container(self.MEASURE_PREFIX)
