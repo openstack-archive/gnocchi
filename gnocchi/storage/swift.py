@@ -35,7 +35,7 @@ LOG = log.getLogger(__name__)
 
 OPTS = [
     cfg.StrOpt('swift_auth_version',
-               default='1',
+               default='3',
                help='Swift authentication version to user.'),
     cfg.StrOpt('swift_preauthurl',
                help='Swift pre-auth URL.'),
