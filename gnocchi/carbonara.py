@@ -363,16 +363,8 @@ class AggregatedTimeSerie(TimeSerie):
         """
         super(AggregatedTimeSerie, self).__init__(ts)
 
-        m = self._AGG_METHOD_PCT_RE.match(aggregation_method)
-
-        if m:
-            self.q = float(m.group(1)) / 100
-            self.aggregation_method_func_name = 'quantile'
-        else:
-            if not hasattr(pandas.core.groupby.SeriesGroupBy,
-                           aggregation_method):
-                raise UnknownAggregationMethod(aggregation_method)
-            self.aggregation_method_func_name = aggregation_method
+        self.aggregation_method_func_name, self.q = self._get_agg_method(
+            aggregation_method)
 
         self.sampling = self._to_offset(sampling).nanos / 10e8
         self.max_size = max_size
@@ -386,6 +378,20 @@ class AggregatedTimeSerie(TimeSerie):
                    aggregation_method=aggregation_method,
                    ts=pandas.Series(values, timestamps),
                    max_size=max_size)
+
+    @staticmethod
+    def _get_agg_method(aggregation_method):
+        q = None
+        m = AggregatedTimeSerie._AGG_METHOD_PCT_RE.match(aggregation_method)
+        if m:
+            q = float(m.group(1)) / 100
+            aggregation_method_func_name = 'quantile'
+        else:
+            if not hasattr(pandas.core.groupby.SeriesGroupBy,
+                           aggregation_method):
+                raise UnknownAggregationMethod(aggregation_method)
+            aggregation_method_func_name = aggregation_method
+        return aggregation_method_func_name, q
 
     def split(self):
         groupby = self.ts.groupby(functools.partial(
@@ -538,14 +544,25 @@ class AggregatedTimeSerie(TimeSerie):
         groupedby = self.ts[after:].groupby(
             functools.partial(round_timestamp,
                               freq=self.sampling * 10e8))
-        agg_func = getattr(groupedby, self.aggregation_method_func_name)
-        if self.aggregation_method_func_name == 'quantile':
-            aggregated = agg_func(self.q)
-        else:
-            aggregated = agg_func()
+        aggregated = self._resample_grouped(groupedby,
+                                            self.aggregation_method_func_name,
+                                            self.q)
         # Now combine the result with the rest of the point – everything
         # that is before `after'
         self.ts = aggregated.combine_first(self.ts[:after][:-1])
+
+    @staticmethod
+    def _resample_grouped(grouped_serie, agg_name, q=None):
+        agg_func = getattr(grouped_serie, agg_name)
+        return agg_func(q) if agg_name == 'quantile' else agg_func()
+
+    @classmethod
+    def from_grouped_serie(cls, grouped_serie, sampling, aggregation_method,
+                           max_size=None):
+        agg_name, q = cls._get_agg_method(aggregation_method)
+        return cls(sampling, aggregation_method,
+                   ts=cls._resample_grouped(grouped_serie, agg_name, q),
+                   max_size=max_size)
 
     def fetch(self, from_timestamp=None, to_timestamp=None):
         """Fetch aggregated time value.
@@ -578,6 +595,7 @@ class AggregatedTimeSerie(TimeSerie):
         self.ts = self.ts.combine_first(ts.ts)
 
     def update(self, ts):
+        # FIXME(gordc): this might not actually be used anywhere?
         if ts.ts.empty:
             return
         ts.ts = self.clean_ts(ts.ts)
