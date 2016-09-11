@@ -18,6 +18,7 @@ import six
 import stevedore
 import voluptuous
 
+from gnocchi import indexer
 from gnocchi import utils
 
 
@@ -74,6 +75,11 @@ class CommonAttributeSchema(object):
         return {"type": self.typename,
                 "required": self.required}
 
+    def check(self, other):
+        if self.required is True and other['required'] is False:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s can not change required to False" % self.name)
+
 
 class StringSchema(CommonAttributeSchema):
     typename = "string"
@@ -103,6 +109,19 @@ class StringSchema(CommonAttributeSchema):
         d.update({"max_length": self.max_length,
                   "min_length": self.min_length})
         return d
+
+    def check(self, other):
+        if self.required is True and other['required'] is False:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s can not change required to False" % self.name)
+        if self.min_length > other['min_length']:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s attribute min_length %s can not be changed "
+                "to be larger!" % (self.name, other['min_length']))
+        if self.max_length < other['max_length']:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s attributes max_length %s can not be changed "
+                "to be smaller!" % (self.name, other['max_length']))
 
 
 class UUIDSchema(CommonAttributeSchema):
@@ -136,6 +155,29 @@ class NumberSchema(CommonAttributeSchema):
         d = super(NumberSchema, self).jsonify()
         d.update({"min": self.min, "max": self.max})
         return d
+
+    def check(self, other):
+        if self.required is True and other['required'] is False:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s can't not change required to False" % self.name)
+        if other['min'] is None and self.min is not None:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s attribute min value is None, can not be changed!"
+                % other.name)
+        if other['max'] is None and self.max is not None:
+            raise indexer.UnsupportedResourceTypeChange(
+                "%s attribute max value is None, can not be changed!"
+                % other.name)
+        if self.min is not None and other['min'] is not None:
+            if self.min > other['min']:
+                raise indexer.UnsupportedResourceTypeChange(
+                    "min %s can not be changed to be larger!"
+                    % (self.name, other['min']))
+        if self.max is not None and other['max'] is not None:
+            if self.max < other['max']:
+                raise indexer.UnsupportedResourceTypeChange(
+                    "%s attribtue max %s can not be changed to be smaller!"
+                    % (self.name, other['max']))
 
 
 class BoolSchema(CommonAttributeSchema):
@@ -171,8 +213,27 @@ class ResourceTypeSchemaManager(stevedore.ExtensionManager):
             self[attr["type"]].plugin(name=name, **attr)
             for name, attr in attributes.items())
 
+    def check_attributes_from_dict(self, new_attributes, original_attributes):
+        resource_type_attributes = []
+        for name, new_attr in new_attributes.items():
+            try:
+                original_attr = original_attributes[name]
+                new_attr = self[new_attr["type"]].plugin(name=name, **new_attr)
+                new_attr.check(original_attr)
+                resource_type_attributes.append(new_attr)
+            except KeyError:
+                raise indexer.UnsupportedResourceTypeChange(
+                    "patch method can not add new attribute")
+        return ResourceTypeAttributes(resource_type_attributes)
+
     def resource_type_from_dict(self, name, attributes, state):
         return ResourceType(name, self.attributes_from_dict(attributes), state)
+
+    def check_resource_type_from_dict(self, original_resource_type,
+                                      name, attributes, state):
+        original_attributes = original_resource_type.attributes.jsonify()
+        return ResourceType(name, self.check_attributes_from_dict(
+            attributes, original_attributes), state)
 
 
 class ResourceType(object):
