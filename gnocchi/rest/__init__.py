@@ -760,6 +760,29 @@ class ResourceTypeController(rest.RestController):
         enforce("get resource type", rt)
         return rt
 
+    @pecan.expose('json')
+    def patch(self):
+        try:
+            original_resource_type = pecan.request.indexer.\
+                get_resource_type(self._name)
+        except indexer.NoSuchResourceType as e:
+            abort(404, e)
+        schema = pecan.request.indexer.get_resource_type_schema()
+        body = deserialize_and_validate(schema)
+        body["state"] = "updating"
+        body["name"] = self._name
+
+        try:
+            new_resource_type = schema.check_resource_type_from_dict(
+                original_resource_type, **body)
+        except resource_type.InvalidResourceAttributeName as e:
+            abort(400, e)
+        except indexer.UnsupportedResourceTypeChange as e:
+            abort(400, e)
+        enforce("update resource type", new_resource_type)
+        return pecan.request.indexer.update_resource_type(
+            original_resource_type, new_resource_type)
+
     @pecan.expose()
     def delete(self):
         try:

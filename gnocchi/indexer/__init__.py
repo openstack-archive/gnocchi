@@ -133,6 +133,14 @@ class ArchivePolicyInUse(IndexerException):
         self.archive_policy = archive_policy
 
 
+class UnsupportedResourceTypeChange(IndexerException):
+    """Error raised when modifying resource type if not supported."""
+    def __init__(self, message):
+        super(UnsupportedResourceTypeChange, self).__init__(
+            "Resource type does not support change: %s" % message)
+        self.message = message
+
+
 class ResourceTypeInUse(IndexerException):
     """Error raised when an resource type is still being used."""
     def __init__(self, resource_type):
