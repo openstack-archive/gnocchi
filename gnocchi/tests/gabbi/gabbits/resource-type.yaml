@@ -168,6 +168,68 @@ tests:
                   type: bool
                   required: false
 
+    - name: patch resource type
+      PATCH: /v1/resource_type/my_custom_type
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          attributes:
+              name:
+                  type: string
+                  required: false
+                  max_length: 50
+                  min_length: 20
+              foobar:
+                  type: string
+                  required: false
+              uuid:
+                  type: uuid
+              int:
+                  type: number
+                  required: false
+                  min: -20
+                  max: 30
+              float:
+                  type: number
+                  required: false
+                  min: -5.3
+              bool:
+                  type: bool
+                  required: false
+      status: 200
+      response_json_paths:
+          $.name: my_custom_resource
+          $.state: active
+          $.attributes:
+              name:
+                  type: string
+                  required: false
+                  max_length: 50
+                  min_length: 20
+              foorbar:
+                  type: string
+                  required: false
+                  max_length: 255
+                  min_length: 0
+              uuid:
+                  type: uuid
+                  required: true
+              int:
+                  type: number
+                  required: false
+                  min: -20
+                  max: 30
+              float:
+                  type: number
+                  required: False
+                  min: -5.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
+                  
+
 # Some bad case case on the type
 
     - name: delete as non-admin

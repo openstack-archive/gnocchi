@@ -162,6 +162,26 @@ class ResourceClassMapper(object):
         # get_classes cannot be called in state creating
         self._cache[resource_type.tablename] = mappers
 
+    @retry_on_deadlock
+    def map_and_update_tables(self, resource_type, facade):
+        if resource_type.state != "updating":
+            raise RuntimeError("map_and_update_tables must be called in state "
+                               "updating")
+
+        mappers = self.get_classes(resource_type)
+        tables = [Base.metadata.tables[klass.__tablename__]
+                  for klass in mappers.values()]
+
+        try:
+            with facade.writer_connection() as connection:
+                Base.metadata.create_all(connection, tables=tables)
+        except exception.DBError as e:
+            if self._is_current_transaction_aborted(e):
+                raise exception.RetryRequest(e)
+            raise
+
+        self._cache[resource_type.tablename] = mappers
+
     @staticmethod
     def _is_current_transaction_aborted(exception):
         # HACK(jd) Sometimes, PostgreSQL raises an error such as "current
@@ -370,6 +390,33 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             # NOTE(sileht): We fail the DDL, we have no way to automatically
             # recover, just set a particular state
             self._set_resource_type_state(resource_type.name, "creation_error")
+            raise
+
+        self._set_resource_type_state(resource_type.name, "active")
+        resource_type.state = "active"
+        return resource_type
+
+    @retry_on_deadlock
+    def _update_resource_type(self, resource_type):
+        with self.facade.writer() as session:
+            q = session.query(ResourceType)
+            q = q.filter(ResourceType.tablename == resource_type.tablename)
+            q.update({'state': resource_type.state,
+                      'attributes': resource_type.attributes})
+
+    def update_resource_type(self, original_resource_type, new_resource_type):
+        resource_type = ResourceType(
+            name=new_resource_type.name,
+            tablename=original_resource_type.tablename,
+            attributes=new_resource_type.attributes,
+            state="updating")
+        resource_type.to_baseclass()
+        self._update_resource_type(resource_type)
+        try:
+            self._RESOURCE_TYPE_MANAGER.map_and_update_tables(resource_type,
+                                                              self.facade)
+        except Exception:
+            self._set_resource_type_state(resource_type.name, "updation_error")
             raise
 
         self._set_resource_type_state(resource_type.name, "active")
