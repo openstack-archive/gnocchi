@@ -261,6 +261,10 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             grouped_serie, archive_policy_def.granularity,
             aggregation, max_size=archive_policy_def.points)
 
+        # Don't do anything if the timeserie is empty
+        if not ts:
+            return
+
         # We only need to check for rewrite if driver is not in WRITE_FULL mode
         # and if we already stored splits once
         need_rewrite = (
