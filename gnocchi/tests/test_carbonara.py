@@ -149,11 +149,12 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                                            aggregation_method='74pct')
 
         self.assertRaises(carbonara.BeforeEpochError,
-                          ts.update,
+                          ts.group_serie,
                           carbonara.TimeSerie.from_tuples(
-                              [(datetime.datetime(1950, 1, 1, 12, 0, 0), 3),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-                               (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
+                              [(datetime.datetime(1950, 1, 1, 12), 3),
+                               (datetime.datetime(2014, 1, 1, 12), 5),
+                               (datetime.datetime(2014, 1, 1, 12), 6)]).ts,
+                          '74pct')
 
     def test_bad_percentile(self):
         for bad_percentile in ('0pct', '100pct', '-1pct', '123pct'):
@@ -162,13 +163,18 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                               sampling='1Min',
                               aggregation_method=bad_percentile)
 
+    @staticmethod
+    def _resample(ts, sampling, agg, max_size=None):
+        grouped = carbonara.TimeSerie.group_serie(ts, sampling)
+        return carbonara.AggregatedTimeSerie.from_grouped_serie(
+            grouped, sampling, agg, max_size=max_size) 
+  
     def test_74_percentile_serialized(self):
-        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
-                                           aggregation_method='74pct')
-        ts.update(carbonara.TimeSerie.from_tuples(
+        ts = carbonara.TimeSerie.from_tuples(
             [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
              (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
+             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)])
+        ts = self._resample(ts.ts, 60, '74pct')
 
         self.assertEqual(1, len(ts))
         self.assertEqual(5.48, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
@@ -176,24 +182,25 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
         # Serialize and unserialize
         key = ts.get_split_key()
         o, s = ts.serialize(key)
-        ts = carbonara.AggregatedTimeSerie.unserialize(
+        saved_ts = carbonara.AggregatedTimeSerie.unserialize(
             s, key, '74pct', ts.sampling)
 
-        ts.update(carbonara.TimeSerie.from_tuples(
+        ts = carbonara.TimeSerie.from_tuples(
             [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
              (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
+             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)])
+        ts = self._resample(ts.ts, 60, '74pct')
+        ts.merge(saved_ts)
 
         self.assertEqual(1, len(ts))
         self.assertEqual(5.48, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
     def test_95_percentile(self):
-        ts = carbonara.AggregatedTimeSerie(sampling='1Min',
-                                           aggregation_method='95pct')
-        ts.update(carbonara.TimeSerie.from_tuples(
+        ts = carbonara.TimeSerie.from_tuples(
             [(datetime.datetime(2014, 1, 1, 12, 0, 0), 3),
              (datetime.datetime(2014, 1, 1, 12, 0, 4), 5),
-             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)]))
+             (datetime.datetime(2014, 1, 1, 12, 0, 9), 6)])
+        ts = self._resample(ts.ts, 60, '95pct')
 
         self.assertEqual(1, len(ts))
         self.assertEqual(5.9000000000000004,
@@ -209,54 +216,50 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                           [3, 5])
 
     def test_max_size(self):
-        ts = carbonara.AggregatedTimeSerie(sampling=1, max_size=2,
-                                           aggregation_method='mean')
-        ts.update(carbonara.TimeSerie.from_data(
+        ts = carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
-            [3, 5, 6]))
+            [3, 5, 6])
+        ts = self._resample(ts.ts, 1, 'mean', max_size=2)
+
         self.assertEqual(2, len(ts))
         self.assertEqual(5, ts[0])
         self.assertEqual(6, ts[1])
 
     def test_down_sampling(self):
-        ts = carbonara.AggregatedTimeSerie(sampling='5Min',
-                                           aggregation_method='mean')
-        ts.update(carbonara.TimeSerie.from_data(
+        ts = carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
-            [3, 5, 7]))
+            [3, 5, 7])
+        ts = self._resample(ts.ts, 300, 'mean')
+
         self.assertEqual(1, len(ts))
         self.assertEqual(5, ts[datetime.datetime(2014, 1, 1, 12, 0, 0)])
 
     def test_down_sampling_with_max_size(self):
-        ts = carbonara.AggregatedTimeSerie(
-            sampling='1Min',
-            aggregation_method='mean',
-            max_size=2)
-        ts.update(carbonara.TimeSerie.from_data(
+        ts = carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 1, 4),
              datetime.datetime(2014, 1, 1, 12, 1, 9),
              datetime.datetime(2014, 1, 1, 12, 2, 12)],
-            [3, 5, 7, 1]))
+            [3, 5, 7, 1])
+        ts = self._resample(ts.ts, 60, 'mean', max_size=2)
+
         self.assertEqual(2, len(ts))
         self.assertEqual(6, ts[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 0)])
 
     def test_down_sampling_with_max_size_and_method_max(self):
-        ts = carbonara.AggregatedTimeSerie(
-            sampling='1Min',
-            max_size=2,
-            aggregation_method='max')
-        ts.update(carbonara.TimeSerie.from_data(
+        ts = carbonara.TimeSerie.from_data(
             [datetime.datetime(2014, 1, 1, 12, 0, 0),
              datetime.datetime(2014, 1, 1, 12, 1, 4),
              datetime.datetime(2014, 1, 1, 12, 1, 9),
              datetime.datetime(2014, 1, 1, 12, 2, 12)],
-            [3, 5, 70, 1]))
+            [3, 5, 70, 1])
+        ts = self._resample(ts.ts, 60, 'max', max_size=2)
+
         self.assertEqual(2, len(ts))
         self.assertEqual(70, ts[datetime.datetime(2014, 1, 1, 12, 1, 0)])
         self.assertEqual(1, ts[datetime.datetime(2014, 1, 1, 12, 2, 0)])
@@ -280,9 +283,9 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
         tsb2 = carbonara.BoundTimeSerie(block_size=tsc2.sampling)
 
         tsb1.set_values([(datetime.datetime(2014, 1, 1, 11, 46, 4), 4)],
-                        before_truncate_callback=tsc1.update)
+                        before_truncate_callback=tsc1.merge)
         tsb2.set_values([(datetime.datetime(2014, 1, 1, 9, 1, 4), 4)],
-                        before_truncate_callback=tsc2.update)
+                        before_truncate_callback=tsc2.merge)
 
         dtfrom = datetime.datetime(2014, 1, 1, 11, 0, 0)
         self.assertRaises(carbonara.UnAggregableTimeseries,
@@ -298,7 +301,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                                              aggregation_method='mean')
 
         tsb1.set_values([(datetime.datetime(2014, 1, 1, 12, 3, 0), 4)],
-                        before_truncate_callback=tsc1.update)
+                        before_truncate_callback=tsc1.merge)
         self.assertRaises(carbonara.UnAggregableTimeseries,
                           carbonara.AggregatedTimeSerie.aggregated,
                           [tsc1, tsc2], aggregation='mean')
@@ -324,7 +327,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 6, 0), 4),
             (datetime.datetime(2014, 1, 1, 12, 7, 0), 10),
             (datetime.datetime(2014, 1, 1, 12, 9, 0), 2),
-        ], before_truncate_callback=tsc1.update)
+        ], before_truncate_callback=tsc1.merge)
 
         tsb2.set_values([
             (datetime.datetime(2014, 1, 1, 12, 1, 0), 3),
@@ -336,7 +339,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 9, 0), 2),
             (datetime.datetime(2014, 1, 1, 12, 11, 0), 2),
             (datetime.datetime(2014, 1, 1, 12, 12, 0), 2),
-        ], before_truncate_callback=tsc2.update)
+        ], before_truncate_callback=tsc2.merge)
 
         dtfrom = datetime.datetime(2014, 1, 1, 12, 0, 0)
         dtto = datetime.datetime(2014, 1, 1, 12, 10, 0)
@@ -379,7 +382,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 6, 0), 7),
             (datetime.datetime(2014, 1, 1, 12, 7, 0), 5),
             (datetime.datetime(2014, 1, 1, 12, 8, 0), 3),
-        ], before_truncate_callback=tsc1.update)
+        ], before_truncate_callback=tsc1.merge)
 
         tsb2.set_values([
             (datetime.datetime(2014, 1, 1, 11, 0, 0), 6),
@@ -389,7 +392,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 4, 0), 4),
             (datetime.datetime(2014, 1, 1, 12, 5, 0), 16),
             (datetime.datetime(2014, 1, 1, 12, 6, 0), 12),
-        ], before_truncate_callback=tsc2.update)
+        ], before_truncate_callback=tsc2.merge)
 
         # By default we require 100% of point that overlap
         # but we allow that the last datapoint is missing
@@ -414,12 +417,12 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
 
         tsb1.set_values([
             (datetime.datetime(2014, 1, 1, 12, 3, 0), 4),
-        ], before_truncate_callback=tsc1.update)
+        ], before_truncate_callback=tsc1.merge)
 
         tsb2.set_values([
             (datetime.datetime(2014, 1, 1, 11, 0, 0), 4),
             (datetime.datetime(2014, 1, 1, 12, 3, 0), 4),
-        ], before_truncate_callback=tsc2.update)
+        ], before_truncate_callback=tsc2.merge)
 
         output = carbonara.AggregatedTimeSerie.aggregated(
             [tsc1, tsc2], aggregation='mean')
@@ -449,11 +452,11 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             (datetime.datetime(2014, 1, 1, 12, 5, 1), 15),
             (datetime.datetime(2014, 1, 1, 12, 5, 12), 1),
             (datetime.datetime(2014, 1, 1, 12, 6, 0, 2), 3),
-        ], before_truncate_callback=ts.update)
+        ], before_truncate_callback=ts.merge)
 
         tsb.set_values([
             (datetime.datetime(2014, 1, 1, 12, 6), 5),
-        ], before_truncate_callback=ts.update)
+        ], before_truncate_callback=ts.merge)
 
         self.assertEqual([
             (datetime.datetime(2014, 1, 1, 11, 54), 60.0, 4.0),
@@ -913,9 +916,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             timestamps=map(datetime.datetime.utcfromtimestamp,
                            six.moves.range(points)),
             values=six.moves.range(points))
-        agg = carbonara.AggregatedTimeSerie(sampling=sampling,
-                                            aggregation_method='mean')
-        agg.update(ts)
+        agg = self._resample(ts.ts, sampling, 'mean')
 
         grouped_points = list(agg.split())
 
@@ -938,9 +939,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             timestamps=map(datetime.datetime.utcfromtimestamp,
                            six.moves.range(points)),
             values=six.moves.range(points))
-        agg = carbonara.AggregatedTimeSerie(sampling=sampling,
-                                            aggregation_method='mean')
-        agg.update(ts)
+        agg = self._resample(ts.ts, sampling, 'mean')
 
         split = [t[1] for t in list(agg.split())]
 
