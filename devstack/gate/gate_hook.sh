@@ -45,6 +45,9 @@ case $STORAGE_DRIVER in
         ;;
 esac
 
+# NOTE(sileht):mitaka devstack have some issue with Xenial, but that works for
+# us so we don't care
+DEVSTACK_LOCAL_CONFIG+=$'\nexport FORCE=yes'
 
 # default to mysql
 case $SQL_DRIVER in
