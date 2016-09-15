@@ -243,9 +243,17 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         object_names = list(self._list_object_names_to_process(object_prefix))
 
         measures = []
-        for n in object_names:
-            data = self._get_object_content(n)
+
+        def add_to_measures(data):
             measures.extend(self._unserialize_measures(data))
+
+        ops = []
+        for n in object_names:
+            ops.append(self.ioctx.aio_read(
+                n, oncompletion=add_to_measures))
+
+        for op in ops:
+            op.wait_for_complete_and_cb()
 
         yield measures
 
