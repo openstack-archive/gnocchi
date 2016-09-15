@@ -86,6 +86,11 @@ class TestStorageDriver(tests_base.TestCase):
             self.skipTest(
                 "This test does not work with S3 as backend as the S3 driver "
                 "has no fake client, and tests run in parallel.")
+
+        if self.conf.storage.driver == "influxdb":
+            self.skipTest("This test does not work with the influxdb driver "
+                          " as it is not based on Carbonara")
+
         metrics = self.storage.list_metric_with_measures_to_process(
             None, None, full=True)
         self.assertEqual(set(), metrics)
@@ -155,6 +160,10 @@ class TestStorageDriver(tests_base.TestCase):
             self.skipTest(
                 "This test does not work with S3 as backend as the S3 driver "
                 "has no fake client, and tests run in parallel.")
+        if self.conf.storage.driver == "influxdb":
+            self.skipTest("This test does not work with the influxdb "
+                          "driver as it is not based on Carbonara")
+
         m, m_sql = self._create_metric('medium')
         measures = [
             storage.Measure(utils.dt_to_unix_ns(2014, 1, 6, i, j, 0), 100)
@@ -201,6 +210,9 @@ class TestStorageDriver(tests_base.TestCase):
                     new_point, args[1].granularity * 10e8))
 
     def test_delete_old_measures(self):
+        if self.conf.storage.driver == 'influxdb':
+            self.skipTest("Influxdb driver handles retention differently")
+
         self.storage.add_measures(self.metric, [
             storage.Measure(utils.dt_to_unix_ns(2014, 1, 1, 12, 0, 1), 69),
             storage.Measure(utils.dt_to_unix_ns(2014, 1, 1, 12, 7, 31), 42),
@@ -241,6 +253,8 @@ class TestStorageDriver(tests_base.TestCase):
                              self.metric, "mean", 300.0))
 
     def test_rewrite_measures(self):
+        if not isinstance(self.storage, _carbonara.CarbonaraBasedStorage):
+            self.skipTest("This driver is not based on Carbonara")
         # Create an archive policy that spans on several splits. Each split
         # being 3600 points, let's go for 36k points so we have 10 splits.
         apname = str(uuid.uuid4())
@@ -369,6 +383,14 @@ class TestStorageDriver(tests_base.TestCase):
             (utils.datetime_utc(2014, 1, 1, 12, 5), 300.0, 4.0),
             (utils.datetime_utc(2014, 1, 1, 12, 10), 300.0, 44.0),
         ], self.storage.get_measures(self.metric, aggregation='min'))
+
+        self.assertEqual([
+            (utils.datetime_utc(2014, 1, 1), 86400.0, 69.0),
+            (utils.datetime_utc(2014, 1, 1, 12), 3600.0, 69.0),
+            (utils.datetime_utc(2014, 1, 1, 12), 300.0, 69.0),
+            (utils.datetime_utc(2014, 1, 1, 12, 5), 300.0, 42.0),
+            (utils.datetime_utc(2014, 1, 1, 12, 10), 300.0, 44.0),
+        ], self.storage.get_measures(self.metric, aggregation='95pct'))
 
     def test_add_and_get_measures(self):
         self.storage.add_measures(self.metric, [
@@ -683,6 +705,7 @@ class TestStorageDriver(tests_base.TestCase):
         name = str(uuid.uuid4())
         ap = archive_policy.ArchivePolicy(name, 0, [(3, 5)])
         self.index.create_archive_policy(ap)
+        self.storage.setup_archive_policy(ap=ap)
         m = self.index.create_metric(uuid.uuid4(), str(uuid.uuid4()),
                                      str(uuid.uuid4()), name)
         m = self.index.list_metrics(ids=[m.id])[0]
@@ -698,8 +721,9 @@ class TestStorageDriver(tests_base.TestCase):
             (utils.datetime_utc(2014, 1, 1, 12, 0, 10), 5.0, 1.0),
         ], self.storage.get_measures(m))
         # expand to more points
-        self.index.update_archive_policy(
+        ap = self.index.update_archive_policy(
             name, [archive_policy.ArchivePolicyItem(granularity=5, points=6)])
+        self.storage.setup_archive_policy(ap=ap, reset=True)
         m = self.index.list_metrics(ids=[m.id])[0]
         self.storage.add_measures(m, [
             storage.Measure(utils.dt_to_unix_ns(2014, 1, 1, 12, 0, 15), 1),
@@ -712,8 +736,9 @@ class TestStorageDriver(tests_base.TestCase):
             (utils.datetime_utc(2014, 1, 1, 12, 0, 15), 5.0, 1.0),
         ], self.storage.get_measures(m))
         # shrink timespan
-        self.index.update_archive_policy(
+        ap = self.index.update_archive_policy(
             name, [archive_policy.ArchivePolicyItem(granularity=5, points=2)])
+        self.storage.setup_archive_policy(ap=ap, reset=True)
         m = self.index.list_metrics(ids=[m.id])[0]
         self.assertEqual([
             (utils.datetime_utc(2014, 1, 1, 12, 0, 10), 5.0, 1.0),
