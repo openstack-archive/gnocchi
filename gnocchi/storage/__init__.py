@@ -180,6 +180,18 @@ class StorageDriver(object):
     def upgrade(index):
         pass
 
+    def create_db(self):
+        pass
+
+    def drop_db(self):
+        pass
+
+    def setup_archive_policies(self):
+        pass
+
+    def setup_archive_policy(self, ap, reset=True):
+        pass
+
     def process_background_tasks(self, index, metrics, sync=False):
         """Process background tasks for this storage.
 
