@@ -35,6 +35,9 @@ options you want to change and configure:
 | storage.s3_*        | Configuration options to access S3                |
 |                     | if you use the S3 storage driver.                 |
 +---------------------+---------------------------------------------------+
+| storage.influxdb_*  | Configuration options to access InfluxDB          |
+|                     | if you use the InfluxDB storage driver.           |
++---------------------+---------------------------------------------------+
 
 
 Gnocchi provides these storage drivers:
@@ -43,6 +46,7 @@ Gnocchi provides these storage drivers:
 - `Swift`_
 - `Ceph`_
 - `S3`_
+- `InfluxDB`_
 
 Gnocchi provides these indexer drivers:
 
@@ -52,6 +56,7 @@ Gnocchi provides these indexer drivers:
 .. _`Swift`: https://launchpad.net/swift
 .. _`Ceph`: http://ceph.com/
 .. _`S3`: https://aws.amazon.com/s3/
+.. _`InfluxDB`: https://www.influxdata.com/time-series-platform/influxdb/
 .. _`PostgreSQL`: http://postgresql.org
 .. _`MySQL`: http://mysql.com
 
@@ -178,3 +183,20 @@ middleware must be enabled to ensure Gnocchi functions correctly. By default,
 Swift has this middleware enabled in its pipeline.
 
 .. _bulk: http://docs.openstack.org/liberty/config-reference/content/object-storage-bulk-delete.html
+
+InfluxDB driver implementation details
+--------------------------------------
+
+All incoming data is stored in a single measurement per archive policy. Each
+sample is tagged with the corresponding metric ID. Each definition in an
+archive policy is turned into a InfluxDB continuous query. These queries
+downsample the incoming data as defined in the archive policy definition.
+Retention policies are also created to match the archive policy definitions.
+This is done using the downsampling method as described in the InfluxDB `docs`_
+
+The InfluxDB driver is not carbonara based and therefore the gnocchi-metricd
+process is not required when using this driver.
+
+NOTE: It is recommended to use InfluxDB version 1.0 or greater.
+
+.. _docs: https://docs.influxdata.com/influxdb/v1.0/guides/downsampling_and_retention/
