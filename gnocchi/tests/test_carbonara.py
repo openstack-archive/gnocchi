@@ -29,7 +29,7 @@ from gnocchi import carbonara
 class TestBoundTimeSerie(base.BaseTestCase):
     def test_benchmark(self):
         self.useFixture(fixtures.Timeout(120, gentle=True))
-        carbonara.AggregatedTimeSerie.benchmark()
+        carbonara.BoundTimeSerie.benchmark()
 
     @staticmethod
     def test_base():
@@ -113,6 +113,10 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
              datetime.datetime(2014, 1, 1, 12, 0, 4),
              datetime.datetime(2014, 1, 1, 12, 0, 9)],
             [3, 5, 6])
+
+    def test_benchmark(self):
+        self.useFixture(fixtures.Timeout(120, gentle=True))
+        carbonara.AggregatedTimeSerie.benchmark()
 
     def test_fetch_basic(self):
         ts = carbonara.AggregatedTimeSerie.from_data(

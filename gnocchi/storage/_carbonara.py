@@ -97,7 +97,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def _get_unaggregated_timeserie(metric):
         raise NotImplementedError
 
-    def _get_unaggregated_timeserie_and_unserialize(self, metric):
+    def _get_unaggregated_timeserie_and_unserialize(
+            self, metric,block_size, back_window):
         """Retrieve unaggregated timeserie for a metric and unserialize it.
 
         Returns a gnocchi.carbonara.BoundTimeSerie object. If the data cannot
@@ -115,7 +116,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 % (metric.id, sw.elapsed()))
         try:
             return carbonara.BoundTimeSerie.unserialize(
-                raw_measures)
+                raw_measures, block_size, back_window)
         except ValueError:
             raise CorruptionError(
                 "Data corruption detected for %s "
@@ -396,7 +397,9 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         timeseries=timeseries, max_size=d.points)
                     try:
                         unaggregated = self._get_unaggregated_timeserie_and_unserialize(  # noqa
-                            metric)
+                            metric,
+                            block_size=metric.archive_policy.max_block_size,
+                            back_window=metric.archive_policy.back_window)
                     except (storage.MetricDoesNotExist, CorruptionError) as e:
                         # NOTE(jd) This case is not really possible – you can't
                         # have archives with splits and no unaggregated
@@ -468,7 +471,9 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
                         try:
                             ts = self._get_unaggregated_timeserie_and_unserialize(  # noqa
-                                metric)
+                                metric,
+                                block_size=metric.archive_policy.max_block_size,
+                                back_window=metric.archive_policy.back_window)
                         except storage.MetricDoesNotExist:
                             try:
                                 self._create_metric(metric)
