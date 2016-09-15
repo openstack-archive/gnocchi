@@ -16,10 +16,12 @@
 
 import os
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
 from unittest import case
+import uuid
 import warnings
 
 from gabbi import fixture
@@ -90,11 +92,23 @@ class ConfigFixture(fixture.GabbiFixture):
         # to signal we are not in a gate driven functional test
         # and thus should override conf settings.
         if 'DEVSTACK_GATE_TEMPEST' not in os.environ:
-            conf.set_override('driver', 'file', 'storage')
             conf.set_override('policy_file',
                               os.path.abspath('etc/gnocchi/policy.json'),
                               group="oslo_policy")
-            conf.set_override('file_basepath', data_tmp_dir, 'storage')
+            storage_driver = os.getenv("GNOCCHI_TEST_STORAGE_DRIVER", "file")
+            if storage_driver not in ['file', 'ceph']:
+                storage_driver = 'file'
+
+            conf.set_override('driver', storage_driver, 'storage')
+            if storage_driver == 'file':
+                conf.set_override('file_basepath', data_tmp_dir, 'storage')
+            elif self.conf.storage.driver == 'ceph':
+                pool_name = uuid.uuid4().hex
+                subprocess.call("rados -c %s mkpool %s" % (
+                    os.getenv("CEPH_CONF"), pool_name), shell=True)
+                self.conf.set_override('ceph_pool', pool_name, 'storage')
+                self.conf.set_override('ceph_conffile', os.getenv("CEPH_CONF"),
+                                       'storage')
 
         # NOTE(jd) All of that is still very SQL centric but we only support
         # SQL for now so let's say it's good enough.
