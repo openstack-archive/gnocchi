@@ -1,0 +1,5 @@
+---
+features:
+  - New storage driver for InfluxDB.
+    This new driver works differently than other drivers as it doesn't
+    use Carbonara.
