@@ -196,7 +196,7 @@ class MetricScheduler(MetricProcessBase):
 
             self.periodic = periodics.PeriodicWorker.create(
                 [], executor_factory=lambda:
-                futures.ThreadPoolExecutor(max_workers=10))
+                futures.ThreadPoolExecutor(max_workers=1))
             self.periodic.add(run_watchers)
             t = threading.Thread(target=self.periodic.start)
             t.daemon = True
