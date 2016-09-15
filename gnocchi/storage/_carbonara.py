@@ -431,6 +431,11 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 break
             marker = metrics[-1].id
 
+    def wait_async_completion(self):
+        # Driver need to implement this method if their want to wait
+        # their async stuffs to finish before we release the metric lock
+        pass
+
     def process_new_measures(self, indexer, metrics_to_process, sync=False):
         metrics = indexer.list_metrics(ids=metrics_to_process)
         # This build the list of deleted metrics, i.e. the metrics we have
@@ -537,6 +542,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
                         self._store_unaggregated_timeserie(metric,
                                                            ts.serialize())
+
+                        self._wait_async_completion()
                 except Exception:
                     if sync:
                         raise
