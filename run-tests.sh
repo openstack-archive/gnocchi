@@ -2,6 +2,7 @@
 set -e
 GNOCCHI_TEST_STORAGE_DRIVERS=${GNOCCHI_TEST_STORAGE_DRIVERS:-file}
 GNOCCHI_TEST_INDEXER_DRIVERS=${GNOCCHI_TEST_INDEXER_DRIVERS:-postgresql}
+
 for storage in ${GNOCCHI_TEST_STORAGE_DRIVERS}
 do
     export GNOCCHI_TEST_STORAGE_DRIVER=$storage
@@ -22,6 +23,9 @@ do
                    pifpaf -e GNOCCHI_INDEXER run $indexer -- \
                    ./tools/pretty_tox.sh $*
 
+        elif [ "$GNOCCHI_TEST_STORAGE_DRIVER" == "influxdb" ]
+            then
+                pifpaf --debug -e GNOCCHI_STORAGE run $storage -- pifpaf -e GNOCCHI_INDEXER run $indexer -- ./tools/pretty_tox.sh $*
         else
             pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
         fi
