@@ -1,0 +1,4 @@
+---
+features:
+  - Ceph driver now uses the librados async API to retreive
+    all measurements of a metric in parallel.
