@@ -72,10 +72,12 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         if not rados:
             raise ImportError("No module named 'rados' nor 'cradox'")
 
-        if not hasattr(rados, 'OmapIterator'):
+        if (not hasattr(rados, 'WriteOp') or not hasattr(
+                getattr(rados, 'WriteOp'), 'truncate')):
             raise ImportError("Your rados python module does not support "
-                              "omap feature. Install 'cradox' (recommended) "
-                              "or upgrade 'python-rados' >= 9.1.0 ")
+                              "required features for Gnocchi. "
+                              "Install 'cradox' (recommended) "
+                              "or upgrade 'python-rados' >= 12.0.0")
 
         LOG.info("Ceph storage backend use '%s' python library" %
                  RADOS_MODULE_NAME)
@@ -92,6 +94,9 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
 
         # NOTE(sileht): constants can't be class attributes because
         # they rely on presence of rados module
+
+        # NOTE(sileht): OMAP_XXXX_FLAGS ARE for "MEASURE_PREFIX" object only
+        # We don't use any flags for other object
 
         # NOTE(sileht): We allow to read the measure object on
         # outdated replicats, that safe for us, we will
@@ -110,6 +115,16 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         # object with the measure have already been delected by previous, so
         # we are safe and good.
         self.OMAP_WRITE_FLAGS = rados.LIBRADOS_OPERATION_SKIPRWLOCKS
+
+        # NOTE(sileht): we currently just wait for the expected number of
+        # operation to complete, perhaps we can store more to get better
+        # debugging information if need in the futur
+        self._pending_operations = []
+
+    def _wait_async_completion(self):
+        while self._pending_operations:
+            op = self._pending_operations.pop()
+            op.wait_for_complete()
 
     def stop(self):
         self.ioctx.aio_flush()
@@ -144,7 +159,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             pass
         else:
             with rados.WriteOpCtx() as op:
-                self.ioctx.set_omap(op, xattrs.keys(), xattrs.values())
+                self.ioctx.set_omap(op, xattrs, xattrs)
                 self.ioctx.operate_write_op(op, container)
             for xattr in xattrs:
                 self.ioctx.aio_remove(xattr)
@@ -244,11 +259,15 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             # NOTE(sileht): come on Ceph, no return code
             # for this operation ?!!
             self.ioctx.remove_omap_keys(op, tuple(object_names))
-            self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
-                                        flags=self.OMAP_WRITE_FLAGS)
+            self._pending_operations.append(
+                self.ioctx.operate_aio_write_op(op, self.MEASURE_PREFIX,
+                                                flags=self.OMAP_WRITE_FLAGS)
+            )
 
         for n in object_names:
-            self.ioctx.aio_remove(n)
+            self._pending_operations.append(
+                self.ioctx.aio_remove(n)
+            )
 
     @staticmethod
     def _get_object_name(metric, timestamp_key, aggregation, granularity,
@@ -275,13 +294,20 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                                granularity, data, offset=None, version=3):
         name = self._get_object_name(metric, timestamp_key,
                                      aggregation, granularity, version)
-        if offset is None:
-            self.ioctx.write_full(name, data)
-        else:
-            self.ioctx.write(name, data, offset=offset)
         with rados.WriteOpCtx() as op:
-            self.set_omap_keys(op, (name,), ("",))
-            self.ioctx.operate_write_op(op, "gnocchi_%s_container" % metric.id)
+            if offset is None:
+                op.write_full(data)
+            else:
+                op.write(data, offset=offset)
+            self._pending_operations.append(
+                self.ioctx.operate_aio_write_op(op, name)
+            )
+        with rados.WriteOpCtx() as op:
+            self.ioctx.set_omap(op, (name,), ("",))
+            self._pending_operations.append(
+                self.ioctx.operate_aio_write_op(
+                    op, "gnocchi_%s_container" % metric.id)
+            )
 
     def _delete_metric_measures(self, metric, timestamp_key, aggregation,
                                 granularity, version=3):
@@ -345,7 +371,12 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             raise storage.MetricDoesNotExist(metric)
 
     def _store_unaggregated_timeserie(self, metric, data):
-        self.ioctx.write_full("gnocchi_%s_none" % metric.id, data)
+        with rados.WriteOpCtx() as op:
+            op.write_full(data)
+            self._pending_operations.append(
+                self.ioctx.operate_aio_write_op(
+                    op, "gnocchi_%s_none" % metric.id)
+            )
 
     def _get_object_content(self, name):
         offset = 0
