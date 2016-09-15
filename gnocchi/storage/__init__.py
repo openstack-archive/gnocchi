@@ -171,6 +171,18 @@ class StorageDriver(object):
     def upgrade(index):
         pass
 
+    def create_db(self):
+        pass
+
+    def drop_db(self):
+        pass
+
+    def setup_archive_policies(self):
+        pass
+
+    def setup_archive_policy(self, ap, reset=True):
+        pass
+
     def process_background_tasks(self, index, metrics, sync=False):
         """Process background tasks for this storage.
 
@@ -290,7 +302,8 @@ class StorageDriver(object):
     @staticmethod
     def search_value(metrics, query, from_timestamp=None,
                      to_timestamp=None,
-                     aggregation='mean'):
+                     aggregation='mean',
+                     granularity=None):
         """Search for an aggregated value that realizes a predicate.
 
         :param metrics: The list of metrics to look into.
@@ -298,6 +311,7 @@ class StorageDriver(object):
         :param from_timestamp: The timestamp to get the measure from.
         :param to_timestamp: The timestamp to get the measure to.
         :param aggregation: The type of aggregation to retrieve.
+        :param granularity: The granularity to retrieve.
         """
         raise exceptions.NotImplementedError
 
