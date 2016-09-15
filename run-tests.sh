@@ -22,6 +22,9 @@ do
                    pifpaf -e GNOCCHI_INDEXER run $indexer -- \
                    ./tools/pretty_tox.sh $*
 
+        elif [ "$GNOCCHI_TEST_STORAGE_DRIVER" == "influxdb" ]
+            then
+                ./tools/setup-influxdb-env.sh pifpaf -e GNOCCHI_STORAGE run $storage -- pifpaf -e GNOCCHI_INDEXER run $indexer -- ./tools/pretty_tox.sh $*
         else
             pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
         fi
