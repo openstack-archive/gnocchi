@@ -1,0 +1,5 @@
+---
+upgrade:
+  - The Ceph driver has moved the storage of measures metadata
+    from xattr to omap. Already created measures are migrated
+    during gnocchi-upgrade run.
