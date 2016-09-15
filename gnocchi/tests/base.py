@@ -271,6 +271,19 @@ class TestCase(base.BaseTestCase):
                 os.getenv("CEPH_CONF"), pool_name), shell=True)
             self.conf.set_override('ceph_pool', pool_name, 'storage')
 
+        if self.conf.storage.driver == 'influxdb':
+            db_name = 'gnocchitest%s' % uuid.uuid4().hex
+            self.conf.set_override('influxdb_database',
+                                   db_name,
+                                   'storage')
+            self.conf.set_override('influxdb_port',
+                                   os.getenv("GNOCCHI_STORAGE_INFLUXDB_PORT",
+                                             "8086"),
+                                   'storage')
+            self.conf.set_override('influxdb_disable_retention_policies',
+                                   True,
+                                   'storage')
+
         self.storage = storage.get_driver(self.conf)
         # NOTE(jd) Do not upgrade the storage. We don't really need the storage
         # upgrade for now, and the code that upgrade from pre-1.3
@@ -278,8 +291,13 @@ class TestCase(base.BaseTestCase):
         # explodes because MySQL does not support that many connections in real
         # life.
         # self.storage.upgrade(self.index)
+        if self.conf.storage.driver == 'influxdb':
+            self.storage._create_database()
+            self.storage.upgrade(self.index)
 
     def tearDown(self):
         self.index.disconnect()
         self.storage.stop()
+        if self.conf.storage.driver == 'influxdb':
+            self.storage._drop_database()
         super(TestCase, self).tearDown()
