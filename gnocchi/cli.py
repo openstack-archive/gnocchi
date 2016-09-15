@@ -268,7 +268,7 @@ class MetricProcessor(MetricProcessBase):
     BLOCK_SIZE = 4
 
     def __init__(self, worker_id, conf, queue):
-        super(MetricProcessor, self).__init__(worker_id, conf, 1)
+        super(MetricProcessor, self).__init__(worker_id, conf, 0.1)
         self.queue = queue
 
     def _run_job(self):
