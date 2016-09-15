@@ -48,7 +48,7 @@ The list of variants available is:
 * swift – provides OpenStack Swift storage support
 * ceph – provides common part of Ceph storage support
 * ceph_recommended_lib – provides Ceph (>=0.80) storage support
-* ceph_alternative_lib – provides Ceph (>=10.1.0) storage support
+* ceph_alternative_lib – provides Ceph (>=12.0.0) storage support
 * file – provides file driver support
 * doc – documentation building support
 * test – unit and functional tests support
@@ -67,11 +67,12 @@ install extra variants using, for example::
 Ceph requirements
 -----------------
 
-Gnocchi leverages omap API of librados, but this is available in python binding
-only since python-rados >= 9.1.0. To handle this, Gnocchi uses 'cradox' python
-library which has exactly the same API but works with Ceph >= 0.80.0.
+Gnocchi leverages omap and aio API of librados, but this is available in python
+binding only since python-rados >= 12.0.0. To handle this, Gnocchi uses
+'cradox' python library which has exactly the same API but works with
+Ceph >= 0.80.0.
 
-If Ceph and python-rados are >= 9.1.0, cradox python library becomes optional
+If Ceph and python-rados are >= 12.0.0, cradox python library becomes optional
 but is still recommended.
 
 
