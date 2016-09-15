@@ -15,8 +15,10 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import itertools
+import multiprocessing
 import uuid
 
+from concurrent import futures
 import jsonpatch
 from oslo_utils import strutils
 import pecan
@@ -224,6 +226,8 @@ RESOURCE_DEFAULT_PAGINATION = ['revision_start:asc',
                                'started_at:asc']
 
 METRIC_DEFAULT_PAGINATION = ['id:asc']
+
+THREADS = multiprocessing.cpu_count() or 1
 
 
 def get_pagination_options(params, default):
@@ -1312,9 +1316,11 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
         for metric in known_metrics:
             enforce("post measures", metric)
 
-        for metric in known_metrics:
-            measures = body[metric.resource_id][metric.name]
-            pecan.request.storage.add_measures(metric, measures)
+        storage = pecan.request.storage
+        with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
+            executor.map(lambda x: storage.add_measures(*x),
+                         ((metric, body[metric.resource_id][metric.name])
+                          for metric in known_metrics))
 
         pecan.response.status = 202
 
@@ -1343,8 +1349,10 @@ class MetricsMeasuresBatchController(rest.RestController):
         for metric in metrics:
             enforce("post measures", metric)
 
-        for metric in metrics:
-            pecan.request.storage.add_measures(metric, body[metric.id])
+        storage = pecan.request.storage
+        with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
+            executor.map(lambda x: storage.add_measures(*x),
+                         ((metric, body[metric.id]) for metric in metrics))
 
         pecan.response.status = 202
 
