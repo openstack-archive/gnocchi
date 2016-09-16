@@ -23,6 +23,9 @@ ENABLED_SERVICES="key,gnocchi-api,gnocchi-metricd,tempest,"
 DEVSTACK_LOCAL_CONFIG+=$'\nexport GNOCCHI_DEPLOY=uwsgi'
 DEVSTACK_LOCAL_CONFIG+=$'\nexport KEYSTONE_DEPLOY=uwsgi'
 
+# v2.0 seems broken in mitaka devstack script
+DEVSTACK_LOCAL_CONFIG+=$'\nexport IDENTITY_API_VERSION=3'
+
 export DEVSTACK_GATE_INSTALL_TESTONLY=1
 export DEVSTACK_GATE_NO_SERVICES=1
 export DEVSTACK_GATE_TEMPEST=1
