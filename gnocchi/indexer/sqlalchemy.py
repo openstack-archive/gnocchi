@@ -23,6 +23,7 @@ import uuid
 import oslo_db.api
 from oslo_db import exception
 from oslo_db.sqlalchemy import enginefacade
+from oslo_db.sqlalchemy import exc_filters
 from oslo_db.sqlalchemy import utils as oslo_db_utils
 from oslo_log import log
 try:
@@ -57,6 +58,33 @@ ResourceType = base.ResourceType
 _marker = indexer._marker
 
 LOG = log.getLogger(__name__)
+
+if not hasattr(exception, 'DBNonExistentTable'):
+    # NOTE(sileht): This was not existing in oslo.db < 4.8
+
+    class DBNonExistentTable(exception.DBError):
+        """Table does not exist.
+
+        :param table: table name
+        :type table: str
+        """
+        def __init__(self, table, inner_exception=None):
+            self.table = table
+            super(DBNonExistentTable, self).__init__(inner_exception)
+
+    exception.DBNonExistentTable = DBNonExistentTable
+
+    @exc_filters.filters("sqlite", sqlalchemy.exc.OperationalError,
+                         r".* no such table: (?P<table>.+)")
+    @exc_filters.filters("mysql", sqlalchemy.exc.InternalError,
+                         r".*1051,.*\"Unknown table '(.+\.)?(?P<table>.+)'\"")
+    @exc_filters.filters("postgresql", sqlalchemy.exc.ProgrammingError,
+                         r".* table \"(?P<table>.+)\" does not exist")
+    def _check_table_non_existing(programming_error, match, engine_name,
+                                  is_disconnect):
+        """Filter for table non existing errors."""
+        raise exception.DBNonExistentTable(match.group("table"),
+                                           programming_error)
 
 
 def retry_on_deadlock(f):
