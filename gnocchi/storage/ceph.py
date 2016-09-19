@@ -254,7 +254,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         if self._object_exists(name):
             raise storage.MetricAlreadyExists(metric)
         else:
-            self.ioctx.write_full(name, "metric created")
+            self.ioctx.write_full(name, b"metric created")
 
     def _store_metric_measures(self, metric, timestamp_key, aggregation,
                                granularity, data, offset=None, version=3):
@@ -264,7 +264,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self.ioctx.write_full(name, data)
         else:
             self.ioctx.write(name, data, offset=offset)
-        self.ioctx.set_xattr("gnocchi_%s_container" % metric.id, name, "")
+        self.ioctx.set_xattr("gnocchi_%s_container" % metric.id, name, b"")
 
     def _delete_metric_measures(self, metric, timestamp_key, aggregation,
                                 granularity, version=3):
