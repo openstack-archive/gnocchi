@@ -88,6 +88,20 @@ tests:
                   min: 8
       status: 400
 
+    - name: post resource type no min value
+      POST: $LAST_URL
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+          attributes:
+              int:
+                  type: number
+                  required: false
+                  max: 3
+      status: 400
+
 # Create a type
 
     - name: post resource type
