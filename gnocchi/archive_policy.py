@@ -121,6 +121,9 @@ class ArchivePolicy(object):
                 and self.definition == other.definition
                 and self.aggregation_methods == other.aggregation_methods)
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def jsonify(self):
         return {
             "name": self.name,

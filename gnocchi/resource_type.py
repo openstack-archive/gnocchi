@@ -205,6 +205,9 @@ class ResourceType(object):
     def __eq__(self, other):
         return self.name == other.name
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def jsonify(self):
         return {"name": self.name,
                 "attributes": self.attributes.jsonify(),

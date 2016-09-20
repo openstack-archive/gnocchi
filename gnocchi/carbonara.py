@@ -115,6 +115,9 @@ class TimeSerie(object):
         return (isinstance(other, TimeSerie)
                 and self.ts.all() == other.ts.all())
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __getitem__(self, key):
         return self.ts[key]
 
@@ -226,6 +229,9 @@ class BoundTimeSerie(TimeSerie):
                 and super(BoundTimeSerie, self).__eq__(other)
                 and self.block_size == other.block_size
                 and self.back_window == other.back_window)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def set_values(self, values, before_truncate_callback=None,
                    ignore_too_old_timestamps=False):
@@ -429,6 +435,9 @@ class AggregatedTimeSerie(TimeSerie):
                 and self.max_size == other.max_size
                 and self.sampling == other.sampling
                 and self.aggregation_method == other.aggregation_method)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __repr__(self):
         return "<%s 0x%x sampling=%fs max_size=%s agg_method=%s>" % (

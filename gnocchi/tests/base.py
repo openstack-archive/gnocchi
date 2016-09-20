@@ -77,6 +77,9 @@ class FakeRadosModule(object):
             def __eq__(self, other):
                 return self.ret == other
 
+            def __ne__(self, other):
+                return not self.__eq__(other)
+
         def __init__(self, start_filter, prefix_filter, number):
             self.start_filter = start_filter
             self.prefix_filter = prefix_filter
