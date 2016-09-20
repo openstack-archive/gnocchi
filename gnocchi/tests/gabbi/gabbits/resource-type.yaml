@@ -88,6 +88,20 @@ tests:
                   min: 8
       status: 400
 
+    - name: post resource type no min value
+      POST: $LAST_URL
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource_bis
+          attributes:
+              int:
+                  type: number
+                  required: false
+                  max: 3
+      status: 201
+
 # Create a type
 
     - name: post resource type
@@ -161,7 +175,7 @@ tests:
       desc: we have a resource type now
       GET: $LAST_URL
       response_json_paths:
-          $.`len`: 16
+          $.`len`: 17
           $.[11].name: my_custom_resource
           $.[11].state: active
 
