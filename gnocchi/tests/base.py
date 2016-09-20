@@ -23,7 +23,7 @@ import fixtures
 from oslotest import base
 from oslotest import mockpatch
 import six
-from six.moves.urllib.parse import unquote
+from six.moves.urllib import parse
 try:
     from swiftclient import exceptions as swexc
 except ImportError:
@@ -359,8 +359,8 @@ class FakeSwiftClient(object):
             if data:
                 for path in data.splitlines():
                     try:
-                        __, container, obj = (unquote(path.decode('utf8'))
-                                              .split('/', 2))
+                        __, container, obj = (
+                            parse.unquote(path.decode('utf8')).split('/', 2))
                         del self.kvs[container][obj]
                         resp['Number Deleted'] += 1
                     except KeyError:
