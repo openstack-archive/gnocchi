@@ -21,7 +21,7 @@ import uuid
 from oslo_config import cfg
 from oslo_log import log
 import six
-from six.moves.urllib.parse import quote
+from six.moves.urllib import parse
 try:
     from swiftclient import client as swclient
     from swiftclient import utils as swift_utils
@@ -163,8 +163,8 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         return len(self._list_measure_files_for_metric_id(metric_id))
 
     def _bulk_delete(self, container, objects):
-        objects = [quote(('/%s/%s' % (container, obj['name'])).encode('utf-8'))
-                   for obj in objects]
+        objects = [parse.quote(('/%s/%s' % (container, obj['name']))
+                   .encode('utf-8')) for obj in objects]
         resp = {}
         headers, body = self.swift.post_account(
             headers=self.POST_HEADERS, query_string='bulk-delete',

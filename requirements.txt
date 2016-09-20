@@ -1,3 +1,4 @@
+lz4
 pbr
 numpy
 iso8601
