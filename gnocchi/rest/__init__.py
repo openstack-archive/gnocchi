@@ -18,7 +18,9 @@ import itertools
 import uuid
 
 import jsonpatch
+import numpy as np
 from oslo_utils import strutils
+import pandas as pd
 import pecan
 from pecan import rest
 import six
@@ -422,6 +424,12 @@ def MeasureSchema(m):
     return storage.Measure(timestamp, value)
 
 
+def get_timestamps_and_values(measures):
+    times = pd.to_datetime([i['timestamp'] for i in measures]).astype(np.int64)
+    return (storage.Measure(t, v) for t, v in itertools.izip(
+        times, (float(i['value']) for i in measures)))
+
+
 class MetricController(rest.RestController):
     _custom_actions = {
         'measures': ['POST', 'GET']
@@ -448,8 +456,8 @@ class MetricController(rest.RestController):
         if not isinstance(params, list):
             abort(400, "Invalid input for measures")
         if params:
-            pecan.request.storage.add_measures(
-                self.metric, six.moves.map(MeasureSchema, params))
+            measures = get_timestamps_and_values(params)
+            pecan.request.storage.add_measures(self.metric, measures)
         pecan.response.status = 202
 
     @pecan.expose('json')
@@ -1283,7 +1291,7 @@ class SearchMetricController(rest.RestController):
 
 class ResourcesMetricsMeasuresBatchController(rest.RestController):
     MeasuresBatchSchema = voluptuous.Schema(
-        {utils.ResourceUUID: {six.text_type: [MeasureSchema]}}
+        {utils.ResourceUUID: {six.text_type: list}}
     )
 
     @pecan.expose()
@@ -1314,6 +1322,7 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
 
         for metric in known_metrics:
             measures = body[metric.resource_id][metric.name]
+            measures = get_timestamps_and_values(measures)
             pecan.request.storage.add_measures(metric, measures)
 
         pecan.response.status = 202
@@ -1326,9 +1335,7 @@ class MetricsMeasuresBatchController(rest.RestController):
     # Because while json allow duplicate keys in dict payload
     # only the last key will be retain by json python module to
     # build the python dict.
-    MeasuresBatchSchema = voluptuous.Schema(
-        {utils.UUID: [MeasureSchema]}
-    )
+    MeasuresBatchSchema = voluptuous.Schema({utils.UUID: list})
 
     @pecan.expose()
     def post(self):
@@ -1344,7 +1351,8 @@ class MetricsMeasuresBatchController(rest.RestController):
             enforce("post measures", metric)
 
         for metric in metrics:
-            pecan.request.storage.add_measures(metric, body[metric.id])
+            measures = get_timestamps_and_values(body[metric.id])
+            pecan.request.storage.add_measures(metric, measures)
 
         pecan.response.status = 202
 
