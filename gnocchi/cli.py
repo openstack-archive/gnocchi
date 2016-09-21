@@ -19,6 +19,7 @@ import time
 import uuid
 
 import cotyledon
+from cotyledon import oslo_config_glue
 from futurist import periodics
 import msgpack
 from oslo_config import cfg
@@ -286,14 +287,23 @@ class MetricProcessor(MetricProcessBase):
 class MetricdServiceManager(cotyledon.ServiceManager):
     def __init__(self, conf):
         super(MetricdServiceManager, self).__init__()
+        oslo_config_glue.setup(self, conf)
+
         self.conf = conf
         self.queue = multiprocessing.Manager().Queue()
 
         self.add(MetricScheduler, args=(self.conf, self.queue))
-        self.add(MetricProcessor, args=(self.conf, self.queue),
-                 workers=conf.metricd.workers)
+        self.metric_processor_id = self.add(
+            MetricProcessor, args=(self.conf, self.queue),
+            workers=conf.metricd.workers)
         self.add(MetricReporting, args=(self.conf,))
         self.add(MetricJanitor, args=(self.conf,))
+
+        self.register_hooks(on_reload=self.on_reload)
+
+    def on_reload(self):
+        self.reconfigure(self.metric_processor_id,
+                         workers=self.conf.metricd.workers)
 
     def run(self):
         super(MetricdServiceManager, self).run()
