@@ -163,10 +163,6 @@ class ArchivePolicyItem(dict):
             raise ValueError("Number of points should be > 0")
 
         if granularity is None:
-            if points is None or timespan is None:
-                raise ValueError(
-                    "At least two of granularity/points/timespan "
-                    "must be provided")
             granularity = round(timespan / float(points))
         else:
             granularity = float(granularity)

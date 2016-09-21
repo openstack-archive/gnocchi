@@ -277,7 +277,7 @@ class ArchivePolicyController(rest.RestController):
                 voluptuous.All([{
                     "granularity": Timespan,
                     "points": PositiveNotNullInt,
-                    "timespan": Timespan}], voluptuous.Length(min=1)),
+                    "timespan": Timespan}], voluptuous.Length(min=2)),
             }))
         # Validate the data
         try:
@@ -328,7 +328,7 @@ class ArchivePoliciesController(rest.RestController):
                 "granularity": Timespan,
                 "points": PositiveNotNullInt,
                 "timespan": Timespan,
-                }], voluptuous.Length(min=1)),
+                }], voluptuous.Length(min=2)),
             })
 
         body = deserialize_and_validate(ArchivePolicySchema)
