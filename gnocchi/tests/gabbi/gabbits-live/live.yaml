@@ -499,6 +499,21 @@ tests:
       response_headers:
           location: $SCHEME://$NETLOC/v1/resource_type/myresource
 
+    - name: add an attribute
+      url: /v1/resource/myresource
+      content-type: application/json-patch+json
+      data:
+        - op: "add"
+          path: "/attributes/awesome-stuff"
+          value: {"type": "bool", "required": false}
+
+    - name: remove an attribute
+      url: /v1/resource/myresource
+      content-type: application/json-patch+json
+      data:
+        - op: "remove"
+          path: "/attributes/awesome-stuff"
+
     - name: myresource resource bad accept
       desc: Expect 406 on bad accept type
       request_headers:
