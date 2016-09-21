@@ -19,6 +19,7 @@ import time
 import uuid
 
 import cotyledon
+from cotyledon import oslo_config_glue
 from futurist import periodics
 import msgpack
 from oslo_config import cfg
@@ -83,6 +84,7 @@ class MetricProcessBase(cotyledon.Service):
         self.interval_delay = interval_delay
         self._shutdown = threading.Event()
         self._shutdown_done = threading.Event()
+        oslo_config_glue.load_options(self, conf)
 
     def _configure(self):
         self.store = storage.get_driver(self.conf)
