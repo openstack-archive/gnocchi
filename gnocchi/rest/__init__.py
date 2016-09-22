@@ -1245,15 +1245,21 @@ class SearchMetricController(rest.RestController):
     )
 
     @pecan.expose('json')
-    def post(self, metric_id, start=None, stop=None, aggregation='mean'):
+    def post(self, metric_id, start=None, stop=None, aggregation='mean',
+             granularity=[]):
+        granularity = [Timespan(g) for g in arg_to_list(granularity)]
+
         metrics = pecan.request.indexer.list_metrics(
             ids=arg_to_list(metric_id))
-
         for metric in metrics:
             enforce("search metric", metric)
 
-        if not pecan.request.body:
-            abort(400, "No query specified in body")
+        try:
+            body = json.loads(pecan.request.body)
+            if not body:
+                abort(400, "No query specified in body")
+        except Exception as e:
+            abort(400, "Unable to decode body: " + six.text_type(e))
 
         query = deserialize_and_validate(self.MetricSearchSchema)
 
@@ -1274,10 +1280,14 @@ class SearchMetricController(rest.RestController):
                 str(metric.id): values
                 for metric, values in six.iteritems(
                     pecan.request.storage.search_value(
-                        metrics, query, start, stop, aggregation)
+                        metrics, query, start, stop, aggregation,
+                        granularity
+                    )
                 )
             }
         except storage.InvalidQuery as e:
+            abort(400, e)
+        except storage.GranularityDoesNotExist as e:
             abort(400, e)
 
 
