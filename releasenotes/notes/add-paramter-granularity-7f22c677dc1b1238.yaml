@@ -1,0 +1,5 @@
+---
+features:
+  - We add a feature to allow gnocchi to
+    search for values in metrics by using
+    one or more granularities.
