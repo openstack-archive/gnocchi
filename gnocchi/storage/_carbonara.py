@@ -330,20 +330,20 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                     metric, key, split, aggregation, archive_policy_def,
                     oldest_mutable_timestamp)
 
-    def add_measures(self, metric, measures):
-        measures = list(measures)
-        data = struct.pack(
-            "<" + self._MEASURE_SERIAL_FORMAT * len(measures),
-            *list(
-                itertools.chain(
-                    # NOTE(jd) int(10e8) to avoid rounding errors
-                    *((int(utils.datetime_to_unix(timestamp) * int(10e8)),
-                       value)
-                      for timestamp, value in measures))))
-        self._store_new_measures(metric, data)
+    def add_measures(self, measures_per_metrics):
+        self._store_new_measures({
+            metric: struct.pack(
+                "<" + self._MEASURE_SERIAL_FORMAT * len(measures),
+                *list(
+                    itertools.chain(
+                        # NOTE(jd) int(10e8) to avoid rounding errors
+                        *((int(utils.datetime_to_unix(timestamp) * int(10e8)),
+                           value)
+                          for timestamp, value in measures))))
+            for metric, measures in measures_per_metrics})
 
     @staticmethod
-    def _store_new_measures(metric, data):
+    def _store_new_measures(data_per_metrics):
         raise NotImplementedError
 
     @staticmethod
