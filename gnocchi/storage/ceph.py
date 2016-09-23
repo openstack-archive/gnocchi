@@ -178,12 +178,13 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             str(uuid.uuid4()),
             datetime.datetime.utcnow().strftime("%Y%m%d_%H:%M:%S")))
 
-        self.ioctx.write_full(name, data)
+        with rados.WriteOpCtx() as op:
+            self.ioctx.operate_aio_write_op(op.write_full(data), name)
 
         with rados.WriteOpCtx() as op:
             self.ioctx.set_omap(op, (name,), (b"",))
-            self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
-                                        flags=self.OMAP_WRITE_FLAGS)
+            self.ioctx.operate_aio_write_op(op, self.MEASURE_PREFIX,
+                                            flags=self.OMAP_WRITE_FLAGS)
 
     def _build_report(self, details):
         names = self._list_object_names_to_process()
