@@ -115,12 +115,14 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         if resp['status'] == 204:
             raise storage.MetricAlreadyExists(metric)
 
-    def _store_new_measures(self, metric, data):
-        now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
-        self.swift.put_object(
-            self.MEASURE_PREFIX,
-            six.text_type(metric.id) + "/" + six.text_type(uuid.uuid4()) + now,
-            data)
+    def _store_new_measures(self, data_per_metrics):
+        for metric, data in six.iteritems(data_per_metrics):
+            now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
+            self.swift.put_object(
+                self.MEASURE_PREFIX,
+                six.text_type(metric.id) + "/" +
+                six.text_type(uuid.uuid4()) + now,
+                data)
 
     def _build_report(self, details):
         metric_details = defaultdict(int)

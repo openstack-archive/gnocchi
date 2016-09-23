@@ -24,6 +24,7 @@ import uuid
 from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import importutils
+import six
 
 from gnocchi import storage
 from gnocchi.storage import _carbonara
@@ -166,25 +167,35 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                     self.ioctx.rm_xattr(container, xattr)
         super(CephStorage, self)._check_for_metric_upgrade(metric)
 
-    def _store_new_measures(self, metric, data):
+    def _store_new_measures(self, data_per_metrics):
         # NOTE(sileht): list all objects in a pool is too slow with
         # many objects (2min for 20000 objects in 50osds cluster),
         # and enforce us to iterrate over all objects
         # So we create an object MEASURE_PREFIX, that have as
         # omap the list of objects to process (not xattr because
         # it doesn't allow to configure the locking behavior)
-        name = "_".join((
-            self.MEASURE_PREFIX,
-            str(metric.id),
-            str(uuid.uuid4()),
-            datetime.datetime.utcnow().strftime("%Y%m%d_%H:%M:%S")))
+        ops = []
+        for metric, data in six.iteritems(data_per_metrics):
+            name = "_".join((
+                self.MEASURE_PREFIX,
+                str(metric.id),
+                str(uuid.uuid4()),
+                datetime.datetime.utcnow().strftime("%Y%m%d_%H:%M:%S")))
 
-        self.ioctx.write_full(name, data)
+            self.ops.append(
+                self.ioctx.aio_write_full(name, data)
+            )
 
-        with rados.WriteOpCtx() as op:
-            self.ioctx.set_omap(op, (name,), (b"",))
-            self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
-                                        flags=self.OMAP_WRITE_FLAGS)
+            with rados.WriteOpCtx() as op:
+                self.ioctx.set_omap(op, (name,), (b"",))
+                self.ops.append(
+                    self.ioctx.operate_aio_write_op(
+                        op, self.MEASURE_PREFIX,
+                        flags=self.OMAP_WRITE_FLAGS))
+
+        while ops:
+            op = ops.pop()
+            op.wait_for_complete()
 
     def _build_report(self, details):
         names = self._list_object_names_to_process()

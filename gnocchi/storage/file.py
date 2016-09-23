@@ -117,26 +117,27 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                 if e.errno != errno.EEXIST:
                     raise
 
-    def _store_new_measures(self, metric, data):
-        tmpfile = self._get_tempfile()
-        tmpfile.write(data)
-        tmpfile.close()
-        path = self._build_measure_path(metric.id, True)
-        while True:
-            try:
-                os.rename(tmpfile.name, path)
-                break
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
+    def _store_new_measures(self, data_per_metrics):
+        for metric, data in six.iteritems(data_per_metrics):
+            tmpfile = self._get_tempfile()
+            tmpfile.write(data)
+            tmpfile.close()
+            path = self._build_measure_path(metric.id, True)
+            while True:
                 try:
-                    os.mkdir(self._build_measure_path(metric.id))
+                    os.rename(tmpfile.name, path)
+                    break
                 except OSError as e:
-                    # NOTE(jd) It's possible that another process created the
-                    # path just before us! In this case, good for us, let's do
-                    # nothing then! (see bug #1475684)
-                    if e.errno != errno.EEXIST:
+                    if e.errno != errno.ENOENT:
                         raise
+                    try:
+                        os.mkdir(self._build_measure_path(metric.id))
+                    except OSError as e:
+                        # NOTE(jd) It's possible that another process created
+                        # the path just before us! In this case, good for us,
+                        # let's do nothing then! (see bug #1475684)
+                        if e.errno != errno.EEXIST:
+                            raise
 
     def _build_report(self, details):
         metric_details = {}
