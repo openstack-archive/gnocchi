@@ -22,10 +22,6 @@ _ORIG_TP = jsonutils.to_primitive
 
 
 def _to_primitive(value, *args, **kwargs):
-    # TODO(jd): Remove that once oslo.serialization is released with
-    # https://review.openstack.org/#/c/166861/
-    if isinstance(value, datetime.datetime):
-        return value.isoformat()
     # This mimics what Pecan implements in its default JSON encoder
     if hasattr(value, "jsonify"):
         return _to_primitive(value.jsonify(), *args, **kwargs)
