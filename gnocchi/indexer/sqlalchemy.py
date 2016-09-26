@@ -95,10 +95,8 @@ class PerInstanceFacade(object):
         return self.trans.reader.using(self._context)
 
     def get_engine(self):
-        # TODO(mbayer): add get_engine() to enginefacade
-        if not self.trans._factory._started:
-            self.trans._factory._start()
-        return self.trans._factory._writer_engine
+        legacy_facade = self.trans.get_legacy_facade()
+        return legacy_facade.get_engine()
 
     def dispose(self):
         # TODO(mbayer): add dispose() to enginefacade
