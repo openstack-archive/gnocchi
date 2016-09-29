@@ -376,7 +376,7 @@ class IndexerDriver(object):
         raise exceptions.NotImplementedError
 
     def get_archive_policy_for_metric(self, metric_name):
-        """Helper to get the archive policy according archive policy rules."""
+        """Helper to get the archive policy according to archive policy rules."""
         rules = self.list_archive_policy_rules()
         for rule in rules:
             if fnmatch.fnmatch(metric_name or "", rule.metric_pattern):
