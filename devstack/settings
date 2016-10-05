@@ -13,6 +13,9 @@ GNOCCHI_WSGI_DIR=${GNOCCHI_WSGI_DIR:-/var/www/gnocchi}
 GNOCCHI_DATA_DIR=${GNOCCHI_DATA_DIR:-${DATA_DIR}/gnocchi}
 GNOCCHI_COORDINATOR_URL=${GNOCCHI_COORDINATOR_URL:-redis://localhost:6379}
 
+# Gate TESTS
+GNOCCHI_DATA_DIR="/dev/shm/gnocchi/"
+
 # GNOCCHI_DEPLOY defines how Gnocchi is deployed, allowed values:
 # - mod_wsgi : Run Gnocchi under Apache HTTPd mod_wsgi
 # - simple : Run gnocchi-api
