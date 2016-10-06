@@ -1047,6 +1047,10 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
             datetime.datetime(2015, 8, 3),
             next(next(carbonara.SplitKey.from_timestamp_and_sampling(
                 datetime.datetime(2015, 1, 1, 15, 3), 3600))))
+        self.assertEqual(
+            datetime.datetime(5567, 8, 12),
+            next(carbonara.SplitKey.from_timestamp_and_sampling(
+                datetime.datetime(2015, 1, 1, 15, 3), 3600 * 24 * 365)))
 
     def test_split(self):
         sampling = 5
@@ -1064,7 +1068,7 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                       / carbonara.SplitKey.POINTS_PER_SPLIT),
             len(grouped_points))
         self.assertEqual("0.0",
-                         str(carbonara.SplitKey(grouped_points[0][0])))
+                         str(carbonara.SplitKey(grouped_points[0][0], 0)))
         # 3600 × 5s = 5 hours
         self.assertEqual(datetime.datetime(1970, 1, 1, 5),
                          grouped_points[1][0])
