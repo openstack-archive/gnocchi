@@ -7,7 +7,7 @@ do
     export GNOCCHI_TEST_STORAGE_DRIVER=$storage
     for indexer in ${GNOCCHI_TEST_INDEXER_DRIVERS}
     do
-        if [ "$GNOCCHI_TEST_STORAGE_DRIVER" == "ceph" ]; then
+        if [ "$storage" == "ceph" ]; then
             pifpaf run ceph -- pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
         else
             pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
