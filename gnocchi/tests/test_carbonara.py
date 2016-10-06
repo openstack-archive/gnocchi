@@ -1032,21 +1032,29 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
         self.assertEqual(
             datetime.datetime(2014, 10, 7),
             carbonara.SplitKey.from_timestamp_and_sampling(
-                datetime.datetime(2015, 1, 1, 15, 3), 3600))
+                datetime.datetime(2015, 1, 1, 15, 3), 3600).as_datetime())
         self.assertEqual(
             datetime.datetime(2014, 12, 31, 18),
             carbonara.SplitKey.from_timestamp_and_sampling(
-                datetime.datetime(2015, 1, 1, 15, 3), 58))
+                datetime.datetime(2015, 1, 1, 15, 3), 58).as_datetime())
+        self.assertEqual(
+            1420048800.0,
+            float(carbonara.SplitKey.from_timestamp_and_sampling(
+                datetime.datetime(2015, 1, 1, 15, 3), 58)))
 
     def test_split_key_next(self):
         self.assertEqual(
             datetime.datetime(2015, 3, 6),
             next(carbonara.SplitKey.from_timestamp_and_sampling(
-                datetime.datetime(2015, 1, 1, 15, 3), 3600)))
+                datetime.datetime(2015, 1, 1, 15, 3), 3600)).as_datetime())
         self.assertEqual(
             datetime.datetime(2015, 8, 3),
             next(next(carbonara.SplitKey.from_timestamp_and_sampling(
-                datetime.datetime(2015, 1, 1, 15, 3), 3600))))
+                datetime.datetime(2015, 1, 1, 15, 3), 3600))).as_datetime())
+        self.assertEqual(
+            113529600000.0,
+            float(next(carbonara.SplitKey.from_timestamp_and_sampling(
+                datetime.datetime(2015, 1, 1, 15, 3), 3600 * 24 * 365))))
 
     def test_split(self):
         sampling = 5
@@ -1064,10 +1072,10 @@ class TestAggregatedTimeSerie(base.BaseTestCase):
                       / carbonara.SplitKey.POINTS_PER_SPLIT),
             len(grouped_points))
         self.assertEqual("0.0",
-                         str(carbonara.SplitKey(grouped_points[0][0])))
+                         str(carbonara.SplitKey(grouped_points[0][0], 0)))
         # 3600 × 5s = 5 hours
         self.assertEqual(datetime.datetime(1970, 1, 1, 5),
-                         grouped_points[1][0])
+                         grouped_points[1][0].as_datetime())
         self.assertEqual(carbonara.SplitKey.POINTS_PER_SPLIT,
                          len(grouped_points[0][1]))
 
