@@ -301,7 +301,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         archive_policy_def.granularity)
                     existing_keys.remove(key)
         else:
-            oldest_key_to_keep = carbonara.SplitKey(0)
+            oldest_key_to_keep = carbonara.SplitKey(0, 0)
 
         # Rewrite all read-only splits just for fun (and compression). This
         # only happens if `previous_oldest_mutable_timestamp' exists, which

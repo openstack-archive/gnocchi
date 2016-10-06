@@ -27,12 +27,10 @@ import re
 import struct
 import time
 
-import iso8601
 import lz4
+import numpy
 import pandas
 import six
-
-from gnocchi import utils
 
 # NOTE(sileht): pandas relies on time.strptime()
 # and often triggers http://bugs.python.org/issue7980
@@ -325,7 +323,8 @@ class BoundTimeSerie(TimeSerie):
             self.ts = self.ts[self.first_block_timestamp():]
 
 
-class SplitKey(pandas.Timestamp):
+@functools.total_ordering
+class SplitKey(object):
     """A class representing a split key.
 
     A split key is basically a timestamp that can be used to split
@@ -336,33 +335,31 @@ class SplitKey(pandas.Timestamp):
 
     POINTS_PER_SPLIT = 3600
 
-    @classmethod
-    def _init(cls, value, sampling):
-        # NOTE(jd) This should be __init__ but it does not work, because of…
-        # Pandas, Cython, whatever.
-        self = cls(value)
+    def __init__(self, value, sampling):
+        if isinstance(value, SplitKey):
+            self.datetime = value.datetime
+        else:
+            self.datetime = numpy.datetime64(value, "s")
         self._carbonara_sampling = sampling
-        return self
 
     @classmethod
     def from_timestamp_and_sampling(cls, timestamp, sampling):
-        return cls._init(
+        return cls(
             round_timestamp(
                 timestamp, freq=sampling * cls.POINTS_PER_SPLIT * 10e8),
             sampling)
 
     @classmethod
     def from_key_string(cls, keystr, sampling):
-        return cls._init(float(keystr) * 10e8, sampling)
+        return cls(float(keystr) * 10e8, sampling)
 
     def __next__(self):
         """Get the split key of the next split.
 
         :return: A `SplitKey` object.
         """
-        return self._init(
-            self + datetime.timedelta(
-                seconds=(self.POINTS_PER_SPLIT * self._carbonara_sampling)),
+        return self.__class__(
+            self.datetime + self.POINTS_PER_SPLIT * self._carbonara_sampling,
             self._carbonara_sampling)
 
     next = __next__
@@ -370,18 +367,35 @@ class SplitKey(pandas.Timestamp):
     def __iter__(self):
         return self
 
+    def __hash__(self):
+        return hash(self.datetime)
+
+    _EPOCH = numpy.datetime64("1970-01-01T00:00:00Z")
+    _ONE_SECOND = numpy.timedelta64(1, "s")
+
+    def __lt__(self, other):
+        if isinstance(other, SplitKey):
+            return self.datetime < other.datetime
+        if isinstance(other, (numpy.datetime64, datetime.datetime)):
+            return self.datetime < other
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if isinstance(other, SplitKey):
+            return self.datetime == other.datetime
+        if isinstance(other, (numpy.datetime64, datetime.datetime)):
+            return self.datetime == other
+        raise NotImplementedError
+
     def __str__(self):
         return str(float(self))
 
     def __float__(self):
-        ts = self.to_datetime()
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=iso8601.iso8601.UTC)
-        return utils.datetime_to_unix(ts)
+        return (self.datetime - self._EPOCH) / self._ONE_SECOND
 
     def __repr__(self):
         return "<%s: %s / %fs>" % (self.__class__.__name__,
-                                   pandas.Timestamp.__repr__(self),
+                                   repr(self.datetime),
                                    self._carbonara_sampling)
 
 
@@ -436,7 +450,7 @@ class AggregatedTimeSerie(TimeSerie):
         groupby = self.ts.groupby(functools.partial(
             SplitKey.from_timestamp_and_sampling, sampling=self.sampling))
         for group, ts in groupby:
-            yield (SplitKey._init(group, self.sampling),
+            yield (SplitKey(group, self.sampling),
                    AggregatedTimeSerie(self.sampling, self.aggregation_method,
                                        ts))
 
@@ -544,6 +558,8 @@ class AggregatedTimeSerie(TimeSerie):
         if not self.ts.index.is_monotonic:
             self.ts = self.ts.sort_index()
         offset_div = self.sampling * 10e8
+        if isinstance(start, SplitKey):
+            start = start.datetime
         start = pandas.Timestamp(start).value
         # calculate how many seconds from start the series runs until and
         # initialize list to store alternating delimiter, float entries
