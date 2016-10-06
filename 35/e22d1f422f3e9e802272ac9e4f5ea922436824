@@ -1,0 +1,9 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Code-Review+1: Yurii Prokulevych <yprokule@redhat.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 06 Oct 2016 13:52:43 +0000
+Reviewed-on: https://review.openstack.org/382247
+Project: openstack/gnocchi
+Branch: refs/heads/stable/3.0
