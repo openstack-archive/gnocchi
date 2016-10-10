@@ -1397,7 +1397,7 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
     )
 
     @pecan.expose()
-    def post(self):
+    def post(self, create_metrics=False):
         body = deserialize_and_validate(self.MeasuresBatchSchema)
 
         known_metrics = []
@@ -1407,8 +1407,23 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
             metrics = pecan.request.indexer.list_metrics(
                 names=names, resource_id=resource_id)
 
-            if len(names) != len(metrics):
-                known_names = [m.name for m in metrics]
+            known_names = [m.name for m in metrics]
+            if strutils.bool_from_string(create_metrics):
+                user_id, project_id = get_user_and_project()
+                for name in names:
+                    if name not in known_names:
+                        metric = MetricsController.MetricSchema({
+                            "name": name
+                        })
+                        user, project = get_user_and_project()
+                        pecan.request.indexer.create_metric(
+                            uuid.uuid4(),
+                            user, project,
+                            resource_id=resource_id,
+                            name=metric.get('name'),
+                            unit=metric.get('unit'),
+                            archive_policy_name=metric['archive_policy_name'])
+            elif len(names) != len(metrics):
                 unknown_metrics.extend(
                     ["%s/%s" % (six.text_type(resource_id), m)
                      for m in names if m not in known_names])
