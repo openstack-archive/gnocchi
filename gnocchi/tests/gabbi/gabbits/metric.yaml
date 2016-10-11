@@ -162,16 +162,37 @@ tests:
       GET: /v1/metric
       status: 200
 
+    - name: push measurements to metric epoch format
+      POST: /v1/metric/$RESPONSE['$[0].id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: 1425652437.0
+            value: 43.1
+      status: 202
+
+    - name: get valid metric id again 2
+      GET: /v1/metric
+      status: 200
+
     - name: push measurements to metric
       POST: /v1/metric/$RESPONSE['$[0].id']/measures
       request_headers:
            content-type: application/json
       data:
-          - timestamp: "2015-03-06T14:33:57"
-            value: 43.1
           - timestamp: "2015-03-06T14:34:12"
             value: 12
       status: 202
+
+    - name: get valid metric id again 3
+      GET: /v1/metric
+
+    - name: get measurements from metric
+      GET: /v1/metric/$RESPONSE['$[0].id']/measures?refresh=true
+      response_json_paths:
+        $:
+          - ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
+          - ["2015-03-06T14:34:12+00:00", 1.0, 12.0]
 
     - name: create valid metric two
       POST: /v1/metric
@@ -232,10 +253,6 @@ tests:
       response_json_paths:
           $[0].archive_policy.name: cookies
 
-    - name: get measurements from metric
-      GET: /v1/metric/$RESPONSE['$[0].id']/measures
-      status: 200
-
     - name: get metric list for start test
       GET: /v1/metric
       status: 200
@@ -243,8 +260,11 @@ tests:
           $[0].archive_policy.name: cookies
 
     - name: get measurements by start
-      GET: /v1/metric/$RESPONSE['$[0].id']/measures?start=2015-03-06T14:33:57
+      GET: /v1/metric/$RESPONSE['$[0].id']/measures?refresh=true&start=2015-03-06T14:34
       status: 200
+      response_json_paths:
+        $:
+          - ["2015-03-06T14:34:12+00:00", 1.0, 12.0]
 
     - name: get measures unknown metric
       GET: /v1/metric/fake/measures
