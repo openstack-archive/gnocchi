@@ -379,7 +379,7 @@ function install_gnocchi {
         _gnocchi_install_redis
     fi
 
-    if [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
+    if [[ "$GNOCCHI_STORAGE_BACKEND" == 'ceph' ]] ; then
         pip_install cradox
     fi
 
@@ -390,7 +390,7 @@ function install_gnocchi {
 
     install_gnocchiclient
 
-    [ "$GNOCCHI_USE_KEYSTONE" == "True" ] && EXTRA_FLAVOR=,keystonemiddleware
+    [ "$GNOCCHI_USE_KEYSTONE" == "True" ] && EXTRA_FLAVOR=keystonemiddleware
 
     # We don't use setup_package because we don't follow openstack/requirements
     sudo -H pip install -e "$GNOCCHI_DIR"[test,$GNOCCHI_STORAGE_BACKEND,${DATABASE_TYPE}${EXTRA_FLAVOR}]
