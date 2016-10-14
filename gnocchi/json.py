@@ -15,6 +15,8 @@
 # under the License.
 import datetime
 
+import ujson 
+
 from oslo_serialization import jsonutils
 
 
@@ -44,5 +46,5 @@ def dumps(obj, *args, **kwargs):
     return jsonutils.dumps(obj, default=to_primitive)
 
 # For convenience
-loads = jsonutils.loads
-load = jsonutils.load
+loads = ujson.loads
+load = ujson.load
