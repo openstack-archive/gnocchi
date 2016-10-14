@@ -14,11 +14,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from oslo_config import generator
 
-def prehook(cmd):
-    try:
-        from oslo_config import generator
-        generator.main(['--config-file',
-                        'etc/gnocchi/gnocchi-config-generator.conf'])
-    except Exception as e:
-        print("Unable to build sample configuration file: %s" % e)
+
+def sdist_prehook(sdist):
+    generator.main(['--config-file',
+                    'etc/gnocchi/gnocchi-config-generator.conf'])
