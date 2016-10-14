@@ -28,6 +28,7 @@ import pyparsing
 import six
 from six.moves.urllib import parse as urllib_parse
 from stevedore import extension
+import ujson
 import voluptuous
 import webob.exc
 import werkzeug.http
@@ -160,8 +161,7 @@ def deserialize(expected_content_types=None):
     if mime_type not in expected_content_types:
         abort(415)
     try:
-        params = json.load(pecan.request.body_file_raw,
-                           encoding=options.get('charset', 'ascii'))
+        params = ujson.load(pecan.request.body_file_raw)
     except Exception as e:
         abort(400, "Unable to decode body: " + six.text_type(e))
     return params
