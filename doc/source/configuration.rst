@@ -55,20 +55,13 @@ Gnocchi provides these indexer drivers:
 .. _`PostgreSQL`: http://postgresql.org
 .. _`MySQL`: http://mysql.com
 
-Configuring the WSGI pipeline
+Configuring authentication
 -----------------------------
 
-The API server leverages `Paste Deployment`_ to manage its configuration. You
-can edit the `/etc/gnocchi/api-paste.ini` to tweak the WSGI pipeline of the
-Gnocchi REST HTTP server. By default, no authentication middleware is enabled,
-meaning your request will have to provides the authentication headers.
-
-Gnocchi is easily connectable with `OpenStack Keystone`_. If you successfully
-installed the `keystone` flavor using `pip` (see :ref:`installation`), you can
-edit the `api-paste.ini` file to add the Keystone authentication middleware::
-
-  [pipeline:main]
-  pipeline = gnocchi+auth
+The API server supports different authentication methods: none (the default) or
+`OpenStack Keystone`_. If you successfully installed the `keystone` flavor
+using `pip` (see :ref:`installation`), you can set `api.auth_mode` to
+`keystone` to enable Keystone authentication.
 
 .. _`Paste Deployment`: http://pythonpaste.org/deploy/
 .. _`OpenStack Keystone`: http://launchpad.net/keystone
