@@ -117,7 +117,6 @@ class ConfigFixture(fixture.GabbiFixture):
         s.upgrade(index)
 
         LOAD_APP_KWARGS = {
-            'appname': 'gnocchi+noauth',
             'storage': s,
             'indexer': index,
             'conf': conf,
