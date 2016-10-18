@@ -38,6 +38,8 @@ def list_opts():
             cfg.StrOpt('paste_config',
                        default='api-paste.ini',
                        help='Path to API Paste configuration.'),
+            cfg.StrOpt('auth_mode',
+                       help='Authentication mode to use.'),
             cfg.IntOpt('max_limit',
                        default=1000,
                        help=('The maximum number of items returned in a '
