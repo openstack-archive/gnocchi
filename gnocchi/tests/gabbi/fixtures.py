@@ -118,6 +118,8 @@ class ConfigFixture(fixture.GabbiFixture):
 
         # Set pagination to a testable value
         conf.set_override('max_limit', 7, 'api')
+        # Those tests do not use any auth
+        conf.set_override("auth_mode", None, 'api')
 
         self.index = index
 
@@ -125,7 +127,6 @@ class ConfigFixture(fixture.GabbiFixture):
         s.upgrade(index)
 
         LOAD_APP_KWARGS = {
-            'appname': 'gnocchi+noauth',
             'storage': s,
             'indexer': index,
             'conf': conf,
