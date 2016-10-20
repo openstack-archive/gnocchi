@@ -450,13 +450,8 @@ tests:
 
 # List resources
 
-    - name: list instance resources no auth
-      GET: /v1/resource/instance
-      response_strings:
-          - "[]"
-
     - name: list instance resources
-      GET: $LAST_URL
+      GET: /v1/resource/instance
       request_headers:
           x-user-id: 0fbb231484614b1a80131fc22f6afc9c
           x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
