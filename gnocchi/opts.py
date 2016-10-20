@@ -13,11 +13,11 @@
 # under the License.
 import copy
 import itertools
-import os
 import uuid
 
 from oslo_config import cfg
 from oslo_middleware import cors
+from stevedore import extension
 
 import gnocchi.archive_policy
 import gnocchi.indexer
@@ -69,6 +69,9 @@ def list_opts():
                                "rest", "api-paste.ini")),
                        help='Path to API Paste configuration.'),
             cfg.StrOpt('auth_mode',
+                       default="noauth",
+                       choices=extension.ExtensionManager(
+                           "gnocchi.rest.auth_helper").names(),
                        help='Authentication mode to use.'),
             cfg.IntOpt('max_limit',
                        default=1000,
