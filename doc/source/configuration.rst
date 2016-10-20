@@ -58,10 +58,10 @@ Gnocchi provides these indexer drivers:
 Configuring authentication
 -----------------------------
 
-The API server supports different authentication methods: none (the default) or
-`OpenStack Keystone`_. If you successfully installed the `keystone` flavor
-using `pip` (see :ref:`installation`), you can set `api.auth_mode` to
-`keystone` to enable Keystone authentication.
+The API server supports different authentication methods: `noauth` (the
+default) or `keystone` to use `OpenStack Keystone`_. If you successfully
+installed the `keystone` flavor using `pip` (see :ref:`installation`), you can
+set `api.auth_mode` to `keystone` to enable Keystone authentication.
 
 .. _`Paste Deployment`: http://pythonpaste.org/deploy/
 .. _`OpenStack Keystone`: http://launchpad.net/keystone
