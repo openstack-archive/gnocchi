@@ -65,9 +65,10 @@ def get_user_and_project():
     return (user_id, project_id)
 
 
-# TODO(jd) Move this to oslo.utils as I stole it from Ceilometer
 def recursive_keypairs(d, separator='.'):
     """Generator that produces sequence of keypairs for nested dictionaries."""
+    # NOTE(lhx): oslo.utils adds the function into dictutils and name 
+    # it flatten_dict_to_keypairs
     for name, value in sorted(six.iteritems(d)):
         if isinstance(value, dict):
             for subname, subvalue in recursive_keypairs(value, separator):
