@@ -19,7 +19,6 @@
 import datetime
 import functools
 import itertools
-import logging
 import math
 import numbers
 import random
@@ -30,6 +29,8 @@ import time
 import lz4
 import pandas
 import six
+
+from oslo_log import log as logging
 
 # NOTE(sileht): pandas relies on time.strptime()
 # and often triggers http://bugs.python.org/issue7980

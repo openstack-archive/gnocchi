@@ -16,11 +16,11 @@
 from collections import defaultdict
 import contextlib
 import datetime
-import logging
 import os
 import uuid
 
 from oslo_config import cfg
+from oslo_log import log as logging
 import retrying
 import six
 try:
