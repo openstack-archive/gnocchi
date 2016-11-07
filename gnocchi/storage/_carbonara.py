@@ -81,7 +81,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         try:
             self.coord.start(start_heart=True)
         except Exception as e:
-            LOG.error("Unable to start coordinator: %s" % e)
+            LOG.error("Unable to start coordinator: %s", e)
             raise utils.Retry(e)
 
     def stop(self):
@@ -421,7 +421,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                     # Just try the next metric, this one has no measures
                     break
                 else:
-                    LOG.info("Migrating metric %s to new format" % metric)
+                    LOG.info("Migrating metric %s to new format", metric)
                     timeseries = filter(
                         lambda x: x is not None,
                         self._map_in_thread(
@@ -443,7 +443,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                             metric, key, agg_method,
                             d.granularity, version=None)
             self._delete_unaggregated_timeserie(metric, version=None)
-            LOG.info("Migrated metric %s to new format" % metric)
+            LOG.info("Migrated metric %s to new format", metric)
 
     def upgrade(self, index):
         marker = None
@@ -471,7 +471,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                     self._delete_unprocessed_measures_for_metric_id(metric_id)
             except coordination.LockAcquireFailed:
                 LOG.debug("Cannot acquire lock for metric %s, postponing "
-                          "unprocessed measures deletion" % metric_id)
+                          "unprocessed measures deletion", metric_id)
         for metric in metrics:
             lock = self._lock(metric.id)
             agg_methods = list(metric.archive_policy.aggregation_methods)
@@ -487,7 +487,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         #               another worker, ignore if no measures.
                         if len(measures) == 0:
                             LOG.debug("Skipping %s (already processed)"
-                                      % metric)
+                                     , metric)
                             continue
 
                         measures = sorted(measures, key=operator.itemgetter(0))
@@ -692,7 +692,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         try:
             return self._unserialize_timeserie_v2(data)
         except ValueError:
-            LOG.error("Data corruption detected for %s ignoring." % metric.id)
+            LOG.error("Data corruption detected for %s ignoring.", metric.id)
 
     def _get_measures_and_unserialize_v2(self, metric, key,
                                          aggregation, granularity):
