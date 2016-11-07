@@ -487,7 +487,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         #               another worker, ignore if no measures.
                         if len(measures) == 0:
                             LOG.debug("Skipping %s (already processed)"
-                                      % metric)
+                                     % metric)
                             continue
 
                         measures = sorted(measures, key=operator.itemgetter(0))
