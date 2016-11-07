@@ -22,6 +22,7 @@ from oslo_utils import timeutils
 from pytimeparse import timeparse
 import six
 import tenacity
+from tooz import coordination
 import uuid
 
 # uuid5 namespace for id transformation.
@@ -61,6 +62,23 @@ retry = tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=0.5, max=60),
     retry=tenacity.retry_if_exception_type(Retry),
     reraise=True)
+
+
+# TODO(jd) Move this to tooz?
+@retry
+def _enable_coordination(coord):
+    try:
+        coord.start(start_heart=True)
+    except Exception as e:
+        LOG.error("Unable to start coordinator: %s", e)
+        raise utils.Retry(e)
+
+
+def get_coordinator_and_start(url):
+    my_id = str(uuid.uuid4())
+    coord = coordination.get_coordinator(url, my_id)
+    _enable_coordination(coord)
+    return coord, my_id
 
 
 def to_timestamp(v):
