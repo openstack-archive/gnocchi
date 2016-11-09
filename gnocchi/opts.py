@@ -79,11 +79,11 @@ def list_opts():
 
 
 def set_defaults():
-    cfg.set_defaults(cors.CORS_OPTS,
-                     allow_headers=[
-                         'X-Auth-Token',
-                         'X-Subject-Token',
-                         'X-User-Id',
-                         'X-Domain-Id',
-                         'X-Project-Id',
-                         'X-Roles'])
+    cors.set_defaults(
+        allow_headers=[
+            'X-Auth-Token',
+            'X-Subject-Token',
+            'X-User-Id',
+            'X-Domain-Id',
+            'X-Project-Id',
+            'X-Roles'])
