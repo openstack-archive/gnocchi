@@ -11,19 +11,51 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import abc
 import itertools
 
 from oslo_config import cfg
+from oslo_db import options as db_options
+from oslo_log import log
 from oslo_middleware import cors
+from oslo_policy import opts as policy_opts
 import uuid
 
 import gnocchi.archive_policy
+from gnocchi import exceptions
 import gnocchi.indexer
 import gnocchi.storage
 import gnocchi.storage.ceph
 import gnocchi.storage.file
 import gnocchi.storage.s3
 import gnocchi.storage.swift
+import six
+
+
+@six.add_metaclass(abc.ABCMeta)
+class OptsBase(object):
+
+    def __init__(self, conf, **kwargs):
+        self.conf = conf
+
+    @abc.abstractmethod
+    def set_defaults(self):
+        raise exceptions.NotImplementedError
+
+
+class GnocchiDBOpts(OptsBase):
+    def set_defaults(self):
+        db_options.set_defaults(self.conf)
+
+
+class GnocchiPolicyOpts(OptsBase):
+    def set_defaults(self):
+        policy_opts.set_defaults(self.conf)
+
+
+class GnocchiLogOpts(OptsBase):
+    def set_defaults(self):
+        log.register_options(self.conf)
 
 
 def list_opts():

@@ -16,15 +16,14 @@
 # limitations under the License.
 
 from oslo_config import cfg
-from oslo_db import options as db_options
 from oslo_log import log
-from oslo_policy import opts as policy_opts
 import pbr.version
 from six.moves.urllib import parse as urlparse
 
 from gnocchi import archive_policy
 from gnocchi import opts
 from gnocchi import utils
+from stevedore import extension
 
 LOG = log.getLogger(__name__)
 
@@ -34,10 +33,15 @@ def prepare_service(args=None, conf=None,
     if conf is None:
         conf = cfg.ConfigOpts()
     opts.set_defaults()
-    # FIXME(jd) Use the pkg_entry info to register the options of these libs
-    log.register_options(conf)
-    db_options.set_defaults(conf)
-    policy_opts.set_defaults(conf)
+
+    # use entry_point to register options
+    opt_mgr = extension.ExtensionManager(
+        namespace='gnocchi.default.opts',
+        invoke_on_load=True,
+        invoke_args=(conf,)
+    )
+    for opt in opt_mgr:
+        opt.obj.set_defaults()
 
     # Register our own Gnocchi options
     for group, options in opts.list_opts():
