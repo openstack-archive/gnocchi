@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 export OS_AUTH_PLUGIN=gnocchi-noauth
 export GNOCCHI_ENDPOINT=http://localhost:8041
