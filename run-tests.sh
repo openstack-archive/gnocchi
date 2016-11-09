@@ -8,7 +8,7 @@ do
     for indexer in ${GNOCCHI_TEST_INDEXER_DRIVERS}
     do
         if [ "$GNOCCHI_TEST_STORAGE_DRIVER" == "ceph" ]; then
-            pifpaf run ceph -- pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
+            pifpaf --debug run ceph -- pifpaf -g GNOCCHI_INDEXER_URL run $indexer -- ./tools/pretty_tox.sh $*
         elif [ "$GNOCCHI_TEST_STORAGE_DRIVER" == "s3" ]
         then
             if ! which s3rver >/dev/null 2>&1
