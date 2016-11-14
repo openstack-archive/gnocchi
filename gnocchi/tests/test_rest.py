@@ -1939,3 +1939,22 @@ class QueryStringSearchAttrFilterTest(tests_base.TestCase):
                           ]},
                           {"=": {"foo": "quote"}},
                       ]})
+
+
+class SearchMetricValueFilterTest(tests_base.TestCase):
+    def _do_test(self, expr, expected):
+        req = rest.SearchMetricValueFilter.parse(expr)
+        self.assertEqual(expected, req)
+
+    def test_search_query_builder(self):
+        self._do_test('= 12.0', {'=': 12.0})
+        self._do_test('>= 15.0 and < 20.0',
+                      {'and': [
+                          {'<': 20.0},
+                          {'>=': 15.0}
+                      ]})
+        self._do_test('> 15.0 and != 20.0',
+                      {'and': [
+                          {'!=': 20.0},
+                          {'>': 15.0}
+                      ]})

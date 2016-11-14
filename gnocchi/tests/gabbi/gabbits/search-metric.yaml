@@ -83,6 +83,18 @@ tests:
       GET: /v1/metric
       status: 200
       response_json_paths:
+        $[0].archive_policy.name: high
+
+    - name: search metric value filter
+      POST: /v1/search/metric?metric_id=$RESPONSE['$[0].id']&filter=eq%2012
+      request_headers:
+        content-type: application/json
+      status: 200
+
+    - name: get metric id for search three
+      GET: /v1/metric
+      status: 200
+      response_json_paths:
           $[0].archive_policy.name: high
 
     - name: search with multiple correct granularities
@@ -93,7 +105,7 @@ tests:
           "=": 12
       status: 200
 
-    - name: get metric id for search three
+    - name: get metric id for search four
       GET: /v1/metric
       status: 200
       response_json_paths:
@@ -109,7 +121,7 @@ tests:
       response_strings:
           - Granularity '300.0' for metric $RESPONSE['$[0].id'] does not exist
 
-    - name: get metric id for search four
+    - name: get metric id for search five
       GET: /v1/metric
       status: 200
       response_json_paths:
@@ -125,7 +137,7 @@ tests:
       response_strings:
           - Granularity '300.0' for metric $RESPONSE['$[0].id'] does not exist
 
-    - name: get metric id for search five
+    - name: get metric id for search six
       GET: /v1/metric
       status: 200
       response_json_paths:
