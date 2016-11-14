@@ -254,6 +254,11 @@
 
     {"=": 12}
 
+- name: search-value-in-metrics-by-search-filter
+  request: |
+    POST /v1/search/metric?metric_id={{ scenarios['create-metric-a']['response'].json['id'] }}&granularity=1second&granularity=1800s&filter==%2012 HTTP/1.1
+    Content-Type: application/json
+
 - name: get-measures
   request: GET /v1/metric/{{ scenarios['create-metric']['response'].json['id'] }}/measures HTTP/1.1
 
