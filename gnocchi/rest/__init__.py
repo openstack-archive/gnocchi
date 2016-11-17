@@ -1489,7 +1489,7 @@ class AggregationResourceController(rest.RestController):
     @pecan.expose('json')
     def post(self, start=None, stop=None, aggregation='mean',
              reaggregation=None, granularity=None, needed_overlap=100.0,
-             groupby=None, refresh=False):
+             groupby=None, fill=None, refresh=False):
         # First, set groupby in the right format: a sorted list of unique
         # strings.
         groupby = sorted(set(arg_to_list(groupby)))
@@ -1513,7 +1513,7 @@ class AggregationResourceController(rest.RestController):
                                    for r in resources)))
             return AggregationController.get_cross_metric_measures_from_objs(
                 metrics, start, stop, aggregation, reaggregation,
-                granularity, needed_overlap, refresh)
+                granularity, needed_overlap, fill, refresh)
 
         def groupper(r):
             return tuple((attr, r[attr]) for attr in groupby)
@@ -1527,7 +1527,7 @@ class AggregationResourceController(rest.RestController):
                 "group": dict(key),
                 "measures": AggregationController.get_cross_metric_measures_from_objs(  # noqa
                     metrics, start, stop, aggregation, reaggregation,
-                    granularity, needed_overlap, refresh)
+                    granularity, needed_overlap, fill, refresh)
             })
 
         return results
@@ -1557,7 +1557,7 @@ class AggregationController(rest.RestController):
                                             aggregation='mean',
                                             reaggregation=None,
                                             granularity=None,
-                                            needed_overlap=100.0,
+                                            needed_overlap=100.0, fill=None,
                                             refresh=False):
         try:
             needed_overlap = float(needed_overlap)
@@ -1595,6 +1595,16 @@ class AggregationController(rest.RestController):
                 granularity = float(granularity)
             except ValueError as e:
                 abort(400, "granularity must be a float: %s" % e)
+
+        if fill is not None:
+            if granularity is None:
+                abort(400, "Unable to fill without a granularity")
+            try:
+                fill = float(fill)
+            except ValueError as e:
+                if fill != 'null':
+                    abort(400, "fill must be a float or \'null\': %s" % e)
+
         try:
             if strutils.bool_from_string(refresh):
                 pecan.request.storage.process_new_measures(
@@ -1609,9 +1619,7 @@ class AggregationController(rest.RestController):
             else:
                 measures = pecan.request.storage.get_cross_metric_measures(
                     metrics, start, stop, aggregation,
-                    reaggregation,
-                    granularity,
-                    needed_overlap)
+                    reaggregation, granularity, needed_overlap, fill)
             # Replace timestamp keys by their string versions
             return [(timestamp.isoformat(), offset, v)
                     for timestamp, offset, v in measures]
@@ -1626,7 +1634,7 @@ class AggregationController(rest.RestController):
     @pecan.expose('json')
     def get_metric(self, metric=None, start=None, stop=None,
                    aggregation='mean', reaggregation=None, granularity=None,
-                   needed_overlap=100.0, refresh=False):
+                   needed_overlap=100.0, fill=None, refresh=False):
         # Check RBAC policy
         metric_ids = arg_to_list(metric)
         metrics = pecan.request.indexer.list_metrics(ids=metric_ids)
@@ -1638,7 +1646,7 @@ class AggregationController(rest.RestController):
                 missing_metric_ids.pop()))
         return self.get_cross_metric_measures_from_objs(
             metrics, start, stop, aggregation, reaggregation,
-            granularity, needed_overlap, refresh)
+            granularity, needed_overlap, fill, refresh)
 
 
 class CapabilityController(rest.RestController):

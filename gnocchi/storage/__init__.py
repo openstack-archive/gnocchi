@@ -278,6 +278,7 @@ class StorageDriver(object):
         :param aggregation: The type of aggregation to retrieve.
         :param reaggregation: The type of aggregation to compute
                               on the retrieved measures.
+        :param fill: The value to use to fill in missing data in series.
         """
         for metric in metrics:
             if aggregation not in metric.archive_policy.aggregation_methods:
