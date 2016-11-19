@@ -1149,7 +1149,10 @@ class QueryStringSearchAttrFilter(object):
         while parsed_query:
             part = parsed_query.pop()
             if part in cls.binary_operator:
-                result = {part: {parsed_query.pop(): result}}
+                try:
+                    result = {part: {parsed_query.pop(): result}}
+                except IndexError:
+                    result = {part: result}
 
             elif part in cls.multiple_operators:
                 if result.get(part):
@@ -1281,6 +1284,21 @@ def _MetricSearchSchema(v):
     return SearchMetricController.MetricSearchSchema(v)
 
 
+class SearchMetricValueFilter(QueryStringSearchAttrFilter):
+    binary_operator = (u">=", u"<=", u"!=", u">", u"<", u"=", u"==", u"eq",
+                       u"ne", u"lt", u"gt", u"ge", u"le", u"≠", u"≥", u"≤")
+    operator = pyparsing.Regex(u"|".join(binary_operator))
+    condition = pyparsing.Group(
+        operator + QueryStringSearchAttrFilter.comparison_term)
+    expr = pyparsing.infixNotation(condition, [
+        ("not", 1, pyparsing.opAssoc.RIGHT, ),
+        ("and", 2, pyparsing.opAssoc.LEFT, ),
+        ("∧", 2, pyparsing.opAssoc.LEFT, ),
+        ("or", 2, pyparsing.opAssoc.LEFT, ),
+        ("∨", 2, pyparsing.opAssoc.LEFT, ),
+    ])
+
+
 def _MetricSearchOperationSchema(v):
     """Helper method to indirect the recursivity of the search schema"""
     return SearchMetricController.MetricSearchOperationSchema(v)
@@ -1333,9 +1351,17 @@ class SearchMetricController(rest.RestController):
         )
     )
 
+    def parse_and_validate_qs_filter(self, query):
+        try:
+            attr_filter = SearchMetricValueFilter.parse(query)
+        except InvalidQueryStringSearchAttrFilter as e:
+            raise abort(400, e)
+        return voluptuous.Schema(self.MetricSearchSchema,
+                                 required=True)(attr_filter)
+
     @pecan.expose('json')
     def post(self, metric_id, start=None, stop=None, aggregation='mean',
-             granularity=None):
+             granularity=None, filter=None):
         granularity = [Timespan(g)
                        for g in arg_to_list(granularity or [])]
         metrics = pecan.request.indexer.list_metrics(
@@ -1344,10 +1370,12 @@ class SearchMetricController(rest.RestController):
         for metric in metrics:
             enforce("search metric", metric)
 
-        if not pecan.request.body:
+        if pecan.request.body:
+            query = deserialize_and_validate(self.MetricSearchSchema)
+        elif filter is not None:
+            query = self.parse_and_validate_qs_filter(filter)
+        else:
             abort(400, "No query specified in body")
-
-        query = deserialize_and_validate(self.MetricSearchSchema)
 
         if start is not None:
             try:
