@@ -214,23 +214,29 @@ class MetricScheduler(MetricProcessBase):
 
     def _run_job(self):
         try:
-            metrics = set(self.store.list_metric_with_measures_to_process(
-                self.block_size, self.block_index))
-            if metrics and not self.queue.empty():
-                # NOTE(gordc): drop metrics we previously process to avoid
-                #              handling twice
-                number_of_scheduled_metrics = len(metrics)
-                metrics = metrics - self.previously_scheduled_metrics
-                if (float(number_of_scheduled_metrics - len(metrics)) /
-                        self.block_size > self.MAX_OVERLAP):
-                    LOG.warning('Metric processing lagging scheduling rate. '
-                                'It is recommended to increase the number of '
-                                'workers or to lengthen processing interval.')
-            metrics = list(metrics)
-            for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
-                self.queue.put(metrics[i:i + self.BLOCK_SIZE])
-            self.previously_scheduled_metrics = set(metrics)
-            LOG.debug("%d metrics scheduled for processing.", len(metrics))
+            while not self._shutdown.is_set():
+                metrics = set(self.store.list_metric_with_measures_to_process(
+                    self.block_size, self.block_index))
+                if not metrics:
+                    # No more metrics waiting we can sleep a bit
+                    self.previously_scheduled_metrics = set()
+                    return
+                if not self.queue.empty():
+                    # NOTE(gordc): drop metrics we previously process to avoid
+                    #              handling twice
+                    number_of_scheduled_metrics = len(metrics)
+                    metrics = metrics - self.previously_scheduled_metrics
+                    if (float(number_of_scheduled_metrics - len(metrics)) /
+                            self.block_size > self.MAX_OVERLAP):
+                        LOG.warning(
+                            'Metric processing lagging scheduling rate. '
+                            'It is recommended to increase the number of '
+                            'workers or to lengthen processing interval.')
+                metrics = list(metrics)
+                for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
+                    self.queue.put(metrics[i:i + self.BLOCK_SIZE])
+                self.previously_scheduled_metrics = set(metrics)
+                LOG.debug("%d metrics scheduled for processing.", len(metrics))
         except Exception:
             LOG.error("Unexpected error scheduling metrics for processing",
                       exc_info=True)
