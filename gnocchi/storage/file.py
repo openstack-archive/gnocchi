@@ -23,19 +23,28 @@ import tempfile
 import uuid
 
 from oslo_config import cfg
+from oslo_log import log
 import six
+
+LOG = log.getLogger(__name__)
 
 from gnocchi import storage
 from gnocchi.storage import _carbonara
 
 
 OPTS = [
-    cfg.StrOpt('file_basepath',
+    cfg.StrOpt('file_storage_path',
+               deprecated_name='file_basepath',
                default='/var/lib/gnocchi',
                help='Path used to store gnocchi data files.'),
-    cfg.StrOpt('file_basepath_tmp',
-               default='${file_basepath}/tmp',
-               help='Path used to store Gnocchi temporary files.'),
+    cfg.StrOpt('file_measure_path',
+               default='${file_storage_path}/measure',
+               help='Path used to store gnocchi data files.'),
+    cfg.StrOpt('file_path_tmp',
+               deprecated_for_removal=True,
+               help='Path used to store Gnocchi temporary files. '
+               '(Ignored setting this lead to unpexpected error)'),
+
 ]
 
 
@@ -45,38 +54,44 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
 
     def __init__(self, conf):
         super(FileStorage, self).__init__(conf)
-        self.basepath = conf.file_basepath
-        self.basepath_tmp = conf.file_basepath_tmp
+        self.storage_path = conf.file_storage_path
+        self.storage_path_tmp = os.path.join(conf.file_storage_path, 'tmp')
+        self.measure_path = conf.file_measure_path
+        self.measure_path_tmp = os.path.join(conf.file_measure_path, 'tmp')
+
         try:
-            os.mkdir(self.basepath)
+            os.mkdir(self.storage_path)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        self.measure_path = os.path.join(self.basepath, self.MEASURE_PREFIX)
         try:
             os.mkdir(self.measure_path)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         try:
-            os.mkdir(self.basepath_tmp)
+            os.mkdir(self.storage_path_tmp)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        try:
+            os.mkdir(self.measure_path_tmp)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
 
-    def _get_tempfile(self):
-        return tempfile.NamedTemporaryFile(prefix='gnocchi',
-                                           dir=self.basepath_tmp,
+    def _get_tempfile(self, path):
+        return tempfile.NamedTemporaryFile(prefix='gnocchi', dir=path,
                                            delete=False)
 
     def _atomic_file_store(self, dest, data):
-        tmpfile = self._get_tempfile()
+        tmpfile = self._get_tempfile(self.storage_path_tmp)
         tmpfile.write(data)
         tmpfile.close()
         os.rename(tmpfile.name, dest)
 
     def _build_metric_dir(self, metric):
-        return os.path.join(self.basepath, str(metric.id))
+        return os.path.join(self.storage_path, str(metric.id))
 
     def _build_unaggregated_timeserie_path(self, metric, version=3):
         return os.path.join(
@@ -118,7 +133,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                     raise
 
     def _store_new_measures(self, metric, data):
-        tmpfile = self._get_tempfile()
+        tmpfile = self._get_tempfile(self.measure_path_tmp)
         tmpfile.write(data)
         tmpfile.close()
         path = self._build_measure_path(metric.id, True)
@@ -141,16 +156,19 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
     def _build_report(self, details):
         metric_details = {}
         for metric in os.listdir(self.measure_path):
+            if metric == 'tmp':
+                continue
             metric_details[metric] = (
                 self._pending_measures_to_process_count(metric))
         return (len(metric_details.keys()), sum(metric_details.values()),
                 metric_details if details else None)
 
     def list_metric_with_measures_to_process(self, size, part, full=False):
-        if full:
-            return set(os.listdir(self.measure_path))
-        return set(
-            os.listdir(self.measure_path)[size * part:size * (part + 1)])
+        metrics = os.listdir(self.measure_path)
+        metrics.remove('tmp')
+        if not full:
+            metrics = metrics[size * part:size * (part + 1)]
+        return set(metrics)
 
     def _list_measures_container_for_metric_id(self, metric_id):
         try:

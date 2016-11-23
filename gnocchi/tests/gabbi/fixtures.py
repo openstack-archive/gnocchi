@@ -94,7 +94,7 @@ class ConfigFixture(fixture.GabbiFixture):
             conf.set_override('policy_file',
                               os.path.abspath('etc/gnocchi/policy.json'),
                               group="oslo_policy")
-            conf.set_override('file_basepath', data_tmp_dir, 'storage')
+            conf.set_override('file_storage_path', data_tmp_dir, 'storage')
 
         # NOTE(jd) All of that is still very SQL centric but we only support
         # SQL for now so let's say it's good enough.

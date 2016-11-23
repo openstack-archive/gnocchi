@@ -262,7 +262,7 @@ class TestCase(base.BaseTestCase):
 
         if self.conf.storage.driver == 'file':
             tempdir = self.useFixture(fixtures.TempDir())
-            self.conf.set_override('file_basepath',
+            self.conf.set_override('file_storage_path',
                                    tempdir.path,
                                    'storage')
         elif self.conf.storage.driver == 'ceph':
