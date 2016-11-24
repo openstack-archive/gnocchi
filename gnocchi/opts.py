@@ -27,25 +27,20 @@ import gnocchi.storage.s3
 import gnocchi.storage.swift
 
 
-def add_deprecation_for_removal(opts):
+def set_storage_default(opts):
     # Don't change the orignals
     opts = copy.deepcopy(list(opts))
     for opt in opts:
-        opt.deprecated_opts = []
-        opt.deprecation_for_removal = True
-        opt.deprecation_reason = ("This option splitted moved in two new "
-                                  "section 'incoming_storage' and "
-                                  "'timeseries_storage'.")
+        opt.default = '${storage.%s}' % opt.name
     return opts
 
 
 def list_opts():
-    storage_opts = itertools.chain(gnocchi.storage._carbonara.OPTS,
-                                   gnocchi.storage.OPTS,
-                                   gnocchi.storage.ceph.OPTS,
-                                   gnocchi.storage.file.OPTS,
-                                   gnocchi.storage.swift.OPTS,
-                                   gnocchi.storage.s3.OPTS)
+    storage_opts = list(itertools.chain(gnocchi.storage._carbonara.OPTS,
+                                        gnocchi.storage.ceph.OPTS,
+                                        gnocchi.storage.file.OPTS,
+                                        gnocchi.storage.swift.OPTS,
+                                        gnocchi.storage.s3.OPTS))
     for opt in storage_opts:
         opt.deprecated_opts.append(cfg.DeprecatedOpt(
             opt.name, group="storage"))
@@ -66,9 +61,8 @@ def list_opts():
                        help=('The maximum number of items returned in a '
                              'single response from a collection resource')),
         )),
-        ("storage", add_deprecation_for_removal(storage_opts)),
-        ("timeseries_storage", copy.deepcopy(storage_opts)),
-        ("incoming_storage", copy.deepcopy(storage_opts)),
+        ("storage", storage_opts + gnocchi.storage.OPTS),
+        ("incoming_storage", set_storage_default(storage_opts)),
         ("statsd", (
             cfg.StrOpt('host',
                        default='0.0.0.0',
