@@ -117,8 +117,7 @@ class TestIndexerDriver(tests_base.TestCase):
                           self.index.delete_archive_policy,
                           str(uuid.uuid4()))
         metric_id = uuid.uuid4()
-        self.index.create_metric(metric_id, str(uuid.uuid4()),
-                                 str(uuid.uuid4()), "low")
+        self.index.create_metric(metric_id, str(uuid.uuid4()), "low")
         self.assertRaises(indexer.ArchivePolicyInUse,
                           self.index.delete_archive_policy,
                           "low")
@@ -150,12 +149,10 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_create_metric(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        m = self.index.create_metric(r1, user, project, "low")
+        creator = str(uuid.uuid4())
+        m = self.index.create_metric(r1, creator, "low")
         self.assertEqual(r1, m.id)
-        self.assertEqual(m.created_by_user_id, user)
-        self.assertEqual(m.created_by_project_id, project)
+        self.assertEqual(m.creator, creator)
         self.assertIsNone(m.name)
         self.assertIsNone(m.unit)
         self.assertIsNone(m.resource_id)
@@ -164,9 +161,8 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_expunge_metric(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        m = self.index.create_metric(r1, user, project, "low")
+        creator = str(uuid.uuid4())
+        m = self.index.create_metric(r1, creator, "low")
         self.index.delete_metric(m.id)
         try:
             self.index.expunge_metric(m.id)
@@ -184,16 +180,16 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_create_resource(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        rc = self.index.create_resource('generic', r1, user, project)
+        creator = str(uuid.uuid4())
+        rc = self.index.create_resource('generic', r1, creator)
         self.assertIsNotNone(rc.started_at)
         self.assertIsNotNone(rc.revision_start)
         self.assertEqual({"id": r1,
                           "revision_start": rc.revision_start,
                           "revision_end": None,
-                          "created_by_user_id": user,
-                          "created_by_project_id": project,
+                          "creator": creator,
+                          "created_by_user_id": creator,
+                          "created_by_project_id": "",
                           "user_id": None,
                           "project_id": None,
                           "started_at": rc.started_at,
@@ -219,19 +215,17 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_create_resource_already_exists(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_resource('generic', r1, user, project)
+        creator = str(uuid.uuid4())
+        self.index.create_resource('generic', r1, creator)
         self.assertRaises(indexer.ResourceAlreadyExists,
                           self.index.create_resource,
-                          'generic', r1, user, project)
+                          'generic', r1, creator)
 
     def test_create_resource_with_new_metrics(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
+        creator = str(uuid.uuid4())
         rc = self.index.create_resource(
-            'generic', r1, user, project,
+            'generic', r1, creator,
             metrics={"foobar": {"archive_policy_name": "low"}})
         self.assertEqual(1, len(rc.metrics))
         m = self.index.list_metrics(id=rc.metrics[0].id)
@@ -247,16 +241,13 @@ class TestIndexerDriver(tests_base.TestCase):
                           r1)
 
     def test_delete_resource_with_metrics(self):
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
+        creator = str(uuid.uuid4())
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        self.index.create_metric(e1, user, project,
-                                 archive_policy_name="low")
-        self.index.create_metric(e2, user, project,
-                                 archive_policy_name="low")
+        self.index.create_metric(e1, creator, archive_policy_name="low")
+        self.index.create_metric(e2, creator, archive_policy_name="low")
         r1 = uuid.uuid4()
-        self.index.create_resource('generic', r1, user, project,
+        self.index.create_resource('generic', r1, creator,
                                    metrics={'foo': e1, 'bar': e2})
         self.index.delete_resource(r1)
         self.assertRaises(indexer.NoSuchResource,
@@ -274,17 +265,14 @@ class TestIndexerDriver(tests_base.TestCase):
     def test_create_resource_with_start_timestamp(self):
         r1 = uuid.uuid4()
         ts = utils.datetime_utc(2014, 1, 1, 23, 34, 23, 1234)
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        rc = self.index.create_resource(
-            'generic',
-            r1, user, project,
-            started_at=ts)
+        creator = str(uuid.uuid4())
+        rc = self.index.create_resource('generic', r1, creator, started_at=ts)
         self.assertEqual({"id": r1,
                           "revision_start": rc.revision_start,
                           "revision_end": None,
-                          "created_by_user_id": user,
-                          "created_by_project_id": project,
+                          "creator": creator,
+                          "created_by_user_id": creator,
+                          "created_by_project_id": "",
                           "user_id": None,
                           "project_id": None,
                           "started_at": ts,
@@ -299,23 +287,21 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1,
-                                 user, project,
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator,
                                  archive_policy_name="low")
-        self.index.create_metric(e2,
-                                 user, project,
+        self.index.create_metric(e2, creator,
                                  archive_policy_name="low")
-        rc = self.index.create_resource('generic', r1, user, project,
+        rc = self.index.create_resource('generic', r1, creator,
                                         metrics={'foo': e1, 'bar': e2})
         self.assertIsNotNone(rc.started_at)
         self.assertIsNotNone(rc.revision_start)
         self.assertEqual({"id": r1,
                           "revision_start": rc.revision_start,
                           "revision_end": None,
-                          "created_by_user_id": user,
-                          "created_by_project_id": project,
+                          "creator": creator,
+                          "created_by_user_id": creator,
+                          "created_by_project_id": "",
                           "user_id": None,
                           "project_id": None,
                           "started_at": rc.started_at,
@@ -329,8 +315,9 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertEqual({"id": r1,
                           "revision_start": r.revision_start,
                           "revision_end": None,
-                          "created_by_user_id": user,
-                          "created_by_project_id": project,
+                          "creator": creator,
+                          "created_by_user_id": creator,
+                          "created_by_project_id": "",
                           "type": "generic",
                           "started_at": rc.started_at,
                           "ended_at": None,
@@ -351,9 +338,8 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_update_resource_end_timestamp(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_resource('generic', r1, user, project)
+        creator = str(uuid.uuid4())
+        self.index.create_resource('generic', r1, creator)
         self.index.update_resource(
             'generic',
             r1,
@@ -365,8 +351,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.assertIsNone(r.revision_end)
         self.assertIsNotNone(r.revision_start)
         self.assertEqual(r1, r.id)
-        self.assertEqual(user, r.created_by_user_id)
-        self.assertEqual(project, r.created_by_project_id)
+        self.assertEqual(creator, r.creator)
         self.assertEqual(utils.datetime_utc(2043, 1, 1, 2, 3, 4), r.ended_at)
         self.assertEqual("generic", r.type)
         self.assertEqual(0, len(r.metrics))
@@ -381,8 +366,9 @@ class TestIndexerDriver(tests_base.TestCase):
                           "revision_start": r.revision_start,
                           "revision_end": None,
                           "ended_at": None,
-                          "created_by_user_id": user,
-                          "created_by_project_id": project,
+                          "created_by_project_id": "",
+                          "created_by_user_id": creator,
+                          "creator": creator,
                           "user_id": None,
                           "project_id": None,
                           "type": "generic",
@@ -394,14 +380,10 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1, user, project,
-                                 archive_policy_name="low")
-        self.index.create_resource('generic', r1, user, project,
-                                   metrics={'foo': e1})
-        self.index.create_metric(e2, user, project,
-                                 archive_policy_name="low")
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator, archive_policy_name="low")
+        self.index.create_resource('generic', r1, creator, metrics={'foo': e1})
+        self.index.create_metric(e2, creator, archive_policy_name="low")
         rc = self.index.update_resource('generic', r1, metrics={'bar': e2})
         r = self.index.get_resource('generic', r1, with_metrics=True)
         self.assertEqual(rc, r)
@@ -410,13 +392,12 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1, user, project,
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator,
                                  archive_policy_name="low")
-        self.index.create_metric(e2, user, project,
+        self.index.create_metric(e2, creator,
                                  archive_policy_name="low")
-        self.index.create_resource('generic', r1, user, project,
+        self.index.create_resource('generic', r1, creator,
                                    metrics={'foo': e1})
         rc = self.index.update_resource('generic', r1, metrics={'bar': e2},
                                         append_metrics=True)
@@ -430,13 +411,12 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1, user, project,
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator,
                                  archive_policy_name="low")
-        self.index.create_metric(e2, user, project,
+        self.index.create_metric(e2, creator,
                                  archive_policy_name="low")
-        self.index.create_resource('generic', r1, user, project,
+        self.index.create_resource('generic', r1, creator,
                                    metrics={'foo': e1})
 
         self.assertRaises(indexer.NamedMetricAlreadyExists,
@@ -454,12 +434,11 @@ class TestIndexerDriver(tests_base.TestCase):
                      "min_length": 2, "max_length": 15}
         }, 'creating')
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
+        creator = str(uuid.uuid4())
         # Create
         self.index.create_resource_type(rtype)
 
-        rc = self.index.create_resource(resource_type, r1, user, project,
+        rc = self.index.create_resource(resource_type, r1, creator,
                                         col1="foo")
         rc = self.index.update_resource(resource_type, r1, col1="foo")
         r = self.index.get_resource(resource_type, r1, with_metrics=True)
@@ -474,9 +453,8 @@ class TestIndexerDriver(tests_base.TestCase):
         }, 'creating')
         self.index.create_resource_type(rtype)
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        rc = self.index.create_resource(resource_type, r1, user, project,
+        creator = str(uuid.uuid4())
+        rc = self.index.create_resource(resource_type, r1, creator,
                                         col1="foo")
         updated = self.index.update_resource(resource_type, r1, col1="foo",
                                              create_revision=False)
@@ -489,9 +467,8 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_update_resource_ended_at_fail(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_resource('generic', r1, user, project)
+        creator = str(uuid.uuid4())
+        self.index.create_resource('generic', r1, creator)
         self.assertRaises(
             indexer.ResourceValueError,
             self.index.update_resource,
@@ -527,7 +504,7 @@ class TestIndexerDriver(tests_base.TestCase):
     def test_update_non_existent_resource(self):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
-        self.index.create_metric(e1, str(uuid.uuid4()), str(uuid.uuid4()),
+        self.index.create_metric(e1, str(uuid.uuid4()),
                                  archive_policy_name="low")
         self.assertRaises(indexer.NoSuchResource,
                           self.index.update_resource,
@@ -547,13 +524,12 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1, user, project,
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator,
                                  archive_policy_name="low")
-        self.index.create_metric(e2, user, project,
+        self.index.create_metric(e2, creator,
                                  archive_policy_name="low")
-        rc = self.index.create_resource('generic', r1, user, project,
+        rc = self.index.create_resource('generic', r1, creator,
                                         metrics={'foo': e1, 'bar': e2})
         self.index.delete_metric(e1)
         self.assertRaises(indexer.NoSuchMetric, self.index.delete_metric, e1)
@@ -565,8 +541,9 @@ class TestIndexerDriver(tests_base.TestCase):
                           "revision_start": rc.revision_start,
                           "revision_end": None,
                           "ended_at": None,
-                          "created_by_user_id": user,
-                          "created_by_project_id": project,
+                          "creator": creator,
+                          "created_by_project_id": "",
+                          "created_by_user_id": creator,
                           "user_id": None,
                           "project_id": None,
                           "original_resource_id": None,
@@ -604,7 +581,7 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
-        g = self.index.create_resource('generic', r1, user, project,
+        g = self.index.create_resource('generic', r1, user + ":" + project,
                                        user, project)
         resources = self.index.list_resources(
             'generic',
@@ -616,34 +593,33 @@ class TestIndexerDriver(tests_base.TestCase):
             attribute_filter={"=": {"user_id": 'bad-user'}})
         self.assertEqual(0, len(resources))
 
-    def test_list_resources_by_created_by_user(self):
+    def test_list_resources_by_user(self):
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        g = self.index.create_resource('generic', r1, user, project)
+        creator = str(uuid.uuid4())
+        g = self.index.create_resource('generic', r1, creator)
         resources = self.index.list_resources(
             'generic',
-            attribute_filter={"=": {"created_by_user_id": user}})
+            attribute_filter={"=": {"creator": creator}})
         self.assertEqual(1, len(resources))
         self.assertEqual(g, resources[0])
         resources = self.index.list_resources(
             'generic',
-            attribute_filter={"=": {"created_by_user_id": 'bad-user'}})
+            attribute_filter={"=": {"creator": 'bad-user'}})
         self.assertEqual(0, len(resources))
 
     def test_list_resources_by_user_with_details(self):
         r1 = uuid.uuid4()
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
-        g = self.index.create_resource('generic', r1, user, project,
+        creator = user + ":" + project
+        g = self.index.create_resource('generic', r1, creator,
                                        user, project)
         mgr = self.index.get_resource_type_schema()
         resource_type = str(uuid.uuid4())
         self.index.create_resource_type(
             mgr.resource_type_from_dict(resource_type, {}, 'creating'))
         r2 = uuid.uuid4()
-        i = self.index.create_resource(resource_type, r2,
-                                       user, project,
+        i = self.index.create_resource(resource_type, r2, creator,
                                        user, project)
         resources = self.index.list_resources(
             'generic',
@@ -658,8 +634,8 @@ class TestIndexerDriver(tests_base.TestCase):
         r1 = uuid.uuid4()
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
-        g = self.index.create_resource('generic', r1, user, project,
-                                       user, project)
+        creator = user + ":" + project
+        g = self.index.create_resource('generic', r1, creator, user, project)
         resources = self.index.list_resources(
             'generic',
             attribute_filter={"=": {"project_id": project}})
@@ -675,14 +651,13 @@ class TestIndexerDriver(tests_base.TestCase):
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
         g = self.index.create_resource(
-            'generic', r1, user, project,
-            user_id=user, project_id=project,
+            'generic', r1, user + ":" + project, user, project,
             started_at=utils.datetime_utc(2010, 1, 1, 12, 0),
             ended_at=utils.datetime_utc(2010, 1, 1, 13, 0))
         resources = self.index.list_resources(
             'generic',
             attribute_filter={"and": [
-                {"=": {"project_id": project}},
+                {"=": {"user_id": user}},
                 {">": {"lifespan": 1800}},
             ]})
         self.assertEqual(1, len(resources))
@@ -773,10 +748,10 @@ class TestIndexerDriver(tests_base.TestCase):
         new_user = str(uuid.uuid4())
         new_project = str(uuid.uuid4())
 
-        self.index.create_metric(e, user, project,
+        self.index.create_metric(e, user + ":" + project,
                                  archive_policy_name="low")
 
-        self.index.create_resource('generic', rid, user, project,
+        self.index.create_resource('generic', rid, user + ":" + project,
                                    user, project,
                                    metrics={'foo': e})
         r2 = self.index.update_resource('generic', rid, user_id=new_user,
@@ -799,18 +774,16 @@ class TestIndexerDriver(tests_base.TestCase):
         rid = uuid.uuid4()
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
+        creator = user + ":" + project
         new_user = str(uuid.uuid4())
         new_project = str(uuid.uuid4())
 
-        self.index.create_metric(e1, user, project,
-                                 archive_policy_name="low")
-        self.index.create_metric(e2, user, project,
-                                 archive_policy_name="low")
-        self.index.create_metric(uuid.uuid4(), user, project,
+        self.index.create_metric(e1, creator, archive_policy_name="low")
+        self.index.create_metric(e2, creator, archive_policy_name="low")
+        self.index.create_metric(uuid.uuid4(), creator,
                                  archive_policy_name="low")
 
-        r1 = self.index.create_resource('generic', rid, user, project,
-                                        user, project,
+        r1 = self.index.create_resource('generic', rid, creator, user, project,
                                         metrics={'foo': e1, 'bar': e2}
                                         ).jsonify()
         r2 = self.index.update_resource('generic', rid, user_id=new_user,
@@ -837,6 +810,7 @@ class TestIndexerDriver(tests_base.TestCase):
         e1 = uuid.uuid4()
         e2 = uuid.uuid4()
         rid = uuid.uuid4()
+        creator = str(uuid.uuid4())
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
         new_user = str(uuid.uuid4())
@@ -850,14 +824,14 @@ class TestIndexerDriver(tests_base.TestCase):
                          "min_length": 2, "max_length": 15}
             }, 'creating'))
 
-        self.index.create_metric(e1, user, project,
+        self.index.create_metric(e1, creator,
                                  archive_policy_name="low")
-        self.index.create_metric(e2, user, project,
+        self.index.create_metric(e2, creator,
                                  archive_policy_name="low")
-        self.index.create_metric(uuid.uuid4(), user, project,
+        self.index.create_metric(uuid.uuid4(), creator,
                                  archive_policy_name="low")
 
-        r1 = self.index.create_resource(resource_type, rid, user, project,
+        r1 = self.index.create_resource(resource_type, rid, creator,
                                         user, project,
                                         col1="foo",
                                         metrics={'foo': e1, 'bar': e2}
@@ -889,10 +863,9 @@ class TestIndexerDriver(tests_base.TestCase):
         # database for all tests and the tests are running concurrently, but
         # for now it'll be better than nothing.
         r1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
+        creator = str(uuid.uuid4())
         g = self.index.create_resource(
-            'generic', r1, user, project,
+            'generic', r1, creator,
             started_at=utils.datetime_utc(2000, 1, 1, 23, 23, 23),
             ended_at=utils.datetime_utc(2000, 1, 3, 23, 23, 23))
         r2 = uuid.uuid4()
@@ -901,7 +874,7 @@ class TestIndexerDriver(tests_base.TestCase):
         self.index.create_resource_type(
             mgr.resource_type_from_dict(resource_type, {}, 'creating'))
         i = self.index.create_resource(
-            resource_type, r2, user, project,
+            resource_type, r2, creator,
             started_at=utils.datetime_utc(2000, 1, 1, 23, 23, 23),
             ended_at=utils.datetime_utc(2000, 1, 4, 23, 23, 23))
         resources = self.index.list_resources(
@@ -955,10 +928,11 @@ class TestIndexerDriver(tests_base.TestCase):
         r2 = uuid.uuid4()
         user = str(uuid.uuid4())
         project = str(uuid.uuid4())
+        creator = user + ":" + project
         metrics = {'foo': {'archive_policy_name': 'medium'}}
-        g1 = self.index.create_resource('generic', r1, user, project,
+        g1 = self.index.create_resource('generic', r1, creator,
                                         user, project, metrics=metrics)
-        g2 = self.index.create_resource('generic', r2, user, project,
+        g2 = self.index.create_resource('generic', r2, creator,
                                         user, project, metrics=metrics)
 
         metrics = self.index.list_metrics(ids=[g1['metrics'][0]['id'],
@@ -986,35 +960,29 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_get_metric(self):
         e1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1,
-                                 user, project,
-                                 archive_policy_name="low")
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator, archive_policy_name="low")
 
         metric = self.index.list_metrics(id=e1)
         self.assertEqual(1, len(metric))
         metric = metric[0]
         self.assertEqual(e1, metric.id)
-        self.assertEqual(metric.created_by_user_id, user)
-        self.assertEqual(metric.created_by_project_id, project)
+        self.assertEqual(metric.creator, creator)
         self.assertIsNone(metric.name)
         self.assertIsNone(metric.resource_id)
 
     def test_get_metric_with_details(self):
         e1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
+        creator = str(uuid.uuid4())
         self.index.create_metric(e1,
-                                 user, project,
+                                 creator,
                                  archive_policy_name="low")
 
         metric = self.index.list_metrics(id=e1)
         self.assertEqual(1, len(metric))
         metric = metric[0]
         self.assertEqual(e1, metric.id)
-        self.assertEqual(metric.created_by_user_id, user)
-        self.assertEqual(metric.created_by_project_id, project)
+        self.assertEqual(metric.creator, creator)
         self.assertIsNone(metric.name)
         self.assertIsNone(metric.resource_id)
         self.assertEqual(self.archive_policies['low'], metric.archive_policy)
@@ -1028,15 +996,10 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_list_metrics(self):
         e1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1,
-                                 user, project,
-                                 archive_policy_name="low")
+        creator = str(uuid.uuid4())
+        self.index.create_metric(e1, creator, archive_policy_name="low")
         e2 = uuid.uuid4()
-        self.index.create_metric(e2,
-                                 user, project,
-                                 archive_policy_name="low")
+        self.index.create_metric(e2, creator, archive_policy_name="low")
         metrics = self.index.list_metrics()
         id_list = [m.id for m in metrics]
         self.assertIn(e1, id_list)
@@ -1048,10 +1011,7 @@ class TestIndexerDriver(tests_base.TestCase):
 
     def test_list_metrics_delete_status(self):
         e1 = uuid.uuid4()
-        user = str(uuid.uuid4())
-        project = str(uuid.uuid4())
-        self.index.create_metric(e1,
-                                 user, project,
+        self.index.create_metric(e1, str(uuid.uuid4()),
                                  archive_policy_name="low")
         self.index.delete_metric(e1)
         metrics = self.index.list_metrics()
