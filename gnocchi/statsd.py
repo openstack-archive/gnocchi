@@ -41,8 +41,7 @@ class Stats(object):
         try:
             self.indexer.create_resource('generic',
                                          self.conf.statsd.resource_id,
-                                         self.conf.statsd.user_id,
-                                         self.conf.statsd.project_id)
+                                         self.conf.statsd.creator)
         except indexer.ResourceAlreadyExists:
             LOG.debug("Resource %s already exists",
                       self.conf.statsd.resource_id)
@@ -107,8 +106,7 @@ class Stats(object):
                     ap_name = self._get_archive_policy_name(metric_name)
                     metric = self.indexer.create_metric(
                         uuid.uuid4(),
-                        self.conf.statsd.user_id,
-                        self.conf.statsd.project_id,
+                        self.conf.statsd.creator,
                         archive_policy_name=ap_name,
                         name=metric_name,
                         resource_id=self.conf.statsd.resource_id)
@@ -167,7 +165,7 @@ class StatsdServer(object):
 def start():
     conf = service.prepare_service()
 
-    for field in ["resource_id", "user_id", "project_id"]:
+    for field in ["resource_id", "creator"]:
         if conf.statsd[field] is None:
             raise cfg.RequiredOptError(field, cfg.OptGroup("statsd"))
 
