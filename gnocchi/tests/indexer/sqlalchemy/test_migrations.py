@@ -16,7 +16,9 @@ import abc
 
 import fixtures
 import mock
+from oslo_db.sqlalchemy import provision
 from oslo_db.sqlalchemy import test_migrations
+from oslotest import mockpatch
 import six
 import sqlalchemy as sa
 import sqlalchemy_utils
@@ -42,6 +44,9 @@ class ModelsMigrationsSync(
     def setUp(self):
         super(ModelsMigrationsSync, self).setUp()
         self.db = mock.Mock()
+        self.useFixture(mockpatch.PatchOject(
+            provision.Backend, 'backend_for_database_type',
+            return_value=mock.Mock()))
         self.conf.set_override(
             'url',
             sqlalchemy.SQLAlchemyIndexer._create_new_database(
