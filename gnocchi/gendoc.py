@@ -19,6 +19,7 @@ import json
 import jinja2
 import six
 import six.moves
+import webob.request
 import yaml
 
 from gnocchi.tests import test_rest
