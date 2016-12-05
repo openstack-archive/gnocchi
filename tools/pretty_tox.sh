@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+
+pip install https://review.openstack.org/changes/406779/revisions/09188819587e8c4425b94d388252a54a2431de0c/archive?format=tgz
+
 set -o pipefail
 
 TESTRARGS=$1
