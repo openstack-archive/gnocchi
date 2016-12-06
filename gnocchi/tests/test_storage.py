@@ -327,6 +327,18 @@ class TestStorageDriver(tests_base.TestCase):
             (utils.datetime_utc(2016, 1, 10, 17, 12), 60.0, 46),
         ], self.storage.get_measures(self.metric, granularity=60.0))
 
+        # Test what happens if we delete the latest split and then need to
+        # compress it! DATA CORRRUPPPTIIIOOON!
+        self.storage._delete_metric_measures(self.metric,
+                                             '1452384000.0',
+                                             'mean', 60.0)
+
+        # Add more point to generate a new split
+        self.storage.incoming.add_measures(self.metric, [
+            storage.Measure(utils.dt_to_unix_ns(2016, 1, 12, 16, 18, 45), 45),
+        ])
+        self.trigger_processing()
+
     def test_updated_measures(self):
         self.storage.incoming.add_measures(self.metric, [
             storage.Measure(utils.dt_to_unix_ns(2014, 1, 1, 12, 0, 1), 69),
