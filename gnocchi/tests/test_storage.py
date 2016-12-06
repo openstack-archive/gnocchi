@@ -327,6 +327,17 @@ class TestStorageDriver(tests_base.TestCase):
             (utils.datetime_utc(2016, 1, 10, 17, 12), 60.0, 46),
         ], self.storage.get_measures(self.metric, granularity=60.0))
 
+        # Test what happens if we delete a random metric!
+        # DATA CORRRUPPPTIIIOOON!
+        self.storage._delete_metric_measures(self.metric,
+                                             '1451952000.0',
+                                             'mean', 60.0)
+        self.storage.incoming.add_measures(self.metric, [
+            storage.Measure(utils.dt_to_unix_ns(2017, 1, 10, 16, 18, 45), 45),
+            storage.Measure(utils.dt_to_unix_ns(2017, 1, 10, 17, 12, 45), 46),
+        ])
+        self.trigger_processing()
+
     def test_updated_measures(self):
         self.storage.incoming.add_measures(self.metric, [
             storage.Measure(utils.dt_to_unix_ns(2014, 1, 1, 12, 0, 1), 69),
