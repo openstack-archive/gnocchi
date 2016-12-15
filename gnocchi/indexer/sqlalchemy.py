@@ -1087,6 +1087,7 @@ class QueryTransformer(object):
         u"not": sqlalchemy.not_,
     }
 
+
     binary_operators = {
         u"=": operator.eq,
         u"==": operator.eq,
@@ -1134,7 +1135,8 @@ class QueryTransformer(object):
     def _handle_unary_op(cls, engine, table, op, node):
         return op(cls.build_filter(engine, table, node))
 
-    def _handle_binary_op(self, engine, table, op, nodes):
+    @classmethod
+    def _handle_binary_op(cls, engine, table, op, nodes):
         try:
             field_name, value = list(nodes.items())[0]
         except Exception:
@@ -1154,7 +1156,7 @@ class QueryTransformer(object):
                 return creator.like("%s:%%" % value)
             elif op == operator.ne:
                 return sqlalchemy.not_(creator.like("%s:%%" % value))
-            elif op == self.binary_operators[u"like"]:
+            elif op == cls.binary_operators[u"like"]:
                 return creator.like("%s:%%" % value)
             raise indexer.QueryValueError(value, field_name)
         elif field_name == "created_by_project_id":
@@ -1162,7 +1164,7 @@ class QueryTransformer(object):
                 return creator.like("%%:%s" % value)
             elif op == operator.ne:
                 return sqlalchemy.not_(creator.like("%%:%s" % value))
-            elif op == self.binary_operators[u"like"]:
+            elif op == cls.binary_operators[u"like"]:
                 return creator.like("%%:%s" % value)
             raise indexer.QueryValueError(value, field_name)
         else:
