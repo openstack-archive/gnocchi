@@ -32,7 +32,7 @@ _RUN = False
 
 def _setup_test_app():
     t = test_rest.RestTest()
-    t.auth = True
+    t.auth_mode = "basic"
     t.setUpClass()
     t.setUp()
     return t.app
@@ -130,8 +130,7 @@ def setup(app):
 
         app.info("Doing request %s: %s" % (entry['name'],
                                            six.text_type(request)))
-        with webapp.use_admin_user():
-            response = webapp.request(request)
+        response = webapp.request(request)
         entry['response'] = response
         entry['doc'] = _format_request_reply(request, response)
     with open("doc/source/rest.j2", "r") as f:
