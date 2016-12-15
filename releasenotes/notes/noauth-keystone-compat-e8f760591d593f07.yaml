@@ -1,0 +1,9 @@
+---
+upgrade:
+  - >-
+    The `auth_type` option has a new value "noauth-keystone-compat" which
+    allows to user Gnocchi REST API with no authentication while keeping the
+    Keystone segregation rules. This was the default up to Gnocchi 3.0.
+    The new "basic" default does not include segregation and does not use the
+    old Keystone headers (`X-User-Id` and `X-Creator-Id`) but the standard HTTP
+    `Authorization` header.
