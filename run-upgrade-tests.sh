@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-export OS_AUTH_PLUGIN=gnocchi-noauth
+export OS_AUTH_TYPE=gnocchi-noauth
 export GNOCCHI_ENDPOINT=http://localhost:8041
 export GNOCCHI_USER_ID=99aae-4dc2-4fbc-b5b8-9688c470d9cc
 export GNOCCHI_PROJECT_ID=c8d27445-48af-457c-8e0d-1de7103eae1f
@@ -21,7 +21,7 @@ dump_data(){
     echo "* Dumping measures aggregations to $dir"
     for resource_id in $RESOURCE_IDS; do
         for agg in min max mean sum ; do
-            gnocchi measures show --aggregation $agg --resource-id $resource_id metric > $dir/${agg}.txt
+            gnocchi --debug measures show --aggregation $agg --resource-id $resource_id metric > $dir/${agg}.txt
         done
     done
 }
@@ -31,7 +31,7 @@ inject_data() {
     # TODO(sileht): Generate better data that ensure we have enought split that cover all
     # situation
     for resource_id in $RESOURCE_IDS; do
-        gnocchi resource create generic --attribute id:$resource_id -n metric:high >/dev/null
+        gnocchi --debug resource create generic --attribute id:$resource_id -n metric:high >/dev/null
     done
 
     {
@@ -91,6 +91,9 @@ pip install -q -U .[${GNOCCHI_VARIANT}]
 
 
 eval $(pifpaf run gnocchi --indexer-url $INDEXER_URL --storage-url $STORAGE_URL)
+# Gnocchi 3.1 uses basic auth by default
+export OS_AUTH_TYPE=gnocchi-basic
+export GNOCCHI_USER=$GNOCCHI_USER_ID
 dump_data $GNOCCHI_DATA/new
 
 echo "* Checking output difference between Gnocchi $old_version and $new_version"
