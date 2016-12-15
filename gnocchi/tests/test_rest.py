@@ -14,6 +14,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import base64
 import calendar
 import contextlib
 import datetime
@@ -59,7 +60,7 @@ class TestingApp(webtest.TestApp):
     INVALID_TOKEN = str(uuid.uuid4())
 
     def __init__(self, *args, **kwargs):
-        self.auth = kwargs.pop('auth')
+        self.auth_mode = kwargs.pop('auth_mode')
         self.storage = kwargs.pop('storage')
         self.indexer = kwargs.pop('indexer')
         super(TestingApp, self).__init__(*args, **kwargs)
@@ -68,8 +69,8 @@ class TestingApp(webtest.TestApp):
 
     @contextlib.contextmanager
     def use_admin_user(self):
-        if not self.auth:
-            raise testcase.TestSkipped("No auth enabled")
+        if self.auth_mode != "keystone":
+            raise testcase.TestSkipped("Auth mode is not Keystone")
         old_token = self.token
         self.token = self.VALID_TOKEN_ADMIN
         try:
@@ -79,8 +80,8 @@ class TestingApp(webtest.TestApp):
 
     @contextlib.contextmanager
     def use_another_user(self):
-        if not self.auth:
-            raise testcase.TestSkipped("No auth enabled")
+        if self.auth_mode != "keystone":
+            raise testcase.TestSkipped("Auth mode is not Keystone")
         old_token = self.token
         self.token = self.VALID_TOKEN_2
         try:
@@ -90,8 +91,8 @@ class TestingApp(webtest.TestApp):
 
     @contextlib.contextmanager
     def use_invalid_token(self):
-        if not self.auth:
-            raise testcase.TestSkipped("No auth enabled")
+        if self.auth_mode != "keystone":
+            raise testcase.TestSkipped("Auth mode is not Keystone")
         old_token = self.token
         self.token = self.INVALID_TOKEN
         try:
@@ -111,8 +112,13 @@ class TestingApp(webtest.TestApp):
             self.token = old_token
 
     def do_request(self, req, *args, **kwargs):
-        if self.auth and self.token is not None:
-            req.headers['X-Auth-Token'] = self.token
+        if self.auth_mode == "keystone":
+            if self.token is not None:
+                req.headers['X-Auth-Token'] = self.token
+        elif self.auth_mode == "basic":
+            req.headers['Authorization'] = (
+                "basic " + base64.b64encode(b"admin:")
+            )
         response = super(TestingApp, self).do_request(req, *args, **kwargs)
         metrics = self.storage.incoming.list_metric_with_measures_to_process(
             None, None, full=True)
@@ -123,8 +129,8 @@ class TestingApp(webtest.TestApp):
 class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
 
     scenarios = [
-        ('noauth', dict(auth=False)),
-        ('keystone', dict(auth=True)),
+        ('basic', dict(auth_mode="basic")),
+        ('keystone', dict(auth_mode="keystone")),
     ]
 
     def setUp(self):
@@ -140,34 +146,32 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
         # options making impossible to override them properly...
         cfg.set_defaults(cors.CORS_OPTS, allowed_origin="http://foobar.com")
 
-        self.auth_token_fixture = self.useFixture(
-            ksm_fixture.AuthTokenFixture())
-        self.auth_token_fixture.add_token_data(
-            is_v2=True,
-            token_id=TestingApp.VALID_TOKEN_ADMIN,
-            user_id=TestingApp.USER_ID_ADMIN,
-            user_name='adminusername',
-            project_id=TestingApp.PROJECT_ID_ADMIN,
-            role_list=['admin'])
-        self.auth_token_fixture.add_token_data(
-            is_v2=True,
-            token_id=TestingApp.VALID_TOKEN,
-            user_id=TestingApp.USER_ID,
-            user_name='myusername',
-            project_id=TestingApp.PROJECT_ID,
-            role_list=["member"])
-        self.auth_token_fixture.add_token_data(
-            is_v2=True,
-            token_id=TestingApp.VALID_TOKEN_2,
-            user_id=TestingApp.USER_ID_2,
-            user_name='myusername2',
-            project_id=TestingApp.PROJECT_ID_2,
-            role_list=["member"])
+        if self.auth_mode == "keystone":
+            self.auth_token_fixture = self.useFixture(
+                ksm_fixture.AuthTokenFixture())
+            self.auth_token_fixture.add_token_data(
+                is_v2=True,
+                token_id=TestingApp.VALID_TOKEN_ADMIN,
+                user_id=TestingApp.USER_ID_ADMIN,
+                user_name='adminusername',
+                project_id=TestingApp.PROJECT_ID_ADMIN,
+                role_list=['admin'])
+            self.auth_token_fixture.add_token_data(
+                is_v2=True,
+                token_id=TestingApp.VALID_TOKEN,
+                user_id=TestingApp.USER_ID,
+                user_name='myusername',
+                project_id=TestingApp.PROJECT_ID,
+                role_list=["member"])
+            self.auth_token_fixture.add_token_data(
+                is_v2=True,
+                token_id=TestingApp.VALID_TOKEN_2,
+                user_id=TestingApp.USER_ID_2,
+                user_name='myusername2',
+                project_id=TestingApp.PROJECT_ID_2,
+                role_list=["member"])
 
-        if self.auth:
-            self.conf.set_override("auth_mode", "keystone", group="api")
-        else:
-            self.conf.set_override("auth_mode", "noauth", group="api")
+        self.conf.set_override("auth_mode", self.auth_mode, group="api")
 
         self.app = TestingApp(app.load_app(conf=self.conf,
                                            indexer=self.index,
@@ -175,7 +179,7 @@ class RestTest(tests_base.TestCase, testscenarios.TestWithScenarios):
                                            not_implemented_middleware=False),
                               storage=self.storage,
                               indexer=self.index,
-                              auth=self.auth)
+                              auth_mode=self.auth_mode)
 
     # NOTE(jd) Used at least by docs
     @staticmethod
@@ -669,16 +673,16 @@ class ResourceTest(RestTest):
         self.resource = self.attributes.copy()
         # Set original_resource_id
         self.resource['original_resource_id'] = self.resource['id']
-        if self.auth:
+        if self.auth_mode == "keystone":
             self.resource['created_by_user_id'] = TestingApp.USER_ID
             self.resource['created_by_project_id'] = TestingApp.PROJECT_ID
             self.resource['creator'] = (
                 TestingApp.USER_ID + ":" + TestingApp.PROJECT_ID
             )
         else:
-            self.resource['created_by_user_id'] = None
-            self.resource['created_by_project_id'] = None
-            self.resource['creator'] = None
+            self.resource['created_by_user_id'] = "admin"
+            self.resource['created_by_project_id'] = ""
+            self.resource['creator'] = "admin"
         self.resource['ended_at'] = None
         self.resource['metrics'] = {}
         if 'user_id' not in self.resource:
