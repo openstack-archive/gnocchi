@@ -1,9 +1,10 @@
 {
-    "admin_or_creator": "role:admin or project_id:%(created_by_project_id)s",
+    "admin": "role:admin or user:admin",
+    "admin_or_creator": "rule:admin or user:%(creator)s or project_id:%(created_by_project_id)s",
     "resource_owner": "project_id:%(project_id)s",
     "metric_owner": "project_id:%(resource.project_id)s",
 
-    "get status": "role:admin",
+    "get status": "rule:admin",
 
     "create resource": "",
     "get resource": "rule:admin_or_creator or rule:resource_owner",
@@ -13,29 +14,29 @@
     "list resource": "rule:admin_or_creator or rule:resource_owner",
     "search resource": "rule:admin_or_creator or rule:resource_owner",
 
-    "create resource type": "role:admin",
-    "delete resource type": "role:admin",
-    "update resource type": "role:admin",
+    "create resource type": "rule:admin",
+    "delete resource type": "rule:admin",
+    "update resource type": "rule:admin",
     "list resource type": "",
     "get resource type": "",
 
     "get archive policy": "",
     "list archive policy": "",
-    "create archive policy": "role:admin",
-    "update archive policy": "role:admin",
-    "delete archive policy": "role:admin",
+    "create archive policy": "rule:admin",
+    "update archive policy": "rule:admin",
+    "delete archive policy": "rule:admin",
 
-    "create archive policy rule": "role:admin",
+    "create archive policy rule": "rule:admin",
     "get archive policy rule": "",
     "list archive policy rule": "",
-    "delete archive policy rule": "role:admin",
+    "delete archive policy rule": "rule:admin",
 
     "create metric": "",
     "delete metric": "rule:admin_or_creator",
     "get metric": "rule:admin_or_creator or rule:metric_owner",
     "search metric": "rule:admin_or_creator or rule:metric_owner",
     "list metric": "",
-    "list all metric": "role:admin",
+    "list all metric": "rule:admin",
 
     "get measures":  "rule:admin_or_creator or rule:metric_owner",
     "post measures":  "rule:admin_or_creator"
