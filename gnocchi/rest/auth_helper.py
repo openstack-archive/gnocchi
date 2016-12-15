@@ -15,6 +15,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import webob
+import werkzeug.http
 
 from gnocchi import rest
 
@@ -85,15 +86,21 @@ class KeystoneAuthHelper(object):
             return {"or": policy_filter}
 
 
-class NoAuthHelper(KeystoneAuthHelper):
+class BasicAuthHelper(object):
     @staticmethod
     def get_current_user(headers):
-        # FIXME(jd) Should be a single header
-        user_id = headers.get("X-User-Id")
-        project_id = headers.get("X-Project-Id")
-        if user_id:
-            if project_id:
-                return user_id + ":" + project_id
-            return user_id
-        if project_id:
-            return project_id
+        auth = werkzeug.http.parse_authorization_header(
+            headers.get("Authorization"))
+        if auth is None:
+            rest.abort(401)
+        return auth.username
+
+    def get_auth_info(self, headers):
+        user = self.get_current_user(headers)
+        return {
+            "user": user,
+        }
+
+    @staticmethod
+    def get_resource_policy_filter(headers, rule, resource_type):
+        return None
