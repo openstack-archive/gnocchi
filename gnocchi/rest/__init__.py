@@ -1414,6 +1414,13 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
                                 unit=metric.get('unit'),
                                 archive_policy_name=metric[
                                     'archive_policy_name'])
+                        except indexer.NamedMetricAlreadyExists as e:
+                            # Created in the mean time
+                            known_metrics.extend(
+                                pecan.request.indexer.list_metrics(
+                                    names=[metric.get('name')],
+                                    resource_id=resource_id)
+                            )
                         except indexer.NoSuchResource as e:
                             unknown_resources.add(resource_id)
                         except indexer.IndexerException as e:
