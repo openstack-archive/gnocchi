@@ -49,7 +49,8 @@ resource_table = sa.Table(
               sqlalchemy_utils.types.uuid.UUIDType(),
               nullable=False),
     sa.Column('original_resource_id', sa.String(255)),
-    sa.Column('type', sa.String(255))
+    sa.Column('type', sa.String(255)),
+    sa.Column('creator', sa.String(255))
 )
 
 resourcehistory_table = sa.Table(
@@ -100,15 +101,24 @@ def upgrade():
                       nullable=False),
         )
 
-    for resource in connection.execute(resource_table.select().where(
-            resource_table.c.original_resource_id.like('%/%'))):
+    for resource in connection.execute(resource_table.select()):
+
+        try:
+            orig_as_uuid = uuid.UUID(
+                str(resource_table.c.original_resource_id))
+        except ValueError:
+            pass
+        else:
+            if orig_as_uuid == resource_table.c.id:
+                continue
+
         new_original_resource_id = resource.original_resource_id.replace(
             '/', '_')
         if six.PY2:
             new_original_resource_id = new_original_resource_id.encode('utf-8')
         new_id = sa.literal(uuidtype.process_bind_param(
-            str(uuid.uuid5(utils.RESOURCE_ID_NAMESPACE,
-                           new_original_resource_id)),
+            str(utils.ResourceUUID(
+                new_original_resource_id, resource.creator)),
             connection.dialect))
 
         # resource table
