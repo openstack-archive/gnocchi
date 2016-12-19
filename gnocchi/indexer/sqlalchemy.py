@@ -1126,7 +1126,6 @@ class QueryTransformer(object):
 
     converters = (
         (base.TimestampUTC, utils.to_datetime),
-        (sqlalchemy_utils.UUIDType, utils.ResourceUUID),
         (types.String, six.text_type),
         (types.Integer, int),
         (types.Numeric, float),
