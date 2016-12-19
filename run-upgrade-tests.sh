@@ -112,7 +112,7 @@ dump_data $GNOCCHI_DATA/new
 
 # NOTE(sileht): change the output of the old gnocchi to compare with the new without '/'
 $GSED -i -e "s,5a301761/dddd/46e2/8900/8b4f6fe6675a,5a301761_dddd_46e2_8900_8b4f6fe6675a,g" \
-      -e "s,19235bb9-35ca-5f55-b7db-165cfb033c86,fe1bdabf-d94c-5b3a-af1e-06bdff53f228,g" $GNOCCHI_DATA/old/resources.list
+      -e "s,19235bb9-35ca-5f55-b7db-165cfb033c86,517920a9-2e50-58b8-88e8-25fd7aae1d8f,g" $GNOCCHI_DATA/old/resources.list
 
 echo "* Checking output difference between Gnocchi $old_version and $new_version"
 diff -uNr $GNOCCHI_DATA/old $GNOCCHI_DATA/new
