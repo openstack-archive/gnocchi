@@ -39,7 +39,7 @@ LOG = log.getLogger(__name__)
 RESOURCE_ID_NAMESPACE = uuid.UUID('0a7a15ff-aa13-4ac2-897c-9bdf30ce175b')
 
 
-def ResourceUUID(value):
+def ResourceUUID(value, creator):
     if isinstance(value, uuid.UUID):
         return value
     if '/' in value:
@@ -51,7 +51,8 @@ def ResourceUUID(value):
             if len(value) <= 255:
                 if six.PY2:
                     value = value.encode('utf-8')
-                return uuid.uuid5(RESOURCE_ID_NAMESPACE, value)
+                return uuid.uuid5(RESOURCE_ID_NAMESPACE,
+                                  value + "\x00" + creator)
             raise ValueError(
                 'transformable resource id >255 max allowed characters')
     except Exception as e:
