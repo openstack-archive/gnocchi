@@ -40,6 +40,8 @@ RESOURCE_ID_NAMESPACE = uuid.UUID('0a7a15ff-aa13-4ac2-897c-9bdf30ce175b')
 
 
 def ResourceUUID(value):
+    if isinstance(value, uuid.UUID):
+        return value
     try:
         try:
             return uuid.UUID(value)
