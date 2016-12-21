@@ -1,0 +1,9 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Code-Review+2: Chris Dent <cdent@anticdent.org>
+Workflow+1: Chris Dent <cdent@anticdent.org>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 21 Dec 2016 17:15:14 +0000
+Reviewed-on: https://review.openstack.org/413254
+Project: openstack/gnocchi
+Branch: refs/heads/master
