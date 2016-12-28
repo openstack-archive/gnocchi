@@ -117,8 +117,9 @@ def setup(app):
         fake_file.seek(0)
         request = webapp.RequestClass.from_file(fake_file)
 
-        # TODO(jd) Fix this lame bug in webob
-        if request.method in ("DELETE"):
+        # TODO(jd) Fix this lame bug in webob < 1.7
+        if (hasattr(webob.request, "http_method_probably_has_body")
+           and request.method == "DELETE"):
             # Webob has a bug it does not read the body for DELETE, l4m3r
             clen = request.content_length
             if clen is None:
