@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 import itertools
+import os
 import uuid
 
 from oslo_config import cfg
@@ -37,7 +38,10 @@ def list_opts():
         )),
         ("api", (
             cfg.StrOpt('paste_config',
-                       default='api-paste.ini',
+                       default=os.path.abspath(
+                           os.path.join(
+                               os.path.dirname(__file__),
+                               "rest", "api-paste.ini")),
                        help='Path to API Paste configuration.'),
             cfg.StrOpt('auth_mode',
                        default="basic",
