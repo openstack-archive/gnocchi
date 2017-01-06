@@ -20,7 +20,7 @@ GNOCCHI_COORDINATOR_URL=${GNOCCHI_COORDINATOR_URL:-redis://localhost:6379}
 GNOCCHI_DEPLOY=${GNOCCHI_DEPLOY}
 
 # Toggle for deploying Gnocchi with/without Keystone
-GNOCCHI_USE_KEYSTONE=$(trueorfalse True GNOCCHI_USE_KEYSTONE)
+GNOCCHI_USE_KEYSTONE=$(trueorfalse False GNOCCHI_USE_KEYSTONE)
 
 # Support potential entry-points console scripts and venvs
 if [[ ${USE_VENV} = True ]]; then
