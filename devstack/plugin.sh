@@ -259,7 +259,8 @@ function configure_gnocchi {
     if _is_ceph_enabled && [[ "$GNOCCHI_STORAGE_BACKEND" = 'ceph' ]] ; then
         iniset $GNOCCHI_CONF storage driver ceph
         iniset $GNOCCHI_CONF storage ceph_username ${GNOCCHI_CEPH_USER}
-        iniset $GNOCCHI_CONF storage ceph_secret $(awk '/key/{print $3}' ${CEPH_CONF_DIR}/ceph.client.${GNOCCHI_CEPH_USER}.keyring)
+        #iniset $GNOCCHI_CONF storage ceph_secret $(awk '/key/{print $3}' ${CEPH_CONF_DIR}/ceph.client.${GNOCCHI_CEPH_USER}.keyring)
+        iniset $GNOCCHI_CONF storage ceph_keyring ${CEPH_CONF_DIR}/ceph.client.${GNOCCHI_CEPH_USER}.keyring
     elif is_service_enabled swift && [[ "$GNOCCHI_STORAGE_BACKEND" = 'swift' ]] ; then
         iniset $GNOCCHI_CONF storage driver swift
         iniset $GNOCCHI_CONF storage swift_user gnocchi_swift
