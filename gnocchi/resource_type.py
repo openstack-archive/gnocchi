@@ -32,7 +32,7 @@ INVALID_NAMES = [
 VALID_CHARS = re.compile("[a-zA-Z0-9][a-zA-Z0-9_]*")
 
 
-class InvalidResourceAttributeName(Exception):
+class InvalidResourceAttributeName(voluptuous.Error):
     """Error raised when the resource attribute name is invalid."""
     def __init__(self, name):
         super(InvalidResourceAttributeName, self).__init__(
@@ -40,7 +40,7 @@ class InvalidResourceAttributeName(Exception):
         self.name = name
 
 
-class InvalidResourceAttributeValue(ValueError):
+class InvalidResourceAttributeValue(voluptuous.Error):
     """Error raised when the resource attribute min is greater than max"""
     def __init__(self, min, max):
         super(InvalidResourceAttributeValue, self).__init__(
