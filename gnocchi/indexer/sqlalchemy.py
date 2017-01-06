@@ -407,12 +407,25 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                             for attr in del_attributes:
                                 batch_op.drop_column(attr)
                             for attr in add_attributes:
-                                # TODO(sileht): When attr.required is True, we
-                                # have to pass a default. rest layer current
-                                # protect us, requied = True is not yet allowed
+                                kwargs = {}
+                                if attr.fill is not None:
+                                    # NOTE(sileht): server_default must be
+                                    # converted in sql element
+                                    kwargs["server_default"] = (
+                                        sqlalchemy.literal(attr.fill))
                                 batch_op.add_column(sqlalchemy.Column(
                                     attr.name, attr.satype,
-                                    nullable=not attr.required))
+                                    nullable=not attr.required, **kwargs))
+
+                                # We have all rows filled now, we can remove
+                                # the server_default
+                                if attr.fill is not None:
+                                    batch_op.alter_column(
+                                        column_name=attr.name,
+                                        existing_type=attr.satype,
+                                        existing_server_default=attr.fill,
+                                        existing_nullable=not attr.required,
+                                        server_default=None)
 
                 rt.state = "active"
                 rt.updated_at = utils.utcnow()
