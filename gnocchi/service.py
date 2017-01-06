@@ -71,6 +71,11 @@ def prepare_service(args=None, conf=None,
                          urlparse.urlunparse(parsed),
                          "storage")
 
+    # Workaround for https://review.openstack.org/417496
+    for name, value in conf.incoming.items():
+        if value == 'None':
+            conf.set_override(name, '', group="incoming")
+
     log.set_defaults(default_log_levels=log.get_default_log_levels() +
                      ["passlib.utils.compat=INFO"])
     log.setup(conf, 'gnocchi')
