@@ -65,7 +65,12 @@ def upgrade():
             op.add_column(table_name, temp_col)
             t = sa.sql.table(table_name, existing_col, temp_col)
             op.execute(t.update().values(
-                **{column_name + "_ts": func.from_unixtime(existing_col)}))
+                **{column_name + "_ts":
+                   func.convert_tz(
+                       func.from_unixtime(existing_col),
+                       sa.literal('@@session.timezone'),
+                       'UTC')
+                   }))
             op.drop_column(table_name, column_name)
             op.alter_column(table_name,
                             column_name + "_ts",
