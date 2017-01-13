@@ -39,6 +39,7 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     if bind and bind.engine.name == "mysql":
+        op.execute("SET time_zone = 'UTC'")
         # NOTE(jd) So that crappy engine that is MySQL does not have "ALTER
         # TABLE … USING …". We need to copy everything and convert…
         for table_name, column_name in (("resource", "started_at"),
@@ -65,12 +66,7 @@ def upgrade():
             op.add_column(table_name, temp_col)
             t = sa.sql.table(table_name, existing_col, temp_col)
             op.execute(t.update().values(
-                **{column_name + "_ts":
-                   func.convert_tz(
-                       func.from_unixtime(existing_col),
-                       sa.literal('@@session.timezone'),
-                       'UTC')
-                   }))
+                **{column_name + "_ts": func.from_unixtime(existing_col)}))
             op.drop_column(table_name, column_name)
             op.alter_column(table_name,
                             column_name + "_ts",
