@@ -22,12 +22,15 @@ Revises: 7e6f9d542f8b
 Create Date: 2016-07-25 15:36:36.469847
 
 """
+import logging
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.sql import func
 
 from gnocchi.indexer import sqlalchemy_base
+
+LOG = logging.getLogger(__name__)
 
 # revision identifiers, used by Alembic.
 revision = '5c4f93e5bb4'
@@ -38,6 +41,8 @@ depends_on = None
 
 def upgrade():
     bind = op.get_bind()
+    results = bind.execute("select id from resource;").fetchall()
+    LOG.error("=======INTERNALS: %s", results)
     if bind and bind.engine.name == "mysql":
         # NOTE(jd) So that crappy engine that is MySQL does not have "ALTER
         # TABLE … USING …". We need to copy everything and convert…
