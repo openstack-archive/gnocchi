@@ -21,7 +21,7 @@ dump_data(){
     echo "* Dumping measures aggregations to $dir"
     for resource_id in $RESOURCE_IDS; do
         for agg in min max mean sum ; do
-            gnocchi measures show --aggregation $agg --resource-id $resource_id metric > $dir/${agg}.txt
+            gnocchi --debug measures show --aggregation $agg --resource-id $resource_id metric > $dir/${agg}.txt
         done
     done
 }
