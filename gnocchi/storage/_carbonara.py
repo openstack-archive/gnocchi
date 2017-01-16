@@ -360,21 +360,21 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 # NOTE(jd) This case is not really possible – you can't
                 # have archives with splits and no unaggregated
                 # timeserie…
-                LOG.error(
-                    "Unable to find unaggregated timeserie for "
-                    "metric %s, unable to upgrade data: %s",
+                LOG.warning(
+                    "Unable to find v2 unaggregated timeserie for "
+                    "metric %s, data not upgraded: %s",
                     metric.id, e)
-                return
-            unaggregated = carbonara.BoundTimeSerie(
-                ts=old_unaggregated.ts,
-                block_size=metric.archive_policy.max_block_size,
-                back_window=metric.archive_policy.back_window)
-            # Upgrade unaggregated timeserie to v3
-            self._store_unaggregated_timeserie(
-                metric, unaggregated.serialize())
-            oldest_mutable_timestamp = (
-                unaggregated.first_block_timestamp()
-            )
+            else:
+                unaggregated = carbonara.BoundTimeSerie(
+                    ts=old_unaggregated.ts,
+                    block_size=metric.archive_policy.max_block_size,
+                    back_window=metric.archive_policy.back_window)
+                # Upgrade unaggregated timeserie to v3
+                self._store_unaggregated_timeserie(
+                    metric, unaggregated.serialize())
+                oldest_mutable_timestamp = (
+                    unaggregated.first_block_timestamp()
+                )
             for agg_method, d in itertools.product(
                     metric.archive_policy.aggregation_methods,
                     metric.archive_policy.definition):
