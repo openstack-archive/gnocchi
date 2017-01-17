@@ -238,11 +238,8 @@ class BoundTimeSerie(TimeSerie):
                                      uncompressed)
         except struct.error:
             raise InvalidData
-        start = deserial[0]
-        timestamps = [start]
-        for delta in itertools.islice(deserial, 1, nb_points):
-            start += delta
-            timestamps.append(start)
+        timestamps = numpy.cumsum(numpy.array(deserial[:nb_points],
+                                              dtype='int'))
         timestamps = numpy.array(timestamps, dtype='datetime64[ns]')
 
         return cls.from_data(
@@ -253,12 +250,9 @@ class BoundTimeSerie(TimeSerie):
 
     def serialize(self):
         # NOTE(jd) Use a double delta encoding for timestamps
-        timestamps = [self.first.value]
-        start = self.first.value
-        for i in self.ts.index[1:]:
-            v = i.value
-            timestamps.append(v - start)
-            start = v
+        timestamps = numpy.insert(numpy.diff(self.ts.index),
+                                  0, self.first.value)
+        timestamps = list(numpy.array(timestamps, dtype='int'))
         values = self.ts.values.tolist()
         return lz4.dumps(struct.pack(
             '<' + 'Q' * len(timestamps) + 'd' * len(values),
@@ -524,10 +518,9 @@ class AggregatedTimeSerie(TimeSerie):
                         uncompressed)
                 except struct.error:
                     raise InvalidData
-                for delta in itertools.islice(deserial, nb_points):
-                    ts = start + (delta * sampling)
-                    y.append(ts)
-                    start = ts
+                y = numpy.cumsum(
+                    numpy.array(deserial[:nb_points]) * sampling,
+                ) + start
                 x = deserial[nb_points:]
             else:
                 # Padded format
@@ -539,6 +532,7 @@ class AggregatedTimeSerie(TimeSerie):
                 except struct.error:
                     raise InvalidData()
                 # alternating split into 2 list and drop items with False flag
+                # TODO(sileht): replace by numpy.array
                 for i, val in itertools.compress(
                         six.moves.zip(six.moves.range(nb_points),
                                       deserial[1::2]),
