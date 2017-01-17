@@ -28,6 +28,7 @@ import struct
 import time
 
 import lz4
+import numpy
 import pandas
 import six
 
@@ -239,11 +240,12 @@ class BoundTimeSerie(TimeSerie):
         start = deserial[0]
         timestamps = [start]
         for delta in itertools.islice(deserial, 1, nb_points):
-            ts = start + delta
-            timestamps.append(ts)
-            start = ts
+            start = start + delta
+            timestamps.append(start)
+        timestamps = numpy.array(timestamps, dtype='datetime64[ns]')
+
         return cls.from_data(
-            pandas.to_datetime(timestamps, unit='ns'),
+            timestamps,
             deserial[nb_points:],
             block_size=block_size,
             back_window=back_window)
