@@ -92,10 +92,10 @@ class TimeSerie(object):
     last in the group when the TimeSerie is created or extended.
     """
 
-    def __init__(self, ts=None):
+    def __init__(self, ts=None, is_clean=False):
         if ts is None:
             ts = pandas.Series()
-        self.ts = self.clean_ts(ts)
+        self.ts = self.clean_ts(ts) if not is_clean else ts
 
     @staticmethod
     def clean_ts(ts):
@@ -106,12 +106,12 @@ class TimeSerie(object):
         return ts
 
     @classmethod
-    def from_data(cls, timestamps=None, values=None):
-        return cls(pandas.Series(values, timestamps))
+    def from_data(cls, timestamps=None, values=None, is_clean=False):
+        return cls(pandas.Series(values, timestamps), is_clean)
 
     @classmethod
-    def from_tuples(cls, timestamps_values):
-        return cls.from_data(*zip(*timestamps_values))
+    def from_tuples(cls, timestamps_values, is_clean=False):
+        return cls.from_data(*zip(*timestamps_values), is_clean=is_clean)
 
     def __eq__(self, other):
         return (isinstance(other, TimeSerie)
@@ -167,7 +167,8 @@ class TimeSerie(object):
 
 
 class BoundTimeSerie(TimeSerie):
-    def __init__(self, ts=None, block_size=None, back_window=0):
+    def __init__(self, ts=None, block_size=None, back_window=0,
+                 is_clean=False):
         """A time serie that is limited in size.
 
         Used to represent the full-resolution buffer of incoming raw
@@ -183,16 +184,17 @@ class BoundTimeSerie(TimeSerie):
         used.
 
         """
-        super(BoundTimeSerie, self).__init__(ts)
+        super(BoundTimeSerie, self).__init__(ts, is_clean=is_clean)
         self.block_size = self._to_offset(block_size)
         self.back_window = back_window
         self._truncate()
 
     @classmethod
     def from_data(cls, timestamps=None, values=None,
-                  block_size=None, back_window=0):
+                  block_size=None, back_window=0, is_clean=False):
         return cls(pandas.Series(values, timestamps),
-                   block_size=block_size, back_window=back_window)
+                   block_size=block_size, back_window=back_window,
+                   is_clean=is_clean)
 
     def __eq__(self, other):
         return (isinstance(other, BoundTimeSerie)
@@ -245,7 +247,8 @@ class BoundTimeSerie(TimeSerie):
             pandas.to_datetime(timestamps),
             deserial[nb_points:],
             block_size=block_size,
-            back_window=back_window)
+            back_window=back_window,
+            is_clean=True)
 
     def serialize(self):
         # NOTE(jd) Use a double delta encoding for timestamps
@@ -410,14 +413,14 @@ class AggregatedTimeSerie(TimeSerie):
     COMPRESSED_SERIAL_LEN = struct.calcsize("<Hd")
 
     def __init__(self, sampling, aggregation_method,
-                 ts=None, max_size=None):
+                 ts=None, max_size=None, is_clean=False):
         """A time serie that is downsampled.
 
         Used to represent the downsampled timeserie for a single
         granularity/aggregation-function pair stored for a metric.
 
         """
-        super(AggregatedTimeSerie, self).__init__(ts)
+        super(AggregatedTimeSerie, self).__init__(ts, is_clean=is_clean)
 
         self.aggregation_method_func_name, self.q = self._get_agg_method(
             aggregation_method)
@@ -433,11 +436,11 @@ class AggregatedTimeSerie(TimeSerie):
 
     @classmethod
     def from_data(cls, sampling, aggregation_method, timestamps=None,
-                  values=None, max_size=None):
+                  values=None, max_size=None, is_clean=False):
         return cls(sampling=sampling,
                    aggregation_method=aggregation_method,
                    ts=pandas.Series(values, timestamps),
-                   max_size=max_size)
+                   max_size=max_size, is_clean=is_clean)
 
     @staticmethod
     def _get_agg_method(aggregation_method):
@@ -539,7 +542,7 @@ class AggregatedTimeSerie(TimeSerie):
             y = numpy.array(y, dtype='float64') * 10e8
             y = numpy.array(y, dtype='datetime64[ns]')
             y = pandas.to_datetime(y)
-        return cls.from_data(sampling, agg_method, y, x)
+        return cls.from_data(sampling, agg_method, y, x, is_clean=True)
 
     def get_split_key(self, timestamp=None):
         """Return the split key for a particular timestamp.
