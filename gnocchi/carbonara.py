@@ -237,18 +237,18 @@ class BoundTimeSerie(TimeSerie):
         nb_points = (
             len(uncompressed) // cls._SERIALIZATION_TIMESTAMP_VALUE_LEN
         )
-        try:
-            deserial = struct.unpack("<" + "Q" * nb_points + "d" * nb_points,
-                                     uncompressed)
-        except struct.error:
-            raise InvalidData
-        timestamps = numpy.cumsum(numpy.array(deserial[:nb_points],
-                                              dtype='int'))
+        timestamp_len = struct.calcsize("<Q")
+        timestamps_raw = uncompressed[:nb_points*timestamp_len]
+        timestamps = numpy.frombuffer(timestamps_raw, dtype='<Q')
+        timestamps = numpy.cumsum(timestamps)
         timestamps = numpy.array(timestamps, dtype='datetime64[ns]')
+
+        values_raw = uncompressed[nb_points*timestamp_len:]
+        values = numpy.frombuffer(values_raw, dtype='<d')
 
         return cls.from_data(
             pandas.to_datetime(timestamps),
-            deserial[nb_points:],
+            values,
             block_size=block_size,
             back_window=back_window)
 
@@ -516,30 +516,28 @@ class AggregatedTimeSerie(TimeSerie):
                 # Compressed format
                 uncompressed = lz4.loads(memoryview(data)[1:].tobytes())
                 nb_points = len(uncompressed) // cls.COMPRESSED_SERIAL_LEN
+
+                timestamp_len = struct.calcsize("<H")
+                timestamps_raw = uncompressed[:nb_points*timestamp_len]
                 try:
-                    deserial = struct.unpack(
-                        '<' + 'H' * nb_points + 'd' * nb_points,
-                        uncompressed)
-                except struct.error:
-                    raise InvalidData
-                y = numpy.cumsum(
-                    numpy.array(deserial[:nb_points]) * sampling,
-                ) + start
-                x = deserial[nb_points:]
+                    y = numpy.frombuffer(timestamps_raw, dtype='<H')
+                except ValueError:
+                    raise InvalidData()
+                y = numpy.cumsum(y * sampling) + start
+
+                values_raw = uncompressed[nb_points*timestamp_len:]
+                x = numpy.frombuffer(values_raw, dtype='<d')
+
             else:
                 # Padded format
-                nb_points = len(data) // cls.PADDED_SERIAL_LEN
-                # NOTE(gordc): use '<' for standardized
-                # little-endian byte order
                 try:
-                    deserial = struct.unpack('<' + '?d' * nb_points, data)
-                except struct.error:
+                    everything = numpy.frombuffer(data, dtype=[('b', '<?'),
+                                                               ('v', '<d')])
+                except ValueError:
                     raise InvalidData()
-                # alternating split into 2 list and drop items with False flag
-                everything = numpy.array(deserial, dtype='float64')
-                index = numpy.nonzero(everything[::2])[0]
+                index = numpy.nonzero(everything['b'])[0]
                 y = index * sampling + start
-                x = everything[1::2][index]
+                x = everything['v'][index]
 
             y = numpy.array(y, dtype='float64') * 10e8
             y = numpy.array(y, dtype='datetime64[ns]')
