@@ -18,6 +18,7 @@
 
 import datetime
 import functools
+import itertools
 import logging
 import math
 import numbers
@@ -459,12 +460,23 @@ class AggregatedTimeSerie(TimeSerie):
         return aggregation_method_func_name, q
 
     def split(self):
-        groupby = self.ts.groupby(functools.partial(
-            SplitKey.from_timestamp_and_sampling, sampling=self.sampling))
-        for group, ts in groupby:
-            yield (SplitKey(group, self.sampling),
+        # NOTE(sileht): We previously use groupby with
+        # SplitKey.from_timestamp_and_sampling, but
+        # this is slow because pandas can do that on any kind DataFrame
+        # but we have ordered timestamps, so don't need
+        # to iter the whole series.
+        freq = self.sampling * SplitKey.POINTS_PER_SPLIT
+        ix = numpy.divide(numpy.array(self.ts.index, 'float64'), 10e8)
+        keys, counts = numpy.unique((ix // freq) * freq, return_counts=True)
+        start = 0
+        for key, count in itertools.izip(keys, counts):
+            end = start + count
+            if key == -0.0:  # float power
+                key = abs(key)
+            yield (SplitKey(key, self.sampling),
                    AggregatedTimeSerie(self.sampling, self.aggregation_method,
-                                       ts))
+                                       self.ts[start:end]))
+            start = end
 
     @classmethod
     def from_timeseries(cls, timeseries, sampling, aggregation_method,
