@@ -42,6 +42,28 @@ time.strptime("2016-02-19", "%Y-%m-%d")
 LOG = logging.getLogger(__name__)
 
 
+def quick_combine_first(s1, s2):
+    # NOTE(sileht): combine_first version based on numpy that more performant
+    # for unique and ordered serie in ns only, beware before using it.
+
+    names = 't, v'
+    formats = 'datetime64[ns], float64'
+
+    ix1 = numpy.array(s1.index, dtype='datetime64[ns]')
+    ix2 = numpy.array(s2.index, dtype='datetime64[ns]')
+    a1 = numpy.core.records.fromarrays((ix1, s1.values),
+                                       names=names, formats=formats)
+
+    a2 = numpy.core.records.fromarrays((ix2, s2.values),
+                                       names=names, formats=formats)
+
+    diff = numpy.setdiff1d(ix2, ix1, assume_unique=True)
+    locs1 = numpy.searchsorted(ix1, diff)
+    locs2 = numpy.searchsorted(ix2, diff)
+    res = numpy.insert(a1, locs1, a2[locs2])
+    return pandas.Series(res['v'], pandas.to_datetime(res['t']))
+
+
 class NoDeloreanAvailable(Exception):
     """Error raised when trying to insert a value that is too old."""
 
@@ -126,7 +148,7 @@ class TimeSerie(object):
 
     def set_values(self, values):
         t = pandas.Series(*reversed(list(zip(*values))))
-        self.ts = self.clean_ts(t).combine_first(self.ts)
+        self.ts = quick_combine_first(self.clean_ts(t), self.ts)
 
     def __len__(self):
         return len(self.ts)
@@ -486,9 +508,12 @@ class AggregatedTimeSerie(TimeSerie):
     @classmethod
     def from_timeseries(cls, timeseries, sampling, aggregation_method,
                         max_size=None):
+        # NOTE(sileht): We assume all timeseries are ordered. Currently true on
+        # storage._carbonara use it and series comes from
+        # AggregatedTimeSerie.unserialize
         ts = pandas.Series()
         for t in timeseries:
-            ts = ts.combine_first(t.ts)
+            ts = quick_combine_first(ts, t.ts)
         return cls(sampling=sampling,
                    aggregation_method=aggregation_method,
                    ts=ts, max_size=max_size)
@@ -680,7 +705,7 @@ class AggregatedTimeSerie(TimeSerie):
         This is equivalent to `update` but is faster as they are is no
         resampling. Be careful on what you merge.
         """
-        self.ts = self.ts.combine_first(ts.ts)
+        self.ts = quick_combine_first(self.ts, ts.ts)
 
     @classmethod
     def benchmark(cls):
