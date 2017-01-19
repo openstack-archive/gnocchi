@@ -684,6 +684,7 @@ class AggregatedTimeSerie(TimeSerie):
         """Run a speed benchmark!"""
         points = SplitKey.POINTS_PER_SPLIT
         sampling = 5
+        resample = 35
         serialize_times = 50
 
         now = datetime.datetime(2015, 4, 3, 23, 11)
@@ -756,6 +757,12 @@ class AggregatedTimeSerie(TimeSerie):
                 list(ts.split())
             t1 = time.time()
             print("  split() speed: %.8f s" % ((t1 - t0) / serialize_times))
+
+            t0 = time.time()
+            for i in six.moves.range(serialize_times):
+                ts.resample(resample)
+            t1 = time.time()
+            print("  resample() speed: %.8f s" % ((t1 - t0) / serialize_times))
 
             # NOTE(sileht): propose a new series with half overload timestamps
             pts = ts.ts.copy(deep=True)
