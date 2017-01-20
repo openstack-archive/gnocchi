@@ -28,6 +28,7 @@ import sqlalchemy as sa
 from sqlalchemy.sql import func
 
 from gnocchi.indexer import sqlalchemy_base
+from gnocchi import utils
 
 # revision identifiers, used by Alembic.
 revision = '5c4f93e5bb4'
@@ -62,7 +63,9 @@ def upgrade():
             temp_col = sa.Column(
                 column_name + "_ts",
                 sqlalchemy_base.TimestampUTC(),
-                nullable=nullable)
+                nullable=nullable,
+                default=lambda: utils.utcnow(),
+            )
             op.add_column(table_name, temp_col)
             t = sa.sql.table(table_name, existing_col, temp_col)
             op.execute(t.update().values(
