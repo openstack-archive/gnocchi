@@ -43,6 +43,11 @@ COMMON_TABLES_ARGS = {'mysql_charset': "utf8",
                       'mysql_engine': "InnoDB"}
 
 
+# NOTE(sileht): Since mysql 5.7.17 having a server_default for datetime column
+# is required even if that doesn't make any sense for us...
+nonnull_timestamputc_default = "0000-01-01 00:00:00"
+
+
 class PreciseTimestamp(types.TypeDecorator):
     """Represents a timestamp precise to the microsecond.
 
@@ -278,12 +283,10 @@ class ResourceType(Base, GnocchiBase, resource_type.ResourceType):
                               nullable=False,
                               server_default="creating")
     updated_at = sqlalchemy.Column(TimestampUTC, nullable=False,
-                                   # NOTE(jd): We would like to use
+                                   # NOTE(jd/sileht): We would like to use
                                    # sqlalchemy.func.now, but we can't
-                                   # because the type of PreciseTimestamp in
-                                   # MySQL is not a Timestamp, so it would
-                                   # not store a timestamp but a date as an
-                                   # integer.
+                                   # because NOW() is locale dependent
+                                   server_default=nonnull_timestamputc_default,
                                    default=lambda: utils.utcnow())
 
     def to_baseclass(self):
@@ -331,8 +334,11 @@ class ResourceMixin(ResourceJsonifier):
 
     creator = sqlalchemy.Column(sqlalchemy.String(255))
     started_at = sqlalchemy.Column(TimestampUTC, nullable=False,
+                                   server_default=nonnull_timestamputc_default,
                                    default=lambda: utils.utcnow())
     revision_start = sqlalchemy.Column(TimestampUTC, nullable=False,
+                                       server_default=(
+                                           nonnull_timestamputc_default),
                                        default=lambda: utils.utcnow())
     ended_at = sqlalchemy.Column(TimestampUTC)
     user_id = sqlalchemy.Column(sqlalchemy.String(255))
@@ -374,6 +380,8 @@ class ResourceHistory(ResourceMixin, Base, GnocchiBase):
                                name="fk_rh_id_resource_id"),
                            nullable=False)
     revision_end = sqlalchemy.Column(TimestampUTC, nullable=False,
+                                     server_default=(
+                                         nonnull_timestamputc_default),
                                      default=lambda: utils.utcnow())
     metrics = sqlalchemy.orm.relationship(
         Metric, primaryjoin="Metric.resource_id == ResourceHistory.id",

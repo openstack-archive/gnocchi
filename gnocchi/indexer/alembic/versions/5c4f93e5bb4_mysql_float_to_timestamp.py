@@ -62,7 +62,8 @@ def upgrade():
             temp_col = sa.Column(
                 column_name + "_ts",
                 sqlalchemy_base.TimestampUTC(),
-                nullable=nullable)
+                nullable=nullable,
+            )
             op.add_column(table_name, temp_col)
             t = sa.sql.table(table_name, existing_col, temp_col)
             op.execute(t.update().values(
@@ -74,4 +75,6 @@ def upgrade():
                             type_=sqlalchemy_base.TimestampUTC(),
                             existing_nullable=nullable,
                             existing_type=existing_type,
-                            new_column_name=column_name)
+                            new_column_name=column_name,
+                            server_default=("0000-01-01 00:00:00"
+                                            if not nullable else None))
