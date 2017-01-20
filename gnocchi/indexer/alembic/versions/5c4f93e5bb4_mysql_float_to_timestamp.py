@@ -40,6 +40,12 @@ def upgrade():
     bind = op.get_bind()
     if bind and bind.engine.name == "mysql":
         op.execute("SET time_zone = '+00:00'")
+
+        # NOTE(sileht): This allow to alter the DATETIME col without default
+        # This is safe for us because we have fill all rows
+        op.execute("SET @@session.sql_mode = "
+                   "'TRADITIONAL,ALLOW_INVALID_DATES'")
+
         # NOTE(jd) So that crappy engine that is MySQL does not have "ALTER
         # TABLE … USING …". We need to copy everything and convert…
         for table_name, column_name in (("resource", "started_at"),
@@ -75,3 +81,4 @@ def upgrade():
                             existing_nullable=nullable,
                             existing_type=existing_type,
                             new_column_name=column_name)
+        op.execute("SET @@session.sql_mode = 'TRADITIONAL'")
