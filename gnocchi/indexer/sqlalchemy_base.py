@@ -284,6 +284,7 @@ class ResourceType(Base, GnocchiBase, resource_type.ResourceType):
                                    # MySQL is not a Timestamp, so it would
                                    # not store a timestamp but a date as an
                                    # integer.
+                                   server_default
                                    default=lambda: utils.utcnow())
 
     def to_baseclass(self):
