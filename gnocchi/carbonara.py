@@ -94,6 +94,11 @@ class GroupedTimeSeries(object):
         # we always assume the orderd to be the same as the input.
         self._granularity = granularity
         self._ts = ts
+        self.freq = granularity * 10e8
+        self.indexes = (numpy.array(ts.index, 'float')
+                        // self.freq) * self.freq
+        self.tstamps, self.counts = numpy.unique(self.indexes,
+                                                 return_counts=True)
 
     def mean(self):
         return self._scipy_aggregate(ndimage.mean)
@@ -121,12 +126,8 @@ class GroupedTimeSeries(object):
                                      default=None)
 
     def _count(self):
-        freq = self._granularity * 10e8
-        timestamps = numpy.array(self._ts.index, 'float64')
-        timestamps, values = numpy.unique((timestamps // freq) * freq,
-                                          return_counts=True)
-        timestamps = numpy.array(timestamps, 'datetime64[ns]')
-        return (values, timestamps)
+        timestamps = numpy.array(self.tstamps, 'datetime64[ns]')
+        return (self.counts, timestamps)
 
     def count(self):
         return pandas.Series(*self._count())
@@ -154,19 +155,12 @@ class GroupedTimeSeries(object):
                                      default=None)
 
     def _scipy_aggregate(self, method, remove_unique=False, *args, **kwargs):
-        freq = self._granularity * 10e8
-        indexes = numpy.array(self._ts.index, 'float')
-        indexes = (indexes // freq) * freq
-        values = numpy.array(self._ts.values)
-
         if remove_unique:
-            timestamps, counts = numpy.unique(indexes, return_counts=True)
-            locs = numpy.argwhere(counts > 1).T[0]
-        else:
-            timestamps = numpy.unique(indexes)
+            locs = numpy.argwhere(self.counts > 1).T[0]
 
-        values = method(values, indexes, timestamps, *args, **kwargs)
-        timestamps = numpy.array(timestamps, 'datetime64[ns]')
+        values = method(self._ts.values, self.indexes, self.tstamps,
+                        *args, **kwargs)
+        timestamps = numpy.array(self.tstamps, 'datetime64[ns]')
 
         if remove_unique:
             timestamps = timestamps[locs]
