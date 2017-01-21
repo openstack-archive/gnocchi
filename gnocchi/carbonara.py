@@ -30,6 +30,7 @@ import lz4
 import numpy
 import numpy.lib.recfunctions
 import pandas
+from scipy import ndimage
 import six
 
 # NOTE(sileht): pandas relies on time.strptime()
@@ -84,6 +85,102 @@ class InvalidData(ValueError):
 def round_timestamp(ts, freq):
     return pandas.Timestamp(
         (pandas.Timestamp(ts).value // freq) * freq)
+
+
+class GroupedTimeSeries(object):
+    def __init__(self, ts, granularity):
+        self._granularity = granularity
+        self._ts = ts
+
+    def mean(self):
+        return self._scipy_aggregate(ndimage.mean)
+
+    def sum(self):
+        return self._scipy_aggregate(ndimage.sum)
+
+    def min(self):
+        return self._scipy_aggregate(ndimage.minimum)
+
+    def max(self):
+        return self._scipy_aggregate(ndimage.maximum)
+
+    def std(self):
+        # NOTE(sileht): scipy is much better but return 0 instead of NaN
+        # return self._scipy_aggregate(ndimage.standard_deviation)
+        return self._pandas_aggregates("std")
+
+    def _count(self):
+        freq = self._granularity * 10e8
+        timestamps = numpy.array(self._ts.index, 'float64')
+        timestamps, values = numpy.unique((timestamps // freq) * freq,
+                                          return_counts=True)
+        timestamps = numpy.array(timestamps, 'datetime64[ns]')
+        return (values, timestamps)
+
+    def count(self):
+        return pandas.Series(*self._count())
+
+    def last(self):
+        counts, timestamps = self._count()
+        cumcounts = numpy.cumsum(counts)
+        values = [self._ts.values[index - 1] for index in cumcounts]
+        return pandas.Series(values, timestamps)
+
+    def first(self):
+        counts, timestamps = self._count()
+        counts = numpy.insert(counts[:-1], 0, 0)
+        cumcounts = numpy.cumsum(counts)
+        values = [self._ts.values[index] for index in cumcounts]
+        return pandas.Series(values, timestamps)
+
+    def median(self):
+        return self._pandas_aggregates("median")
+
+    def quantile(self, q):
+        return self._pandas_aggregates("quantile", q)
+
+    def _scipy_aggregate(self, method):
+        freq = self._granularity * 10e8
+        indexes = numpy.array(self._ts.index, 'float64')
+        indexes = (indexes // freq) * freq,
+        values = numpy.array(self._ts.values)
+
+        timestamps = numpy.unique(indexes)
+        values = method(values, indexes, timestamps)
+        timestamps = numpy.array(timestamps, 'datetime64[ns]')
+        return pandas.Series(values, timestamps)
+
+    def _pandas_aggregates(self, name, *args):
+        groups = self._ts.groupby(functools.partial(
+            round_timestamp, freq=self._granularity * 10e8))
+        return getattr(groups, name)(*args).dropna()
+
+    def _numpy_groups(self):
+        freq = self._granularity * 10e8
+        indexes = numpy.array(self._ts.index[self._start:], 'float64')
+        indexes, counts = numpy.unique((indexes // freq) * freq,
+                                       return_counts=True)
+        indexes = numpy.absolute(indexes)
+
+        timestamps = numpy.array(indexes, 'datetime64[ns]')
+        values = numpy.concatenate(list(self._group_values(counts,
+                                                           self._start)))
+        return (timestamps, values)
+
+    def _group_values(self, counts, start):
+        maxsize = counts.max()
+        for count in counts:
+            end = start + count
+            # NOTE(sileht): To be able to use the so fast broadcast system of
+            # numpy all array must have the same size but this is not the case
+            # for us due to hole and ts size that not a modulo of freq
+            # So, we fill each series with nan, and mask them to numpy math
+            # method.
+            values = numpy.array(self._ts.values[start:end])
+            values = numpy.pad(values, (0, maxsize - values.size),
+                               mode='constant', constant_values=numpy.nan)
+            values = numpy.ma.masked_invalid(values, copy=False)
+            yield numpy.array([values])
 
 
 class TimeSerie(object):
@@ -161,14 +258,14 @@ class TimeSerie(object):
         except IndexError:
             return
 
-    def group_serie(self, granularity, start=None):
+    def group_serie(self, granularity, start=0):
         # NOTE(jd) Our whole serialization system is based on Epoch, and we
         # store unsigned integer, so we can't store anything before Epoch.
         # Sorry!
         if self.ts.index[0].value < 0:
             raise BeforeEpochError(self.ts.index[0])
-        return self.ts[start:].groupby(functools.partial(
-            round_timestamp, freq=granularity * 10e8))
+
+        return GroupedTimeSeries(self.ts[start:], granularity)
 
 
 class BoundTimeSerie(TimeSerie):
@@ -494,7 +591,7 @@ class AggregatedTimeSerie(TimeSerie):
         agg_name, q = cls._get_agg_method(aggregation_method)
         return cls(sampling, aggregation_method,
                    ts=cls._resample_grouped(grouped_serie, agg_name,
-                                            q).dropna(),
+                                            q),
                    max_size=max_size)
 
     def __eq__(self, other):
