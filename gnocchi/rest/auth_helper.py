@@ -98,6 +98,7 @@ class NoAuthHelper(KeystoneAuthHelper):
             return user_id
         if project_id:
             return project_id
+        rest.abort(400, "Unable to determine current user")
 
 
 class BasicAuthHelper(object):
