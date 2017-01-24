@@ -1,0 +1,4 @@
+---
+other:
+  - The `noauth` authentication mode now requires that the `X-User-Id` and/or
+  `x-Project-Id` to be present for some operations.
