@@ -500,6 +500,7 @@ tests:
 
     - name: add an attribute
       url: /v1/resource/myresource
+      method: PATCH
       request_headers:
           content-type: application/json-patch+json
       data:
@@ -510,6 +511,7 @@ tests:
 
     - name: remove an attribute
       url: /v1/resource/myresource
+      method: PATCH
       request_headers:
           content-type: application/json-patch+json
       data:
