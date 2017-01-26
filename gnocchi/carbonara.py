@@ -701,7 +701,7 @@ class AggregatedTimeSerie(TimeSerie):
         values = numpy.array(self.ts.values, dtype='<d')
         ones = numpy.ones_like(values, dtype='<?')
         values = numpy.core.records.fromarrays(
-            (ones, values), names='b, v', formats='<?, <d')
+            (ones, values), names='b, v', formats='bool, <d')
 
         serial[locs] = values
 
