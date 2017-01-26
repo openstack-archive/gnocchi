@@ -492,7 +492,7 @@ class AggregatedTimeSerie(TimeSerie):
 
     _AGG_METHOD_PCT_RE = re.compile(r"([1-9][0-9]?)pct")
 
-    PADDED_SERIAL_LEN = struct.calcsize("<?d")
+    PADDED_SERIAL_LEN = struct.calcsize("<bd")
     COMPRESSED_SERIAL_LEN = struct.calcsize("<Hd")
     COMPRESSED_TIMESPAMP_LEN = struct.calcsize("<H")
 
@@ -619,7 +619,7 @@ class AggregatedTimeSerie(TimeSerie):
             else:
                 # Padded format
                 try:
-                    everything = numpy.frombuffer(data, dtype=[('b', '<?'),
+                    everything = numpy.frombuffer(data, dtype=[('b', '<b'),
                                                                ('v', '<d')])
                 except ValueError:
                     raise InvalidData()
@@ -694,14 +694,14 @@ class AggregatedTimeSerie(TimeSerie):
         locs = numpy.array(locs, dtype='int')
 
         # Fill everything with zero
-        serial_dtype = [('b', '<?'), ('v', '<d')]
+        serial_dtype = [('b', '<b'), ('v', '<d')]
         serial = numpy.zeros((e_offset,), dtype=serial_dtype)
 
         # Create a structured array with two dimensions
         values = numpy.array(self.ts.values, dtype='<d')
-        ones = numpy.ones_like(values, dtype='<?')
+        ones = numpy.ones_like(values, dtype='<b')
         values = numpy.core.records.fromarrays(
-            (ones, values), names='b, v', formats='<?, <d')
+            (ones, values), names='b, v', formats='<b, <d')
 
         serial[locs] = values
 
