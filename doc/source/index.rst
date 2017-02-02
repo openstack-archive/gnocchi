@@ -27,6 +27,14 @@ More information are available on `Julien's blog post on Gnocchi
 .. _`OpenStack Ceilometer`: http://launchpad.net/ceilometer
 
 
+Community
+---------
+- Bug tracker: https://bugs.launchpad.net/gnocchi
+- IRC: #gnocchi on `Freenode <https://freenode.net>`_
+- Mailing list: `openstack-dev@lists.openstack.org
+  <http://lists.openstack.org/cgi-bin/mailman/listinfo/openstack-dev>`_ with
+  *[gnocchi]* in the `Subject` header.
+
 Use cases
 ---------
 Gnocchi is meant to be used to store time series and their associated resource
