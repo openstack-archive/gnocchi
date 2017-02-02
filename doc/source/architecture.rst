@@ -16,18 +16,20 @@ are scalable. Additional workers can be added depending on load.
 Back-ends
 ---------
 
-Gnocchi uses two different back-end for storing data: one for storing the time
-series (the storage driver) and one for indexing the data (the index driver).
+Gnocchi uses three different back-ends for storing data: one for storing new
+incoming measures (the incoming driver), one for storing the time series (the
+storage driver) and one for indexing the data (the index driver).
 
-The *storage* is responsible for storing measures of created metrics. It
-receives timestamps and values, and pre-computes aggregations according to
-the defined archive policies.
+The *incoming* storage is responsible for storing new measures sent to metrics.
+It is by default and usually the same driver than the *storage* one.
 
-The *indexer* is responsible for storing the index of all resources, along with
-their types and properties. Gnocchi not only knows about resource types from
-the OpenStack project, but also provides a *generic* type so you can create
-basic resources and handle the resource properties yourself. The indexer is
-also responsible for linking resources with metrics.
+The *storage*is responsible for storing measures of created metrics. It
+receives timestamps and values, and pre-computes aggregations according to the
+defined archive policies.
+
+The *indexer* is responsible for storing the index of all resources, archive
+policies and metrics, along with their definitions, types and properties. The
+indexer is also responsible for linking resources with metrics.
 
 How to choose back-ends
 ~~~~~~~~~~~~~~~~~~~~~~~
