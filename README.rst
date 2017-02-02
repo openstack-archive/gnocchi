@@ -9,8 +9,8 @@ provides an `HTTP REST`_ interface to create and manipulate the data. It is
 designed to store metrics at a very large scale while providing access to
 metrics and resources information to operators and users.
 
-Gnocchi is part of the `OpenStack` project. While Gnocchi has support for
-OpenStack, it is fully able to work stand-alone.
+While Gnocchi is part of the `OpenStack` project, it works stand-alone by
+default.
 
 You can read the full documentation online at http://gnocchi.xyz.
 
