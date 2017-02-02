@@ -6,6 +6,7 @@
 defaults:
     request_headers:
         x-auth-token: $ENVIRON['GNOCCHI_SERVICE_TOKEN']
+        authorization: $ENVIRON['GNOCCHI_AUTHORIZATION']
 
 tests:
     - name: check /
@@ -34,6 +35,7 @@ tests:
       request_headers:
           content-type: application/json
           x-auth-token: 'hello'
+          authorization: 'basic hello:'
       data:
           name: medium
           definition:
@@ -300,6 +302,7 @@ tests:
       request_headers:
           content-type: application/json
           x-auth-token: 'hello'
+          authorization: 'basic hello:'
       data:
         name: test_rule
         metric_pattern: "disk.foo.*"
