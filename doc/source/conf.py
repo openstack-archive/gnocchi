@@ -178,3 +178,10 @@ html_static_path = ['_static']
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'gnocchidoc'
+
+# TODO(sileht): need to undestand how to extract only the last tag of each
+# branch/major-version instead of the static list
+scv_sort = ('semver',)
+scv_greatest_tag = True
+scv_whitelist_branches = ('master', 'stable/3.x', 'stable/2.x')
+scv_whitelist_tags = ('master', '3.1.0', '3.0.4', '2.2.0')
