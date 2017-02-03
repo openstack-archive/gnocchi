@@ -15,6 +15,9 @@
 # under the License.
 from __future__ import absolute_import
 import json
+import os
+import subprocess
+import sys
 
 import jinja2
 import six
@@ -23,7 +26,6 @@ import webob.request
 import yaml
 
 from gnocchi.tests import test_rest
-
 
 # HACK(jd) Not sure why but Sphinx setup this multiple times, so we just avoid
 # doing several times the requests by using this global variable :(
@@ -103,10 +105,55 @@ class ScenarioList(list):
         return super(ScenarioList, self).__getitem__(key)
 
 
+multiversion_hack = """
+import sys
+import os
+
+srcdir = os.path.join("%s", "..", "..")
+os.chdir(srcdir)
+sys.path.insert(0, srcdir)
+
+class FakeApp(object):
+    called_from_gnocchi = True
+
+    def info(self, *args, **kwasrgs):
+        pass
+
+import gnocchi.gendoc
+gnocchi.gendoc.setup(FakeApp())
+"""
+
+
 def setup(app):
     global _RUN
     if _RUN:
         return
+
+    # NOTE(sileht): On gnocchi.xyz, we build a multiversion of the docs
+    # all versions are built with the master gnocchi.gendoc sphinx extension.
+    # So the hack here run an other python script to generate the rest.rst
+    # file of old version of the module.
+    # It also drop the database before each run.
+    if (sys.argv[0].endswith("sphinx-versioning") and
+            not hasattr(app, "called_from_master")):
+        subprocess.call("dropdb -h %(PGHOST)s -p %(PGPORT)s %(PGDATABASE)s" %
+                        os.environ, shell=True)
+        subprocess.call("createdb -h %(PGHOST)s -p %(PGPORT)s %(PGDATABASE)s" %
+                        os.environ, shell=True)
+
+        script_name = "tmp.py"
+        try:
+            with open(script_name, "w") as f:
+                f.write(multiversion_hack % app.confdir)
+            subprocess.call(['python', script_name])
+        finally:
+            try:
+                os.remove(script_name)
+            except Exception:
+                pass
+        _RUN = True
+        return
+
     webapp = _setup_test_app()
     # TODO(jd) Do not hardcode doc/source
     with open("doc/source/rest.yaml") as f:
