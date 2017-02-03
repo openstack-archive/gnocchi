@@ -15,19 +15,53 @@
 # under the License.
 from __future__ import absolute_import
 import json
+import os.path
 
 import jinja2
 import six
 import six.moves
+import sqlalchemy
+from sqlalchemy.engine import reflection
 import webob.request
 import yaml
 
 from gnocchi.tests import test_rest
 
+meta = sqlalchemy.MetaData()
 
 # HACK(jd) Not sure why but Sphinx setup this multiple times, so we just avoid
 # doing several times the requests by using this global variable :(
 _RUN = False
+
+
+def _cleanup_database(index):
+
+    inspector = reflection.Inspector.from_engine(index.facade.get_engine())
+    with index.facade.writer_connection() as conn:
+        trans = conn.begin()
+        metadata = sqlalchemy.MetaData()
+
+        tbs = []
+        all_fks = []
+
+        for table_name in inspector.get_table_names():
+            fks = []
+            for fk in inspector.get_foreign_keys(table_name):
+                if not fk['name']:
+                    continue
+                fks.append(sqlalchemy.schema.ForeignKeyConstraint(
+                    (), (), name=fk['name']))
+            t = sqlalchemy.schema.Table(table_name, metadata, *fks)
+            tbs.append(t)
+            all_fks.extend(fks)
+
+        for fkc in all_fks:
+            conn.execute(sqlalchemy.schema.DropConstraint(fkc))
+
+        for table in tbs:
+            conn.execute(sqlalchemy.schema.DropTable(table))
+
+        trans.commit()
 
 
 def _setup_test_app():
@@ -35,7 +69,7 @@ def _setup_test_app():
     t.auth_mode = "basic"
     t.setUpClass()
     t.setUp()
-    return t.app
+    return t.app, t.index
 
 
 def _format_json(txt):
@@ -107,9 +141,9 @@ def setup(app):
     global _RUN
     if _RUN:
         return
-    webapp = _setup_test_app()
+    webapp, indexer = _setup_test_app()
     # TODO(jd) Do not hardcode doc/source
-    with open("doc/source/rest.yaml") as f:
+    with open(os.path.join(app.confdir, "rest.yaml")) as f:
         scenarios = ScenarioList(yaml.load(f))
     for entry in scenarios:
         template = jinja2.Template(entry['request'])
@@ -134,8 +168,9 @@ def setup(app):
             response = webapp.request(request)
         entry['response'] = response
         entry['doc'] = _format_request_reply(request, response)
-    with open("doc/source/rest.j2", "r") as f:
+    with open(os.path.join(app.confdir, "rest.j2"), "r") as f:
         template = jinja2.Template(f.read().decode('utf-8'))
-    with open("doc/source/rest.rst", "w") as f:
+    with open(os.path.join(app.confdir, "rest.rst"), "w") as f:
         f.write(template.render(scenarios=scenarios).encode('utf-8'))
+    _cleanup_database(indexer)
     _RUN = True
