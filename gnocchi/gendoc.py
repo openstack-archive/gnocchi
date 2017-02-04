@@ -110,7 +110,7 @@ def setup(app):
     webapp = _setup_test_app()
     # TODO(jd) Do not hardcode doc/source
     with open("doc/source/rest.yaml") as f:
-        scenarios = ScenarioList(yaml.load(f))
+        scenarios = ScenarioList(yaml.safe_load(f))
     for entry in scenarios:
         template = jinja2.Template(entry['request'])
         fake_file = six.moves.cStringIO()
