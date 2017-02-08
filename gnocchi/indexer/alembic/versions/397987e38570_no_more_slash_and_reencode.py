@@ -80,6 +80,8 @@ uuidtype = sqlalchemy_utils.types.uuid.UUIDType()
 def upgrade():
     connection = op.get_bind()
 
+    insp = sa.inspect(connection)
+
     resource_type_tables = {}
     resource_type_tablenames = dict(
         (rt.name, rt.tablename)
@@ -87,8 +89,10 @@ def upgrade():
         if rt.tablename != "generic"
     )
 
-    op.drop_constraint("fk_metric_resource_id_resource_id", "metric",
-                       type_="foreignkey")
+    fk_names = [fk['name'] for fk in insp.get_foreign_keys('metric')]
+    if ("fk_metric_resource_id_resource_id" in fk_names):
+        op.drop_constraint("fk_metric_resource_id_resource_id", "metric",
+                           type_="foreignkey")
     for name, table in resource_type_tablenames.items():
         op.drop_constraint("fk_%s_id_resource_id" % table, table,
                            type_="foreignkey")
