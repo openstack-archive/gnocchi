@@ -13,6 +13,7 @@ RESOURCE_IDS=(
     "5a301761-aaaa-46e2-8900-8b4f6fe6675a"
     "5a301761-bbbb-46e2-8900-8b4f6fe6675a"
     "5a301761-cccc-46e2-8900-8b4f6fe6675a"
+    "non-uuid"
 )
 
 [ "$have_resource_type_post" ] && RESOURCE_ID_EXT="5a301761/dddd/46e2/8900/8b4f6fe6675a"
@@ -21,10 +22,12 @@ dump_data(){
     dir="$1"
     mkdir -p $dir
     echo "* Dumping measures aggregations to $dir"
-    gnocchi resource list -c id -c type -c project_id -c user_id -c original_resource_id -c started_at -c ended_at -c revision_start -c revision_end > $dir/resources.list
+    gnocchi resource list -c id -c type -c project_id -c user_id -c original_resource_id -c started_at -c ended_at -c revision_start -c revision_end | tee $dir/resources.list
     for resource_id in ${RESOURCE_IDS[@]} $RESOURCE_ID_EXT; do
         for agg in min max mean sum ; do
+            echo "gnocchi measures show --aggregation $agg --resource-id $resource_id metric"
             gnocchi measures show --aggregation $agg --resource-id $resource_id metric > $dir/${agg}.txt
+            echo "done"
         done
     done
 }
@@ -109,6 +112,7 @@ RESOURCE_IDS=(
     "5a301761-aaaa-46e2-8900-8b4f6fe6675a"
     "5a301761-bbbb-46e2-8900-8b4f6fe6675a"
     "5a301761-cccc-46e2-8900-8b4f6fe6675a"
+    "non-uuid"
 )
 # NOTE(sileht): / are now _
 # NOTE(jdanjou): and we reencode for admin:admin, but we cannot authenticate as
