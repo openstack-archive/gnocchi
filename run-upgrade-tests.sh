@@ -13,6 +13,7 @@ RESOURCE_IDS=(
     "5a301761-aaaa-46e2-8900-8b4f6fe6675a"
     "5a301761-bbbb-46e2-8900-8b4f6fe6675a"
     "5a301761-cccc-46e2-8900-8b4f6fe6675a"
+    "non-uuid"
 )
 
 [ "$have_resource_type_post" ] && RESOURCE_ID_EXT="5a301761/dddd/46e2/8900/8b4f6fe6675a"
