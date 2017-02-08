@@ -21,6 +21,7 @@ Create Date: 2017-01-11 16:32:40.421758
 
 """
 import uuid
+import logging
 
 from alembic import op
 import six
@@ -28,6 +29,8 @@ import sqlalchemy as sa
 import sqlalchemy_utils
 
 from gnocchi import utils
+
+LOG = logging.getLogger(__name__)
 
 # revision identifiers, used by Alembic.
 revision = '397987e38570'
@@ -102,7 +105,7 @@ def upgrade():
         )
 
     for resource in connection.execute(resource_table.select()):
-
+        LOG.info("handling: %s", resource.id)
         if resource.original_resource_id is None:
             # statsd resource has no original_resource_id and is NULL
             continue
@@ -114,7 +117,7 @@ def upgrade():
         else:
             if orig_as_uuid == resource.id:
                 continue
-
+        LOG.info("migrating: %s", resource.id)
         new_original_resource_id = resource.original_resource_id.replace(
             '/', '_')
         if six.PY2:
