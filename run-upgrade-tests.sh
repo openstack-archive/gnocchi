@@ -21,7 +21,7 @@ dump_data(){
     dir="$1"
     mkdir -p $dir
     echo "* Dumping measures aggregations to $dir"
-    gnocchi resource list -c id -c type -c project_id -c user_id -c original_resource_id -c started_at -c ended_at -c revision_start -c revision_end > $dir/resources.list
+    gnocchi resource list -c id -c type -c project_id -c user_id -c original_resource_id -c started_at -c ended_at -c revision_start -c revision_end | tee $dir/resources.list
     for resource_id in ${RESOURCE_IDS[@]} $RESOURCE_ID_EXT; do
         for agg in min max mean sum ; do
             gnocchi measures show --aggregation $agg --resource-id $resource_id metric > $dir/${agg}.txt
@@ -87,7 +87,6 @@ eval $(pifpaf run gnocchi --indexer-url $INDEXER_URL --storage-url $STORAGE_URL)
 export OS_AUTH_TYPE=gnocchi-noauth
 export GNOCCHI_USER_ID=admin
 export GNOCCHI_PROJECT_ID=admin
-gnocchi resource delete $GNOCCHI_STATSD_RESOURCE_ID
 inject_data $GNOCCHI_DATA
 # Encode resource id as it contains slashes and gnocchiclient does not encode it
 [ "$have_resource_type_post" ] && RESOURCE_ID_EXT="19235bb9-35ca-5f55-b7db-165cfb033c86"
@@ -102,8 +101,6 @@ eval $(pifpaf --debug run gnocchi --indexer-url $INDEXER_URL --storage-url $STOR
 # Gnocchi 3.1 uses basic auth by default
 export OS_AUTH_TYPE=gnocchi-basic
 export GNOCCHI_USER=$GNOCCHI_USER_ID
-
-gnocchi resource delete $GNOCCHI_STATSD_RESOURCE_ID
 
 RESOURCE_IDS=(
     "5a301761-aaaa-46e2-8900-8b4f6fe6675a"
