@@ -23,6 +23,8 @@ Create Date: 2017-01-26 19:33:35.209688
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import func
+import sqlalchemy_utils
 
 
 # revision identifiers, used by Alembic.
@@ -33,7 +35,23 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
     for table_name in ('resource', 'resource_history'):
+        table = sa.Table(table_name, sa.MetaData(),
+                         sa.Column('id',
+                                   sqlalchemy_utils.types.uuid.UUIDType(),
+                                   nullable=False),
+                         sa.Column('original_resource_id', sa.String(255)))
+
+        # NOTE(gordc): mysql stores id as binary so we need to convert to
+        # string.
+        if bind and bind.engine.name == "mysql":
+            vals = {'original_resource_id': func.HEX(table.c.id)}
+        else:
+            vals = {'original_resource_id': table.c.id}
+
+        op.execute(table.update().where(
+            table.c.original_resource_id.is_(None)).values(vals))
         op.alter_column(table_name, "original_resource_id", nullable=False,
                         existing_type=sa.String(255),
                         existing_nullable=True)
