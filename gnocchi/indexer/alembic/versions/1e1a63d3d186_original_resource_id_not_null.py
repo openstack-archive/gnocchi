@@ -23,6 +23,7 @@ Create Date: 2017-01-26 19:33:35.209688
 
 from alembic import op
 import sqlalchemy as sa
+import sqlalchemy_utils
 
 
 # revision identifiers, used by Alembic.
@@ -34,6 +35,14 @@ depends_on = None
 
 def upgrade():
     for table_name in ('resource', 'resource_history'):
+        table = sa.Table(table_name, sa.MetaData(),
+                         sa.Column('id',
+                                   sqlalchemy_utils.types.uuid.UUIDType(),
+                                   nullable=False),
+                         sa.Column('original_resource_id', sa.String(255)))
+        op.execute(table.update().where(
+            table.c.original_resource_id.is_(None)).values(
+                {'original_resource_id': sa.cast(table.c.id, sa.String)}))
         op.alter_column(table_name, "original_resource_id", nullable=False,
                         existing_type=sa.String(255),
                         existing_nullable=True)
