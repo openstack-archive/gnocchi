@@ -1,0 +1,10 @@
+Code-Review+2: Mehdi Abaakouk (sileht) <sileht@redhat.com>
+Code-Review+1: Pradeep Kilambi <pkilambi@redhat.com>
+Code-Review+2: gordon chung <gord@live.ca>
+Workflow+1: gordon chung <gord@live.ca>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 14 Feb 2017 03:33:19 +0000
+Reviewed-on: https://review.openstack.org/432431
+Project: openstack/gnocchi
+Branch: refs/heads/master
