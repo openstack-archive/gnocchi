@@ -17,6 +17,7 @@ import functools
 import json
 import os
 import subprocess
+import threading
 import uuid
 
 import fixtures
@@ -178,6 +179,9 @@ class FakeSwiftClient(object):
 @six.add_metaclass(SkipNotImplementedMeta)
 class TestCase(base.BaseTestCase):
 
+    REDIS_DB_INDEX = 0
+    REDIS_DB_LOCK = threading.Lock()
+
     ARCHIVE_POLICIES = {
         'no_granularity_match': archive_policy.ArchivePolicy(
             "no_granularity_match",
@@ -303,6 +307,12 @@ class TestCase(base.BaseTestCase):
             subprocess.call("rados -c %s mkpool %s" % (
                 os.getenv("CEPH_CONF"), pool_name), shell=True)
             self.conf.set_override('ceph_pool', pool_name, 'storage')
+        elif self.conf.storage.driver == 'redis':
+            with self.REDIS_DB_LOCK:
+                self.REDIS_DB_INDEX += 1
+                redis_url = "redis://localhost:6379?db=%d" % (
+                    self.REDIS_DB_INDEX)
+            self.conf.set_override("redis_url", redis_url, "storage")
 
         # Override the bucket prefix to be unique to avoid concurrent access
         # with any other test
