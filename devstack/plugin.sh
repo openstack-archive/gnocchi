@@ -356,7 +356,7 @@ function preinstall_gnocchi {
 
 # install_gnocchi() - Collect source and prepare
 function install_gnocchi {
-    if [ "${GNOCCHI_COORDINATOR_URL%%:*}" == "redis" ]; then
+    if [[ "$GNOCCHI_STORAGE_BACKEND" = 'redis' ]] || [[ "${GNOCCHI_COORDINATOR_URL%%:*}" == "redis" ]]; then
         _gnocchi_install_redis
     fi
 
