@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    A redis driver have been introduced for storing incoming measures and
+    computed timeseries.
