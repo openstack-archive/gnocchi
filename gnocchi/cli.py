@@ -133,7 +133,9 @@ class MetricReporting(MetricProcessBase):
 
     def _run_job(self):
         try:
-            report = self.store.incoming.measures_report(details=False)
+            buckets = self.index.get_storage_state().buckets
+            report = self.store.incoming.measures_report(buckets,
+                                                         details=False)
             LOG.info("%d measurements bundles across %d "
                      "metrics wait to be processed.",
                      report['summary']['measures'],

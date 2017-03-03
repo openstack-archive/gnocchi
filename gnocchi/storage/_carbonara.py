@@ -349,7 +349,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             # If the metric has never been upgraded, we need to delete this
             # here too
             self._delete_metric(metric)
-            self.incoming.delete_unprocessed_measures_for_metric_id(metric.id)
+            self.incoming.delete_unprocessed_measures_for_metric(metric)
 
     @staticmethod
     def _delete_metric_measures(metric, timestamp_key,

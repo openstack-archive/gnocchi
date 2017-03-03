@@ -41,7 +41,7 @@ class StorageDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
-    def measures_report(details=True):
+    def measures_report(buckets, details=True):
         """Return a report of pending to process measures.
 
         Only useful for drivers that process measurements in background
@@ -52,5 +52,5 @@ class StorageDriver(object):
         raise exceptions.NotImplementedError
 
     @staticmethod
-    def list_metric_with_measures_to_process(size, part, full=False):
+    def list_metric_with_measures_to_process(bucket, size):
         raise NotImplementedError

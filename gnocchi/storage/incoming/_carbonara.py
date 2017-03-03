@@ -61,23 +61,19 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
     def _store_new_measures(metric, data):
         raise NotImplementedError
 
-    def measures_report(self, details=True):
-        metrics, measures, full_details = self._build_report(details)
+    def measures_report(self, buckets, details=True):
+        metrics, measures, full_details = self._build_report(buckets, details)
         report = {'summary': {'metrics': metrics, 'measures': measures}}
         if full_details is not None:
             report['details'] = full_details
         return report
 
     @staticmethod
-    def _build_report(details):
+    def _build_report(buckets, details):
         raise NotImplementedError
 
     @staticmethod
-    def list_metric_with_measures_to_process(size, part, full=False):
-        raise NotImplementedError
-
-    @staticmethod
-    def delete_unprocessed_measures_for_metric_id(metric_id):
+    def delete_unprocessed_measures_for_metric(metric):
         raise NotImplementedError
 
     @staticmethod
