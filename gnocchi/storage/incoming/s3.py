@@ -36,53 +36,53 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
             s3.get_connection(conf)
         )
 
-        self._bucket_name_measures = (
-            self._bucket_prefix + "-" + self.MEASURE_PREFIX
-        )
-        try:
-            s3.create_bucket(self.s3, self._bucket_name_measures,
-                             self._region_name)
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error'].get('Code') not in (
+    def _bucket_name(self, bucket):
+        return '%s-measure%s' % (self._bucket_prefix, bucket)
+
+    def upgrade(self, index):
+        super(S3Storage, self).upgrade(index)
+        buckets = index.get_storage_state().buckets
+        for i in range(buckets):
+            try:
+                s3.create_bucket(self.s3, self._bucket_name(i),
+                                 self._region_name)
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error'].get('Code') not in (
                     "BucketAlreadyExists", "BucketAlreadyOwnedByYou"
-            ):
-                raise
+                ):
+                    raise
 
     def _store_new_measures(self, metric, data):
         now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
         self.s3.put_object(
-            Bucket=self._bucket_name_measures,
+            Bucket=self._bucket_name(metric.bucket),
             Key=(six.text_type(metric.id)
                  + "/"
                  + six.text_type(uuid.uuid4())
                  + now),
             Body=data)
 
-    def _build_report(self, details):
+    def _build_report(self, buckets, details):
         metric_details = defaultdict(int)
-        response = {}
-        while response.get('IsTruncated', True):
-            if 'NextContinuationToken' in response:
-                kwargs = {
-                    'ContinuationToken': response['NextContinuationToken']
-                }
-            else:
-                kwargs = {}
-            response = self.s3.list_objects_v2(
-                Bucket=self._bucket_name_measures,
-                **kwargs)
-            for c in response.get('Contents', ()):
-                metric, metric_file = c['Key'].split("/", 1)
-                metric_details[metric] += 1
+        for i in range(buckets):
+            response = {}
+            while response.get('IsTruncated', True):
+                if 'NextContinuationToken' in response:
+                    kwargs = {
+                        'ContinuationToken': response['NextContinuationToken']
+                    }
+                else:
+                    kwargs = {}
+                response = self.s3.list_objects_v2(
+                    Bucket=self._bucket_name(i),
+                    **kwargs)
+                for c in response.get('Contents', ()):
+                    metric, metric_file = c['Key'].split("/", 1)
+                    metric_details[metric] += 1
         return (len(metric_details), sum(metric_details.values()),
                 metric_details if details else None)
 
-    def list_metric_with_measures_to_process(self, size, part, full=False):
-        if full:
-            limit = 1000        # 1000 is the default anyway
-        else:
-            limit = size * (part + 1)
-
+    def list_metric_with_measures_to_process(self, bucket):
         metrics = set()
         response = {}
         # Handle pagination
@@ -94,19 +94,15 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
             else:
                 kwargs = {}
             response = self.s3.list_objects_v2(
-                Bucket=self._bucket_name_measures,
+                Bucket=self._bucket_name(bucket),
                 Delimiter="/",
-                MaxKeys=limit,
                 **kwargs)
             for p in response.get('CommonPrefixes', ()):
                 metrics.add(p['Prefix'].rstrip('/'))
 
-        if full:
-            return metrics
+        return metrics
 
-        return sorted(list(metrics))[size * part:]
-
-    def _list_measure_files_for_metric_id(self, metric_id):
+    def _list_measure_files_for_metric_id(self, bucket, metric_id):
         files = set()
         response = {}
         while response.get('IsTruncated', True):
@@ -117,7 +113,7 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
             else:
                 kwargs = {}
             response = self.s3.list_objects_v2(
-                Bucket=self._bucket_name_measures,
+                Bucket=self._bucket_name(bucket),
                 Prefix=six.text_type(metric_id) + "/",
                 **kwargs)
 
@@ -126,9 +122,10 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
 
         return files
 
-    def delete_unprocessed_measures_for_metric_id(self, metric_id):
-        files = self._list_measure_files_for_metric_id(metric_id)
-        s3.bulk_delete(self.s3, self._bucket_name_measures, files)
+    def delete_unprocessed_measures_for_metric(self, metric):
+        files = self._list_measure_files_for_metric_id(metric.bucket,
+                                                       metric.id)
+        s3.bulk_delete(self.s3, self._bucket_name(metric.bucket), files)
 
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
@@ -137,7 +134,7 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
         measures = []
         for f in files:
             response = self.s3.get_object(
-                Bucket=self._bucket_name_measures,
+                Bucket=self._bucket_name(bucket),
                 Key=f)
             measures.extend(
                 self._unserialize_measures(f, response['Body'].read()))
@@ -145,4 +142,4 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
         yield measures
 
         # Now clean objects
-        s3.bulk_delete(self.s3, self._bucket_name_measures, files)
+        s3.bulk_delete(self.s3, self._bucket_name(bucket), files)
