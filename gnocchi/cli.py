@@ -19,14 +19,10 @@ import time
 
 import cotyledon
 from cotyledon import oslo_config_glue
-from futurist import periodics
 from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import timeutils
 import six
-import tenacity
-import tooz
-from tooz import coordination
 
 from gnocchi import archive_policy
 from gnocchi import genconfig
@@ -143,63 +139,37 @@ class MetricReporting(MetricProcessBase):
 
 class MetricProcessor(MetricProcessBase):
     name = "processing"
-    GROUP_ID = "gnocchi-processing"
-    SYNC_RATE = 30
-    BLOCK_SIZE = 4
 
     def __init__(self, worker_id, conf):
         super(MetricProcessor, self).__init__(
             worker_id, conf, conf.metricd.metric_processing_delay)
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
-        self.periodic = None
 
-    @utils.retry
-    def _configure(self):
-        super(MetricProcessor, self)._configure()
-        try:
-            join_req = self._coord.join_group(self.GROUP_ID)
-            join_req.get()
-            LOG.info('Joined coordination group: %s', self.GROUP_ID)
-
-            @periodics.periodic(spacing=self.SYNC_RATE, run_immediately=True)
-            def run_watchers():
-                self._coord.run_watchers()
-
-            self.periodic = periodics.PeriodicWorker.create([])
-            self.periodic.add(run_watchers)
-            t = threading.Thread(target=self.periodic.start)
-            t.daemon = True
-            t.start()
-        except coordination.GroupNotCreated as e:
-            create_group_req = self._coord.create_group(self.GROUP_ID)
-            try:
-                create_group_req.get()
-            except coordination.GroupAlreadyExist:
-                pass
-            raise tenacity.TryAgain(e)
-        except tooz.NotImplemented:
-            LOG.warning('Configured coordination driver does not support '
-                        'required functionality. Coordination is disabled.')
-        except Exception as e:
-            LOG.error('Failed to configure coordination. Coordination is '
-                      'disabled: %s', e)
+    def _lock(self, sack):
+        lock_name = b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
+        return self._coord.get_lock(lock_name)
 
     def _run_job(self):
         try:
-            metrics = list(
-                self.store.incoming.list_metric_with_measures_to_process())
-            LOG.debug("%d metrics scheduled for processing.", len(metrics))
-            self.store.process_background_tasks(self.index, metrics)
+            m_count = 0
+            s_count = 0
+            in_store = self.store.incoming
+            for s in six.moves.range(in_store.NUM_SACKS):
+                # TODO(gordc): make tooz support delay release lock so we don't
+                # process a sack right away.
+                with self._lock(s)(blocking=False):
+                    metrics = in_store.list_metric_with_measures_to_process(s)
+                    sack_size = len(metrics)
+                    self.store.process_background_tasks(self.index, metrics)
+                    m_count += sack_size
+                    s_count += 1
+            LOG.debug("%d metrics processed from %d sacks", m_count, s_count)
         except Exception:
-            LOG.error("Unexpected error scheduling metrics for processing",
+            LOG.error("Unexpected error processing assigned job",
                       exc_info=True)
 
     def close_services(self):
-        if self.periodic:
-            self.periodic.stop()
-            self.periodic.wait()
-        self._coord.leave_group(self.GROUP_ID)
         self._coord.stop()
 
 
@@ -254,9 +224,13 @@ def metricd_tester(conf):
     index = indexer.get_driver(conf)
     index.connect()
     s = storage.get_driver(conf)
-    metrics = s.incoming.list_metric_with_measures_to_process()[
-        :conf.stop_after_processing_metrics]
-    s.process_new_measures(index, metrics, True)
+    metrics = set()
+    for i in six.moves.range(s.incoming.NUM_SACKS):
+        metrics.update(s.incoming.list_metric_with_measures_to_process(i))
+        if len(metrics) >= conf.stop_after_processing_metrics:
+            break
+    s.process_new_measures(
+        index, list(metrics)[:conf.stop_after_processing_metrics], True)
 
 
 def metricd():
