@@ -28,8 +28,11 @@ LOG = log.getLogger(__name__)
 
 class CarbonaraBasedStorage(incoming.StorageDriver):
     MEASURE_PREFIX = "measure"
+    SACK_PREFIX = "incoming-%s"
     _MEASURE_SERIAL_FORMAT = "Qd"
     _MEASURE_SERIAL_LEN = struct.calcsize(_MEASURE_SERIAL_FORMAT)
+
+    NUM_SACKS = 8
 
     def _unserialize_measures(self, measure_id, data):
         nb_measures = len(data) // self._MEASURE_SERIAL_LEN
@@ -74,3 +77,6 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
     @staticmethod
     def process_measure_for_metric(metric):
         raise NotImplementedError
+
+    def compute_sack(self, metric_id):
+        return metric_id.int % self.NUM_SACKS

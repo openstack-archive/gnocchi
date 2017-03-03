@@ -23,6 +23,7 @@ from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import timeutils
 import six
+from tooz import coordination
 
 from gnocchi import archive_policy
 from gnocchi import genconfig
@@ -146,14 +147,31 @@ class MetricProcessor(MetricProcessBase):
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
 
+    def _lock(self, sack):
+        lock_name = b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
+        return self._coord.get_lock(lock_name)
+
     def _run_job(self):
         try:
-            metrics = list(
-                self.store.incoming.list_metric_with_measures_to_process())
-            LOG.debug("%d metrics scheduled for processing.", len(metrics))
-            self.store.process_background_tasks(self.index, metrics)
+            m_count = 0
+            s_count = 0
+            in_ = self.store.incoming
+            for s in six.moves.range(in_.NUM_SACKS):
+                # TODO(gordc): make tooz support delay release lock so we don't
+                # process a sack right after it's another process
+                try:
+                    with self._lock(s)(blocking=False):
+                        metrics = in_.list_metric_with_measures_to_process(s)
+                        sack_size = len(metrics)
+                        self.store.process_background_tasks(self.index,
+                                                            metrics)
+                        m_count += sack_size
+                        s_count += 1
+                except coordination.LockAcquireFailed:
+                    pass  # don't care, let others try & try again next time
+            LOG.debug("%d metrics processed from %d sacks", m_count, s_count)
         except Exception:
-            LOG.error("Unexpected error scheduling metrics for processing",
+            LOG.error("Unexpected error processing assigned job",
                       exc_info=True)
 
     def close_services(self):
@@ -211,9 +229,13 @@ def metricd_tester(conf):
     index = indexer.get_driver(conf)
     index.connect()
     s = storage.get_driver(conf)
-    metrics = s.incoming.list_metric_with_measures_to_process()[
-        :conf.stop_after_processing_metrics]
-    s.process_new_measures(index, metrics, True)
+    metrics = set()
+    for i in six.moves.range(s.incoming.NUM_SACKS):
+        metrics.update(s.incoming.list_metric_with_measures_to_process(i))
+        if len(metrics) >= conf.stop_after_processing_metrics:
+            break
+    s.process_new_measures(
+        index, list(metrics)[:conf.stop_after_processing_metrics], True)
 
 
 def metricd():
