@@ -60,7 +60,7 @@ class TestAggregates(tests_base.TestCase):
             for n, val in enumerate(data)]
         self.index.create_metric(metric.id, str(uuid.uuid4()), 'medium')
         self.storage.incoming.add_measures(metric, measures)
-        metrics = self.storage.incoming.list_metric_with_measures_to_process()
+        metrics = self.list_all_metrics(self.storage.incoming)
         self.storage.process_background_tasks(self.index, metrics, sync=True)
 
         return metric
