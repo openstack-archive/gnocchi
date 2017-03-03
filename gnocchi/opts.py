@@ -26,6 +26,7 @@ import gnocchi.indexer
 import gnocchi.storage
 import gnocchi.storage.ceph
 import gnocchi.storage.file
+from gnocchi.storage.incoming import _carbonara as incoming_carbonara
 import gnocchi.storage.s3
 import gnocchi.storage.swift
 
@@ -105,7 +106,7 @@ def list_opts():
                              'single response from a collection resource')),
         )),
         ("storage", (_STORAGE_OPTS + gnocchi.storage._carbonara.OPTS)),
-        ("incoming", _INCOMING_OPTS),
+        ("incoming", (_INCOMING_OPTS + incoming_carbonara.OPTS)),
         ("statsd", (
             cfg.StrOpt('host',
                        default='0.0.0.0',
