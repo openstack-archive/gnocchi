@@ -650,9 +650,18 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             raise indexer.ArchivePolicyRuleAlreadyExists(name)
         return apr
 
+    def get_buckets(self):
+        with self.facade.independent_reader() as session:
+            return session.query(StorageState).first().buckets
+    
+    def _compute_bucket(self, id):
+        buckets = self.get_buckets()
+
+
     @retry_on_deadlock
     def create_metric(self, id, creator, archive_policy_name,
                       name=None, unit=None, resource_id=None):
+        bucket = self.compute_bucket(id)
         m = Metric(id=id,
                    creator=creator,
                    archive_policy_name=archive_policy_name,

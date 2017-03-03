@@ -32,8 +32,12 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         self.measure_path = os.path.join(self.basepath, 'measure')
         utils.ensure_paths([self.basepath_tmp, self.measure_path])
 
-    def _build_measure_path(self, metric_id, random_id=None):
-        path = os.path.join(self.measure_path, six.text_type(metric_id))
+    def measure_path(self, bucket):
+        return os.path.join(self.basepath, 'measure%s' % bucket)
+
+    def _build_measure_path(self, bucket, metric_id, random_id=None):
+        path = os.path.join(self.measure_path(bucket),
+                            six.text_type(metric_id))
         if random_id:
             if random_id is True:
                 now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
@@ -72,11 +76,11 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         return (len(metric_details.keys()), sum(metric_details.values()),
                 metric_details if details else None)
 
-    def list_metric_with_measures_to_process(self, size, part, full=False):
+    def list_metric_with_measures_to_process(self, bucket, size):
         if full:
-            return set(os.listdir(self.measure_path))
+            return set(os.listdir(self.measure_path(bucket)))
         return set(
-            os.listdir(self.measure_path)[size * part:size * (part + 1)])
+            os.listdir(self.measure_path(bucket))[:size])
 
     def _list_measures_container_for_metric_id(self, metric_id):
         try:
@@ -115,7 +119,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         files = self._list_measures_container_for_metric_id(metric.id)
         measures = []
         for f in files:
-            abspath = self._build_measure_path(metric.id, f)
+            abspath = self._build_measure_path(metric.bucket, metric.id, f)
             with open(abspath, "rb") as e:
                 measures.extend(self._unserialize_measures(f, e.read()))
 

@@ -186,6 +186,7 @@ class Metric(Base, GnocchiBase, storage.Metric):
                                                name="metric_status_enum"),
                                nullable=False,
                                server_default='active')
+    bucket = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
 
     def jsonify(self):
         d = {
