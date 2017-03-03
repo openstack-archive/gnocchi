@@ -317,7 +317,7 @@ class TestCase(base.BaseTestCase):
         if self.conf.storage.driver == 'redis':
             # Create one prefix per test
             self.storage.STORAGE_PREFIX = str(uuid.uuid4())
-            self.storage.incoming.STORAGE_PREFIX = str(uuid.uuid4())
+            self.storage.incoming.SACK_PREFIX = str(uuid.uuid4()) + "-%s"
 
         self.storage.upgrade(self.index)
 
@@ -325,3 +325,10 @@ class TestCase(base.BaseTestCase):
         self.index.disconnect()
         self.storage.stop()
         super(TestCase, self).tearDown()
+
+    @staticmethod
+    def list_all_metrics(incoming):
+        metrics = set()
+        for i in six.moves.range(incoming.NUM_SACKS):
+            metrics.update(incoming.list_metric_with_measures_to_process(i))
+        return metrics
