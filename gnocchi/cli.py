@@ -21,7 +21,6 @@ import time
 import cotyledon
 from cotyledon import oslo_config_glue
 from futurist import periodics
-import msgpack
 from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import timeutils
@@ -145,10 +144,8 @@ class MetricReporting(MetricProcessBase):
 
 class MetricScheduler(MetricProcessBase):
     name = "scheduler"
-    MAX_OVERLAP = 0.3
     GROUP_ID = "gnocchi-scheduler"
     SYNC_RATE = 30
-    TASKS_PER_WORKER = 16
     BLOCK_SIZE = 4
 
     def __init__(self, worker_id, conf, queue):
@@ -157,41 +154,34 @@ class MetricScheduler(MetricProcessBase):
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
         self.queue = queue
-        self.previously_scheduled_metrics = set()
-        self.workers = conf.metricd.workers
-        self.block_index = 0
-        self.block_size_default = self.workers * self.TASKS_PER_WORKER
-        self.block_size = self.block_size_default
+        self.sack_list = []
         self.periodic = None
 
-    def set_block(self, event):
+    def set_sacks(self, event):
+        NUM_SACKS = self.store.incoming.NUM_SACKS
         get_members_req = self._coord.get_members(self.GROUP_ID)
         try:
             members = sorted(get_members_req.get())
-            self.block_index = members.index(self._my_id)
-            reqs = list(self._coord.get_member_capabilities(self.GROUP_ID, m)
-                        for m in members)
-            for req in reqs:
-                cap = msgpack.loads(req.get(), encoding='utf-8')
-                max_workers = max(cap['workers'], self.workers)
-            self.block_size = max_workers * self.TASKS_PER_WORKER
-            LOG.info('New set of agents detected. Now working on block: %s, '
-                     'with up to %s metrics', self.block_index,
-                     self.block_size)
+            index = members.index(self._my_id)
+            # TODO(gordc): change to hashring
+            self.sack_list = (
+                [i for i in six.moves.range(NUM_SACKS)][index::len(members)])
+            if not self.sack_list:
+                raise Exception
+            LOG.info('New set of agents detected. Now working on %s sacks',
+                     len(self.sack_list))
         except Exception:
-            LOG.warning('Error getting block to work on, defaulting to first')
-            self.block_index = 0
-            self.block_size = self.block_size_default
+            LOG.warning('Error getting sacks to work on, defaulting to all')
+            self.sack_list = [i for i in six.moves.range(NUM_SACKS)]
 
     @utils.retry
     def _configure(self):
         super(MetricScheduler, self)._configure()
         try:
-            cap = msgpack.dumps({'workers': self.workers})
-            join_req = self._coord.join_group(self.GROUP_ID, cap)
+            join_req = self._coord.join_group(self.GROUP_ID)
             join_req.get()
             LOG.info('Joined coordination group: %s', self.GROUP_ID)
-            self.set_block(None)
+            self.set_sacks(None)
 
             @periodics.periodic(spacing=self.SYNC_RATE, run_immediately=True)
             def run_watchers():
@@ -203,8 +193,8 @@ class MetricScheduler(MetricProcessBase):
             t.daemon = True
             t.start()
 
-            self._coord.watch_join_group(self.GROUP_ID, self.set_block)
-            self._coord.watch_leave_group(self.GROUP_ID, self.set_block)
+            self._coord.watch_join_group(self.GROUP_ID, self.set_sacks)
+            self._coord.watch_leave_group(self.GROUP_ID, self.set_sacks)
         except coordination.GroupNotCreated as e:
             create_group_req = self._coord.create_group(self.GROUP_ID)
             try:
@@ -221,24 +211,17 @@ class MetricScheduler(MetricProcessBase):
 
     def _run_job(self):
         try:
-            metrics = set(
-                self.store.incoming.list_metric_with_measures_to_process(
-                    self.block_size, self.block_index))
-            if metrics and not self.queue.empty():
-                # NOTE(gordc): drop metrics we previously process to avoid
-                #              handling twice
-                number_of_scheduled_metrics = len(metrics)
-                metrics = metrics - self.previously_scheduled_metrics
-                if (float(number_of_scheduled_metrics - len(metrics)) /
-                        self.block_size > self.MAX_OVERLAP):
-                    LOG.warning('Metric processing lagging scheduling rate. '
-                                'It is recommended to increase the number of '
-                                'workers or to lengthen processing interval.')
-            metrics = list(metrics)
-            for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
-                self.queue.put(metrics[i:i + self.BLOCK_SIZE])
-            self.previously_scheduled_metrics = set(metrics)
-            LOG.debug("%d metrics scheduled for processing.", len(metrics))
+            count = 0
+            tasks = list(self.sack_list)
+            for sack in tasks:
+                metrics = list(
+                    self.store.incoming.list_metric_with_measures_to_process(
+                        sack))
+                count += len(metrics)
+                for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
+                    self.queue.put(metrics[i:i + self.BLOCK_SIZE])
+            LOG.debug("%d metrics scheduled for processing from %d sacks",
+                      count, len(tasks))
         except Exception:
             LOG.error("Unexpected error scheduling metrics for processing",
                       exc_info=True)
@@ -326,9 +309,13 @@ def metricd_tester(conf):
     index = indexer.get_driver(conf)
     index.connect()
     s = storage.get_driver(conf)
-    metrics = s.incoming.list_metric_with_measures_to_process(
-        conf.stop_after_processing_metrics, 0)
-    s.process_new_measures(index, metrics, True)
+    metrics = set()
+    for i in six.moves.range(s.incoming.NUM_SACKS):
+        metrics.update(s.incoming.list_metric_with_measures_to_process(i))
+        if len(metrics) >= conf.stop_after_processing_metrics:
+            break
+    s.process_new_measures(
+        index, list(metrics)[:conf.stop_after_processing_metrics], True)
 
 
 def metricd():
