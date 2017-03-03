@@ -55,6 +55,7 @@ ArchivePolicyRule = base.ArchivePolicyRule
 Resource = base.Resource
 ResourceHistory = base.ResourceHistory
 ResourceType = base.ResourceType
+StorageState = base.StorageState
 
 _marker = indexer._marker
 
@@ -650,15 +651,25 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             raise indexer.ArchivePolicyRuleAlreadyExists(name)
         return apr
 
+    def get_storage_state(self):
+        with self.facade.independent_reader() as session:
+            return session.query(StorageState).first()
+
+    def _compute_sack(self, id):
+        sacks = self.get_storage_state().sacks
+        return id.int % sacks
+
     @retry_on_deadlock
     def create_metric(self, id, creator, archive_policy_name,
                       name=None, unit=None, resource_id=None):
+        sack = self.compute_sack(id)
         m = Metric(id=id,
                    creator=creator,
                    archive_policy_name=archive_policy_name,
                    name=name,
                    unit=unit,
-                   resource_id=resource_id)
+                   resource_id=resource_id,
+                   sack=sack)
         try:
             with self.facade.writer() as session:
                 session.add(m)

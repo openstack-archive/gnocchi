@@ -29,11 +29,18 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         super(FileStorage, self).__init__(conf)
         self.basepath = conf.file_basepath
         self.basepath_tmp = os.path.join(self.basepath, 'tmp')
-        self.measure_path = os.path.join(self.basepath, 'measure')
-        utils.ensure_paths([self.basepath_tmp, self.measure_path])
+        utils.ensure_paths([self.basepath_tmp])
 
-    def _build_measure_path(self, metric_id, random_id=None):
-        path = os.path.join(self.measure_path, six.text_type(metric_id))
+    def upgrade(self, index):
+        super(FileStorage, self).upgrade(index)
+        sacks = index.get_storage_state().sacks
+        utils.ensure_paths([self._sack_path(i) for i in range(sacks)])
+
+    def _sack_path(self, sack):
+        return os.path.join(self.basepath, self.SACK_PREFIX % sack)
+
+    def _build_measure_path(self, sack, metric_id, random_id=None):
+        path = os.path.join(self._sack_path(sack), six.text_type(metric_id))
         if random_id:
             if random_id is True:
                 now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
@@ -47,7 +54,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
             delete=False)
         tmpfile.write(data)
         tmpfile.close()
-        path = self._build_measure_path(metric.id, True)
+        path = self._build_measure_path(metric.sack, metric.id, True)
         while True:
             try:
                 os.rename(tmpfile.name, path)
@@ -56,7 +63,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                 if e.errno != errno.ENOENT:
                     raise
                 try:
-                    os.mkdir(self._build_measure_path(metric.id))
+                    os.mkdir(self._build_measure_path(metric.sack, metric.id))
                 except OSError as e:
                     # NOTE(jd) It's possible that another process created the
                     # path just before us! In this case, good for us, let's do
@@ -64,39 +71,37 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
                     if e.errno != errno.EEXIST:
                         raise
 
-    def _build_report(self, details):
+    def _build_report(self, sacks, details):
         metric_details = {}
-        for metric in os.listdir(self.measure_path):
-            metric_details[metric] = len(
-                self._list_measures_container_for_metric_id(metric))
+        for i in range(sacks):
+            for metric in os.listdir(self._sack_path(i)):
+                metric_details[metric] = len(
+                    self._list_measures_container_for_metric_id(i, metric))
         return (len(metric_details.keys()), sum(metric_details.values()),
                 metric_details if details else None)
 
-    def list_metric_with_measures_to_process(self, size, part, full=False):
-        if full:
-            return set(os.listdir(self.measure_path))
-        return set(
-            os.listdir(self.measure_path)[size * part:size * (part + 1)])
+    def list_metric_with_measures_to_process(self, sack):
+        return set(os.listdir(self._sack_path(sack)))
 
-    def _list_measures_container_for_metric_id(self, metric_id):
+    def _list_measures_container_for_metric_id(self, sack, metric_id):
         try:
-            return os.listdir(self._build_measure_path(metric_id))
+            return os.listdir(self._build_measure_path(sack, metric_id))
         except OSError as e:
             # Some other process treated this one, then do nothing
             if e.errno == errno.ENOENT:
                 return []
             raise
 
-    def _delete_measures_files_for_metric_id(self, metric_id, files):
+    def _delete_measures_files_for_metric(self, metric, files):
         for f in files:
             try:
-                os.unlink(self._build_measure_path(metric_id, f))
+                os.unlink(self._build_measure_path(metric.sack, metric.id, f))
             except OSError as e:
                 # Another process deleted it in the meantime, no prob'
                 if e.errno != errno.ENOENT:
                     raise
         try:
-            os.rmdir(self._build_measure_path(metric_id))
+            os.rmdir(self._build_measure_path(metric.sack, metric.id))
         except OSError as e:
             # ENOENT: ok, it has been removed at almost the same time
             #         by another process
@@ -106,19 +111,21 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
             if e.errno not in (errno.ENOENT, errno.ENOTEMPTY, errno.EEXIST):
                 raise
 
-    def delete_unprocessed_measures_for_metric_id(self, metric_id):
-        files = self._list_measures_container_for_metric_id(metric_id)
-        self._delete_measures_files_for_metric_id(metric_id, files)
+    def delete_unprocessed_measures_for_metric(self, metric):
+        files = self._list_measures_container_for_metric_id(metric.sack,
+                                                            metric.id)
+        self._delete_measures_files_for_metric(metric, files)
 
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
-        files = self._list_measures_container_for_metric_id(metric.id)
+        files = self._list_measures_container_for_metric_id(metric.sack,
+                                                            metric.id)
         measures = []
         for f in files:
-            abspath = self._build_measure_path(metric.id, f)
+            abspath = self._build_measure_path(metric.sack, metric.id, f)
             with open(abspath, "rb") as e:
                 measures.extend(self._unserialize_measures(f, e.read()))
 
         yield measures
 
-        self._delete_measures_files_for_metric_id(metric.id, files)
+        self._delete_measures_files_for_metric(metric, files)

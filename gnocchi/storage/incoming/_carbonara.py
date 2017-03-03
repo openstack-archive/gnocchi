@@ -28,6 +28,7 @@ LOG = log.getLogger(__name__)
 
 class CarbonaraBasedStorage(incoming.StorageDriver):
     MEASURE_PREFIX = "measure"
+    SACK_PREFIX = "incoming-%s"
     _MEASURE_SERIAL_FORMAT = "Qd"
     _MEASURE_SERIAL_LEN = struct.calcsize(_MEASURE_SERIAL_FORMAT)
 
@@ -56,23 +57,19 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
     def _store_new_measures(metric, data):
         raise NotImplementedError
 
-    def measures_report(self, details=True):
-        metrics, measures, full_details = self._build_report(details)
+    def measures_report(self, sacks, details=True):
+        metrics, measures, full_details = self._build_report(sacks, details)
         report = {'summary': {'metrics': metrics, 'measures': measures}}
         if full_details is not None:
             report['details'] = full_details
         return report
 
     @staticmethod
-    def _build_report(details):
+    def _build_report(sacks, details):
         raise NotImplementedError
 
     @staticmethod
-    def list_metric_with_measures_to_process(size, part, full=False):
-        raise NotImplementedError
-
-    @staticmethod
-    def delete_unprocessed_measures_for_metric_id(metric_id):
+    def delete_unprocessed_measures_for_metric(metric):
         raise NotImplementedError
 
     @staticmethod

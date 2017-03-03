@@ -186,6 +186,7 @@ class Metric(Base, GnocchiBase, storage.Metric):
                                                name="metric_status_enum"),
                                nullable=False,
                                server_default='active')
+    sack = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
 
     def jsonify(self):
         d = {
@@ -457,3 +458,9 @@ class ArchivePolicyRule(Base, GnocchiBase):
             name="fk_apr_ap_name_ap_name"),
         nullable=False)
     metric_pattern = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+
+
+class StorageState(Base, GnocchiBase):
+    __tablename__ = 'storage_state'
+
+    sacks = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)

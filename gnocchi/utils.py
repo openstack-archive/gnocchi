@@ -84,6 +84,11 @@ def _enable_coordination(coord):
         raise tenacity.TryAgain(e)
 
 
+def to_bytes(value):
+    """encode to bytes"""
+    return six.text_type(value).encode('utf-8')
+
+
 def get_coordinator_and_start(url):
     my_id = str(uuid.uuid4())
     coord = coordination.get_coordinator(url, my_id)
