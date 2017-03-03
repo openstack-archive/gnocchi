@@ -29,65 +29,68 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
     def __init__(self, conf):
         super(SwiftStorage, self).__init__(conf)
         self.swift = swift.get_connection(conf)
-        self.swift.put_container(self.MEASURE_PREFIX)
+
+    def upgrade(self, index):
+        super(SwiftStorage, self).upgrade(index)
+        for i in six.moves.range(self.NUM_SACKS):
+            self.swift.put_container(self.SACK_PREFIX % i)
 
     def _store_new_measures(self, metric, data):
         now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
         self.swift.put_object(
-            self.MEASURE_PREFIX,
+            self.SACK_PREFIX % self.compute_sack(metric.id),
             six.text_type(metric.id) + "/" + six.text_type(uuid.uuid4()) + now,
             data)
 
     def _build_report(self, details):
         metric_details = defaultdict(int)
-        if details:
-            headers, files = self.swift.get_container(self.MEASURE_PREFIX,
-                                                      full_listing=True)
-            for f in files:
-                metric, __ = f['name'].split("/", 1)
-                metric_details[metric] += 1
-            nb_metrics = len(metric_details)
-        else:
-            headers, files = self.swift.get_container(self.MEASURE_PREFIX,
-                                                      delimiter='/',
-                                                      full_listing=True)
-            nb_metrics = len(files)
-        measures = int(headers.get('x-container-object-count'))
-        return nb_metrics, measures, metric_details if details else None
+        nb_metrics = 0
+        measures = 0
+        for i in six.moves.range(self.NUM_SACKS):
+            if details:
+                headers, files = self.swift.get_container(self.SACK_PREFIX % i,
+                                                          full_listing=True)
+                for f in files:
+                    metric, __ = f['name'].split("/", 1)
+                    metric_details[metric] += 1
+            else:
+                headers, files = self.swift.get_container(self.SACK_PREFIX % i,
+                                                          delimiter='/',
+                                                          full_listing=True)
+                nb_metrics += len(files)
+            measures += int(headers.get('x-container-object-count'))
+        return (nb_metrics or len(metric_details), measures,
+                metric_details if details else None)
 
-    def list_metric_with_measures_to_process(self, size, part, full=False):
-        limit = None
-        if not full:
-            limit = size * (part + 1)
-        headers, files = self.swift.get_container(self.MEASURE_PREFIX,
+    def list_metric_with_measures_to_process(self, sack):
+        headers, files = self.swift.get_container(self.SACK_PREFIX % sack,
                                                   delimiter='/',
-                                                  full_listing=full,
-                                                  limit=limit)
-        if not full:
-            files = files[size * part:]
+                                                  full_listing=True)
         return set(f['subdir'][:-1] for f in files if 'subdir' in f)
 
-    def _list_measure_files_for_metric_id(self, metric_id):
+    def _list_measure_files_for_metric_id(self, sack, metric_id):
         headers, files = self.swift.get_container(
-            self.MEASURE_PREFIX, path=six.text_type(metric_id),
+            self.SACK_PREFIX % sack, path=six.text_type(metric_id),
             full_listing=True)
         return files
 
-    def delete_unprocessed_measures_for_metric_id(self, metric_id):
-        files = self._list_measure_files_for_metric_id(metric_id)
-        swift.bulk_delete(self.swift, self.MEASURE_PREFIX, files)
+    def delete_unprocessed_measures_for_metric(self, metric):
+        sack = self.compute_sack(metric.id)
+        files = self._list_measure_files_for_metric_id(sack, metric.id)
+        swift.bulk_delete(self.swift, self.SACK_PREFIX % sack, files)
 
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
-        files = self._list_measure_files_for_metric_id(metric.id)
+        sack = self.compute_sack(metric.id)
+        files = self._list_measure_files_for_metric_id(sack, metric.id)
 
         measures = []
         for f in files:
             headers, data = self.swift.get_object(
-                self.MEASURE_PREFIX, f['name'])
+                self.SACK_PREFIX % sack, f['name'])
             measures.extend(self._unserialize_measures(f['name'], data))
 
         yield measures
 
         # Now clean objects
-        swift.bulk_delete(self.swift, self.MEASURE_PREFIX, files)
+        swift.bulk_delete(self.swift, self.SACK_PREFIX % sack, files)
