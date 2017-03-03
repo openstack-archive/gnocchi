@@ -122,8 +122,10 @@ class TestingApp(webtest.TestApp):
             req.headers['X-User-Id'] = self.USER_ID
             req.headers['X-Project-Id'] = self.PROJECT_ID
         response = super(TestingApp, self).do_request(req, *args, **kwargs)
-        metrics = self.storage.incoming.list_metric_with_measures_to_process(
-            None, None, full=True)
+        metrics = set()
+        for i in six.moves.range(self.storage.incoming.NUM_SACKS):
+            metrics.update(
+                self.storage.incoming.list_metric_with_measures_to_process(i))
         self.storage.process_background_tasks(self.indexer, metrics, sync=True)
         return response
 
