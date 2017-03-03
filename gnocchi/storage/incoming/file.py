@@ -29,14 +29,19 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         super(FileStorage, self).__init__(conf)
         self.basepath = conf.file_basepath
         self.basepath_tmp = os.path.join(self.basepath, 'tmp')
-        self.measure_path = os.path.join(self.basepath, 'measure')
 
-    def upgrade(self, indexer):
-        super(FileStorage, self).upgrade(indexer)
-        utils.ensure_paths([self.basepath_tmp, self.measure_path])
+    def upgrade(self, index):
+        super(FileStorage, self).upgrade(index)
+        utils.ensure_paths([self._sack_path(i)
+                            for i in six.moves.range(self.NUM_SACKS)])
+        utils.ensure_paths([self.basepath_tmp])
+
+    def _sack_path(self, sack):
+        return os.path.join(self.basepath, self.SACK_PREFIX % sack)
 
     def _build_measure_path(self, metric_id, random_id=None):
-        path = os.path.join(self.measure_path, six.text_type(metric_id))
+        sack = self.compute_sack(metric_id)
+        path = os.path.join(self._sack_path(sack), six.text_type(metric_id))
         if random_id:
             if random_id is True:
                 now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
@@ -69,17 +74,15 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
 
     def _build_report(self, details):
         metric_details = {}
-        for metric in os.listdir(self.measure_path):
-            metric_details[metric] = len(
-                self._list_measures_container_for_metric_id(metric))
+        for i in six.moves.range(self.NUM_SACKS):
+            for metric in os.listdir(self._sack_path(i)):
+                metric_details[metric] = len(
+                    self._list_measures_container_for_metric_id(i, metric))
         return (len(metric_details.keys()), sum(metric_details.values()),
                 metric_details if details else None)
 
-    def list_metric_with_measures_to_process(self, size, part, full=False):
-        if full:
-            return set(os.listdir(self.measure_path))
-        return set(
-            os.listdir(self.measure_path)[size * part:size * (part + 1)])
+    def list_metric_with_measures_to_process(self, sack):
+        return set(os.listdir(self._sack_path(sack)))
 
     def _list_measures_container_for_metric_id(self, metric_id):
         try:
