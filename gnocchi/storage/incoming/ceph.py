@@ -122,7 +122,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 return ()
             return (k for k, v in omaps)
 
-    def list_metric_with_measures_to_process(self):
+    def list_metric_with_measures_to_process(self, sack):
         names = set()
         marker = ""
         while True:
