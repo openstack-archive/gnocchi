@@ -18,7 +18,6 @@ import errno
 import functools
 import uuid
 
-
 from gnocchi.storage.common import ceph
 from gnocchi.storage.incoming import _carbonara
 
@@ -53,23 +52,6 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
     def stop(self):
         ceph.close_rados_connection(self.rados, self.ioctx)
         super(CephStorage, self).stop()
-
-    def upgrade(self, index):
-        super(CephStorage, self).upgrade(index)
-
-        # Move names stored in xattrs to omap
-        try:
-            xattrs = tuple(k for k, v in
-                           self.ioctx.get_xattrs(self.MEASURE_PREFIX))
-        except rados.ObjectNotFound:
-            return
-        with rados.WriteOpCtx() as op:
-            self.ioctx.set_omap(op, xattrs, tuple([b""]*len(xattrs)))
-            self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
-                                        flags=self.OMAP_WRITE_FLAGS)
-
-        for xattr in xattrs:
-            self.ioctx.rm_xattr(self.MEASURE_PREFIX, xattr)
 
     def _store_new_measures(self, metric, data):
         # NOTE(sileht): list all objects in a pool is too slow with
@@ -135,7 +117,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 return ()
             return (k for k, v in omaps)
 
-    def list_metric_with_measures_to_process(self):
+    def list_metric_with_measures_to_process(self, sack):
         names = set()
         marker = ""
         while True:

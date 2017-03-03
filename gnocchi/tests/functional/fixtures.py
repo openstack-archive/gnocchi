@@ -27,6 +27,7 @@ from oslo_config import cfg
 from oslo_middleware import cors
 from oslotest import log
 from oslotest import output
+import six
 import sqlalchemy_utils
 
 from gnocchi import indexer
@@ -173,7 +174,10 @@ class MetricdThread(threading.Thread):
     def run(self):
         incoming = self.storage.incoming
         while self.flag:
-            metrics = incoming.list_metric_with_measures_to_process()
+            metrics = set()
+            for i in six.moves.range(incoming.NUM_SACKS):
+                metrics.update(
+                    incoming.list_metric_with_measures_to_process(i))
             self.storage.process_background_tasks(self.index, metrics)
             time.sleep(0.1)
 
