@@ -325,3 +325,10 @@ class TestCase(base.BaseTestCase):
         self.index.disconnect()
         self.storage.stop()
         super(TestCase, self).tearDown()
+
+    @staticmethod
+    def list_all_metrics(incoming):
+        metrics = set()
+        for i in six.moves.range(incoming.NUM_SACKS):
+            metrics.update(incoming.list_metric_with_measures_to_process(i))
+        return metrics
