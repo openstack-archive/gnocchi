@@ -25,9 +25,6 @@ from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import timeutils
 import six
-import tenacity
-import tooz
-from tooz import coordination
 
 from gnocchi import archive_policy
 from gnocchi import genconfig
@@ -154,32 +151,17 @@ class MetricScheduler(MetricProcessBase):
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
         self.queue = queue
-        self.sack_list = []
+        self.partitioner = None
+        self._tasks = []
+        self.last_state = None
         self.periodic = None
 
-    def set_sacks(self, event):
-        NUM_SACKS = self.store.incoming.NUM_SACKS
-        get_members_req = self._coord.get_members(self.GROUP_ID)
-        try:
-            members = sorted(get_members_req.get())
-            index = members.index(self._my_id)
-            # TODO(gordc): change to hashring
-            self.sack_list = list(
-                six.moves.range(NUM_SACKS))[index::len(members)]
-            LOG.info('New set of agents detected. Now working on %s sacks',
-                     len(self.sack_list))
-        except Exception:
-            LOG.warning('Error getting sacks to work on, defaulting to all')
-            self.sack_list = list(six.moves.range(NUM_SACKS))
-
-    @utils.retry
     def _configure(self):
         super(MetricScheduler, self)._configure()
         try:
-            join_req = self._coord.join_group(self.GROUP_ID)
-            join_req.get()
+            self.partitioner = self._coord.join_partitioned_group(
+                self.GROUP_ID, weight=self.conf.metricd.workers)
             LOG.info('Joined coordination group: %s', self.GROUP_ID)
-            self.set_sacks(None)
 
             @periodics.periodic(spacing=self.SYNC_RATE, run_immediately=True)
             def run_watchers():
@@ -190,28 +172,22 @@ class MetricScheduler(MetricProcessBase):
             t = threading.Thread(target=self.periodic.start)
             t.daemon = True
             t.start()
-
-            self._coord.watch_join_group(self.GROUP_ID, self.set_sacks)
-            self._coord.watch_leave_group(self.GROUP_ID, self.set_sacks)
-        except coordination.GroupNotCreated as e:
-            create_group_req = self._coord.create_group(self.GROUP_ID)
-            try:
-                create_group_req.get()
-            except coordination.GroupAlreadyExist:
-                pass
-            raise tenacity.TryAgain(e)
-        except tooz.NotImplemented:
-            LOG.warning('Configured coordination driver does not support '
-                        'required functionality. Coordination is disabled.')
         except Exception as e:
-            LOG.error('Failed to configure coordination. Coordination is '
+            LOG.error('Failed to configure coordination. MetricD agent is '
                       'disabled: %s', e)
+
+    def _get_tasks(self):
+        sacks = self.store.incoming.NUM_SACKS
+        if not self._tasks or self.last_state != self.partitioner.ring.nodes:
+            self.last_state = self.partitioner.ring.nodes.copy()
+            self._tasks = [i for i in six.moves.range(sacks)
+                           if self.partitioner.belongs_to_self(bytes(i))]
+        return self._tasks
 
     def _run_job(self):
         try:
             count = 0
-            tasks = list(self.sack_list)
-            for sack in tasks:
+            for sack in self._get_tasks():
                 metrics = list(
                     self.store.incoming.list_metric_with_measures_to_process(
                         sack))
@@ -219,7 +195,7 @@ class MetricScheduler(MetricProcessBase):
                 for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
                     self.queue.put(metrics[i:i + self.BLOCK_SIZE])
             LOG.debug("%d metrics scheduled for processing from %d sacks",
-                      count, len(tasks))
+                      count, len(self._tasks))
         except Exception:
             LOG.error("Unexpected error scheduling metrics for processing",
                       exc_info=True)
