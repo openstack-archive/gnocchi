@@ -464,6 +464,42 @@ class MetricTest(RestTest):
              [u'2013-01-01T12:00:00+00:00', 1.0, 1234.2]],
             result)
 
+    def test_get_measure_stop_with_epoch(self):
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy_name": "high"})
+        metric = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:00',
+                                    "value": 1234.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 456}])
+        ret = self.app.get("/v1/metric/%s/measures"
+                           "?stop=1357038001" % metric['id'],
+                           status=200)
+        result = json.loads(ret.text)
+        self.assertEqual(
+            [[u'2013-01-01T12:00:00+00:00', 3600.0, 845.1],
+             [u'2013-01-01T12:00:00+00:00', 60.0, 845.1],
+             [u'2013-01-01T12:00:00+00:00', 1.0, 1234.2]],
+            result)
+
+    def test_get_measure_start_with_epoch(self):
+        result = self.app.post_json("/v1/metric",
+                                    params={"archive_policy_name": "high"})
+        metric = json.loads(result.text)
+        self.app.post_json("/v1/metric/%s/measures" % metric['id'],
+                           params=[{"timestamp": '2013-01-01 12:00:00',
+                                    "value": 1234.2},
+                                   {"timestamp": '2013-01-01 12:00:02',
+                                    "value": 456}])
+        ret = self.app.get("/v1/metric/%s/measures"
+                           "?start=1357038001" % metric['id'],
+                           status=200)
+        result = json.loads(ret.text)
+        self.assertEqual(
+            [[u'2013-01-01T12:00:02+00:00', 1.0, 1234.2]],
+            result)
+
     def test_get_measure_aggregation(self):
         result = self.app.post_json("/v1/metric",
                                     params={"archive_policy_name": "medium"})
