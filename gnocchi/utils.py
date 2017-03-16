@@ -94,6 +94,10 @@ def get_coordinator_and_start(url):
 unix_universal_start64 = numpy.datetime64("1970")
 
 
+def _to_epoch_nano(v):
+    return int(float(v) * 10e8)
+
+
 def to_timestamps(values):
     try:
         values = list(values)
@@ -103,7 +107,13 @@ def to_timestamps(values):
               is_valid_timestamp(values[0])):
             times = pd.to_datetime(values, utc=True, box=False)
         else:
-            times = (utcnow() + pd.to_timedelta(values)).values
+            try:
+                float(values[0])
+            except ValueError:
+                times = (utcnow() + pd.to_timedelta(values)).values
+            else:
+                times = pd.to_datetime(map(_to_epoch_nano, values),
+                                       utc=True, box=False)
     except ValueError:
         raise ValueError("Unable to convert timestamps")
 
