@@ -1,0 +1,18 @@
+sudo: required
+
+services:
+  - docker
+
+env:
+  - target: pep8
+  - target: docs
+  - target: py27
+  - target: py35
+  - target: py27-mysql-ceph-upgrade-from-3.1
+  - target: py35-postgresql-file-upgrade-from-3.1
+
+before_install:
+  - docker pull ubuntu:16.04
+
+script:
+  - docker build --file=tools/ci-setup.dockerfile --build-arg TARGET=${target} .
