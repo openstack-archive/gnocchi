@@ -92,7 +92,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self.ioctx.remove_omap_keys(op, (name,))
             self.ioctx.operate_write_op(
                 op, self._build_unaggregated_timeserie_path(metric, 3))
-        self.ioctx.aio_remove(name)
+        self.ioctx.remove_object(name)
 
     def _delete_metric(self, metric):
         with rados.ReadOpCtx() as op:
@@ -104,10 +104,14 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
                 return
             if ret == errno.ENOENT:
                 return
-            for name, _ in omaps:
-                self.ioctx.aio_remove(name)
-        self.ioctx.aio_remove(
-            self._build_unaggregated_timeserie_path(metric, 3))
+
+        ops = [self.ioctx.aio_remove(name) for name, _ in omaps]
+
+        ops.append(self.ioctx.aio_remove(
+            self._build_unaggregated_timeserie_path(metric, 3)))
+
+        for op in ops:
+            op.wait_for_complete_and_cb()
 
     def _get_measures(self, metric, timestamp_key, aggregation, granularity,
                       version=3):
@@ -158,7 +162,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self._build_unaggregated_timeserie_path(metric, version), data)
 
     def _delete_unaggregated_timeserie(self, metric, version=3):
-        self.ioctx.aio_remove(
+        self.ioctx.remove_object(
             self._build_unaggregated_timeserie_path(metric, version))
 
     def _get_object_content(self, name):
