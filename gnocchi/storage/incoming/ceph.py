@@ -148,8 +148,12 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
     def delete_unprocessed_measures_for_metric_id(self, metric_id):
         object_prefix = self.MEASURE_PREFIX + "_" + str(metric_id)
         object_names = self._list_object_names_to_process(object_prefix)
+
         if not object_names:
             return
+
+        for op in list(map(self.ioctx.aio_remove, object_names)):
+            op.wait_for_complete_and_cb()
 
         # Now clean objects and omap
         with rados.WriteOpCtx() as op:
@@ -158,9 +162,6 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self.ioctx.remove_omap_keys(op, tuple(object_names))
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
-
-        for n in object_names:
-            self.ioctx.aio_remove(n)
 
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
@@ -208,5 +209,5 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
 
-        for n in object_names:
-            self.ioctx.aio_remove(n)
+        for op in list(map(self.ioctx.aio_remove, object_names)):
+            op.wait_for_complete_and_cb()
