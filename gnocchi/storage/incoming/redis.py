@@ -35,19 +35,19 @@ class RedisStorage(_carbonara.CarbonaraBasedStorage):
 
     def _store_new_measures(self, metric, data):
         path = self._build_measure_path(metric.id)
-        self._client.rpush(path.encode("utf8"), data)
+        self._client.rpush(path, data)
 
     def _build_report(self, details):
-        match = redis.SEP.join([self.STORAGE_PREFIX, "*"]).encode('utf8')
+        match = redis.SEP.join([self.STORAGE_PREFIX, "*"])
         metric_details = collections.defaultdict(int)
         for key in self._client.scan_iter(match=match, count=1000):
-            metric = key.decode('utf8').split(redis.SEP)[1]
+            metric = key.decode('utf').split(redis.SEP)[1]
             metric_details[metric] = self._client.llen(key)
         return (len(metric_details.keys()), sum(metric_details.values()),
                 metric_details if details else None)
 
     def list_metric_with_measures_to_process(self, size, part, full=False):
-        match = redis.SEP.join([self.STORAGE_PREFIX, "*"]).encode('utf8')
+        match = redis.SEP.join([self.STORAGE_PREFIX, "*"])
         keys = self._client.scan_iter(match=match, count=1000)
         measures = set([k.decode('utf8').split(redis.SEP)[1] for k in keys])
         if full:
