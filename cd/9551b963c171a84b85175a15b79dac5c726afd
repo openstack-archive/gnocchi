@@ -1,0 +1,10 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Code-Review+2: gordon chung <gord@live.ca>
+Workflow+1: gordon chung <gord@live.ca>
+Code-Review+2: Chris Dent <cdent@anticdent.org>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 22 Mar 2017 14:22:38 +0000
+Reviewed-on: https://review.openstack.org/448534
+Project: openstack/gnocchi
+Branch: refs/heads/master
