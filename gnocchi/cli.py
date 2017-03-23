@@ -154,6 +154,7 @@ class MetricScheduler(MetricProcessBase):
         self.queue = queue
         # set to 1/4 the number of workers since scheduling < processing
         self.scheduling_threads = (self.conf.metricd.workers - 1 // 4) + 1
+        self.prev_sched = self.prev_qsize = 0
         self.partitioner = None
         self._tasks = []
         self.last_state = None
@@ -189,11 +190,13 @@ class MetricScheduler(MetricProcessBase):
 
     def _run_job(self):
         try:
-            count = 0
+            if self._skip_scheduling():
+                return
             tasks = self._get_tasks()
             with futures.ThreadPoolExecutor(
                     max_workers=self.scheduling_threads) as executor:
                 count = sum(executor.map(self._schedule, tasks))
+                self.prev_sched = count / self.BLOCK_SIZE
             LOG.debug("%d metrics scheduled for processing from %d sacks",
                       count, len(self._tasks))
         except Exception:
@@ -208,6 +211,29 @@ class MetricScheduler(MetricProcessBase):
         for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
             self.queue.put(metrics[i:i + self.BLOCK_SIZE])
         return count
+
+    def _skip_scheduling(self):
+        """Check whether to alter scheduling
+
+        Safety check to see if we're scheduling too frequently for processors.
+        Checks existing job queue size compared to previously scheduled load.
+        if >55% remains, skip scheduling, else delay if needed.
+        """
+        if self.prev_sched or self.prev_qsize:
+            qsize = self.queue.qsize()
+            time_left = qsize / ((self.prev_sched - qsize) /
+                                 self.interval_delay)
+            self.prev_qsize = qsize
+            if time_left / self.interval_delay > 0.55:
+                LOG.warning('Skipping scheduling cycle. Consider increasing '
+                            'workers or scheduling interval if normal load')
+                self.prev_sched = 0
+                return True
+            elif time_left / self.interval_delay > 0.15:
+                LOG.debug('Delaying scheduling cycle. Consider increasing '
+                          'workers or scheduling interval if normal load')
+                time.sleep(time_left)
+        return False
 
     def close_services(self):
         if self.periodic:
