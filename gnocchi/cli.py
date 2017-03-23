@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 
+from concurrent import futures
 import cotyledon
 from cotyledon import oslo_config_glue
 from futurist import periodics
@@ -151,6 +152,8 @@ class MetricScheduler(MetricProcessBase):
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
         self.queue = queue
+        # set to 1/4 the number of workers since scheduling < processing
+        self.scheduling_threads = (self.conf.metricd.workers - 1 // 4) + 1
         self.partitioner = None
         self._tasks = []
         self.last_state = None
@@ -187,18 +190,24 @@ class MetricScheduler(MetricProcessBase):
     def _run_job(self):
         try:
             count = 0
-            for sack in self._get_tasks():
-                metrics = list(
-                    self.store.incoming.list_metric_with_measures_to_process(
-                        sack))
-                count += len(metrics)
-                for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
-                    self.queue.put(metrics[i:i + self.BLOCK_SIZE])
+            tasks = self._get_tasks()
+            with futures.ThreadPoolExecutor(
+                    max_workers=self.scheduling_threads) as executor:
+                count = sum(executor.map(self._schedule, tasks))
             LOG.debug("%d metrics scheduled for processing from %d sacks",
                       count, len(self._tasks))
         except Exception:
             LOG.error("Unexpected error scheduling metrics for processing",
                       exc_info=True)
+
+    def _schedule(self, sack):
+        count = 0
+        metrics = list(
+            self.store.incoming.list_metric_with_measures_to_process(sack))
+        count += len(metrics)
+        for i in six.moves.range(0, len(metrics), self.BLOCK_SIZE):
+            self.queue.put(metrics[i:i + self.BLOCK_SIZE])
+        return count
 
     def close_services(self):
         if self.periodic:
