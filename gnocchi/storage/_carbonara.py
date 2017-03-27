@@ -96,6 +96,8 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 self._get_unaggregated_timeserie(
                     metric)
             )
+            if not raw_measures:
+                raise storage.MetricDoesNotExist(metric)
             LOG.debug(
                 "Retrieve unaggregated measures "
                 "for %s in %.2fs",
