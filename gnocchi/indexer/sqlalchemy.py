@@ -18,7 +18,6 @@ import itertools
 import operator
 import os.path
 import threading
-import uuid
 
 from alembic import migration
 from alembic import operations
@@ -27,6 +26,7 @@ from oslo_db import exception
 from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import utils as oslo_db_utils
 from oslo_log import log
+from oslo_utils import uuidutils
 try:
     import psycopg2
 except ImportError:
@@ -348,7 +348,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         # tablename, the limit is 64. The longest name we have is
         # fk_<tablename>_h_revision_rh_revision,
         # so 64 - 26 = 38 and 3 chars for rt_, 35 chars, uuid is 32, it's cool.
-        tablename = "rt_%s" % uuid.uuid4().hex
+        tablename = "rt_%s" % uuidutils.generate_uuid(dashed=False)
         resource_type = ResourceType(name=resource_type.name,
                                      tablename=tablename,
                                      attributes=resource_type.attributes,
