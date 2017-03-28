@@ -13,11 +13,9 @@
 # under the License.
 from collections import defaultdict
 import contextlib
-import datetime
 import errno
 import functools
 import itertools
-import uuid
 
 
 from gnocchi.storage.common import ceph
@@ -79,18 +77,16 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         # So we create an object MEASURE_PREFIX, that have as
         # omap the list of objects to process (not xattr because
         # it doesn't allow to configure the locking behavior)
-        name = "_".join((
-            self.MEASURE_PREFIX,
-            str(metric.id),
-            str(uuid.uuid4()),
-            datetime.datetime.utcnow().strftime("%Y%m%d_%H:%M:%S")))
+        name = self.MEASURE_PREFIX + "_" + str(metric.id)
 
-        self.ioctx.write_full(name, data)
+        op = self.ioctx.aio_append(name, data)
 
         with rados.WriteOpCtx() as op:
             self.ioctx.set_omap(op, (name,), (b"",))
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
+
+        op.wait_for_complete_and_cb()
 
     def _build_report(self, details):
         LIMIT = 1000
@@ -146,57 +142,23 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         return set([name.split("_")[1] for name in objs_it])
 
     def delete_unprocessed_measures_for_metric_id(self, metric_id):
-        object_prefix = self.MEASURE_PREFIX + "_" + str(metric_id)
-        object_names = self._list_object_names_to_process(object_prefix)
-        if not object_names:
-            return
+        object_name = self.MEASURE_PREFIX + "_" + str(metric_id)
 
         # Now clean objects and omap
         with rados.WriteOpCtx() as op:
             # NOTE(sileht): come on Ceph, no return code
             # for this operation ?!!
-            self.ioctx.remove_omap_keys(op, tuple(object_names))
+            self.ioctx.remove_omap_keys(op, (object_name,))
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
 
-        for n in object_names:
-            self.ioctx.aio_remove(n)
+        self.ioctx.aio_remove(object_name)
 
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
-        object_prefix = self.MEASURE_PREFIX + "_" + str(metric.id)
-        object_names = list(self._list_object_names_to_process(object_prefix))
-
-        measures = []
-        ops = []
-        bufsize = 8192  # Same sa rados_read one
-
-        tmp_measures = {}
-
-        def add_to_measures(name, comp, data):
-            if name in tmp_measures:
-                tmp_measures[name] += data
-            else:
-                tmp_measures[name] = data
-            if len(data) < bufsize:
-                measures.extend(self._unserialize_measures(name,
-                                                           tmp_measures[name]))
-                del tmp_measures[name]
-            else:
-                ops.append(self.ioctx.aio_read(
-                    name, bufsize, len(tmp_measures[name]),
-                    functools.partial(add_to_measures, name)
-                ))
-
-        for name in object_names:
-            ops.append(self.ioctx.aio_read(
-                name, bufsize, 0,
-                functools.partial(add_to_measures, name)
-            ))
-
-        while ops:
-            op = ops.pop()
-            op.wait_for_complete_and_cb()
+        object_name = self.MEASURE_PREFIX + "_" + str(metric.id)
+        data = self.ioctx.read(object_name)
+        measures = self._unserialize_measures(object_name, data)
 
         yield measures
 
@@ -204,9 +166,8 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         with rados.WriteOpCtx() as op:
             # NOTE(sileht): come on Ceph, no return code
             # for this operation ?!!
-            self.ioctx.remove_omap_keys(op, tuple(object_names))
+            self.ioctx.remove_omap_keys(op, (object_name,))
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
 
-        for n in object_names:
-            self.ioctx.aio_remove(n)
+        self.ioctx.aio_remove(object_name)
