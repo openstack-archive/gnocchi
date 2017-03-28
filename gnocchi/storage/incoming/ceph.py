@@ -152,7 +152,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
 
-        self.ioctx.aio_remove(object_name)
+        self.ioctx.remove(object_name)
 
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
@@ -170,4 +170,4 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             self.ioctx.operate_write_op(op, self.MEASURE_PREFIX,
                                         flags=self.OMAP_WRITE_FLAGS)
 
-        self.ioctx.aio_remove(object_name)
+        self.ioctx.remove(object_name)
