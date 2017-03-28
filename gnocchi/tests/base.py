@@ -302,7 +302,7 @@ class TestCase(base.BaseTestCase):
                                    tempdir.path,
                                    'storage')
         elif self.conf.storage.driver == 'ceph':
-            pool_name = uuid.uuid4().hex
+            pool_name = uuidutils.generate_uuid(dashed=False)
             subprocess.call("rados -c %s mkpool %s" % (
                 os.getenv("CEPH_CONF"), pool_name), shell=True)
             self.conf.set_override('ceph_pool', pool_name, 'storage')
