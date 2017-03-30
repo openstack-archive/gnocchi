@@ -26,6 +26,7 @@ import re
 import struct
 import time
 
+import bitshuffle
 import lz4.block
 import numpy
 import numpy.lib.recfunctions
@@ -310,23 +311,17 @@ class BoundTimeSerie(TimeSerie):
             before_truncate_callback(self)
         self._truncate()
 
-    _SERIALIZATION_TIMESTAMP_VALUE_LEN = struct.calcsize("<Qd")
-    _SERIALIZATION_TIMESTAMP_LEN = struct.calcsize("<Q")
-
     @classmethod
     def unserialize(cls, data, block_size, back_window):
         uncompressed = lz4.block.decompress(data)
-        nb_points = (
-            len(uncompressed) // cls._SERIALIZATION_TIMESTAMP_VALUE_LEN
-        )
-        timestamps_raw = uncompressed[
-            :nb_points*cls._SERIALIZATION_TIMESTAMP_LEN]
-        timestamps = numpy.frombuffer(timestamps_raw, dtype='<Q')
+        arr = numpy.frombuffer(uncompressed)
+        unshuffled = bitshuffle.bitunshuffle(arr)
+        nb_points = len(unshuffled) // 2
+        timestamps = unshuffled[:nb_points]
         timestamps = numpy.cumsum(timestamps)
         timestamps = numpy.array(timestamps, dtype='datetime64[ns]')
 
-        values_raw = uncompressed[nb_points*cls._SERIALIZATION_TIMESTAMP_LEN:]
-        values = numpy.frombuffer(values_raw, dtype='<d')
+        values = unshuffled[nb_points:].view(numpy.float64)
 
         return cls.from_data(
             pandas.to_datetime(timestamps),
@@ -337,11 +332,11 @@ class BoundTimeSerie(TimeSerie):
     def serialize(self):
         # NOTE(jd) Use a double delta encoding for timestamps
         timestamps = numpy.insert(numpy.diff(self.ts.index),
-                                  0, self.first.value)
-        timestamps = numpy.array(timestamps, dtype='<Q')
-        values = numpy.array(self.ts.values, dtype='<d')
-        payload = (timestamps.tobytes() + values.tobytes())
-        return lz4.block.compress(payload)
+                                  0, self.first.value).view(numpy.uint64)
+        values = self.ts.values.view(numpy.float64)
+        mixed = numpy.append(timestamps, values)
+        payload = bitshuffle.bitshuffle(mixed)
+        return lz4.block.compress(payload.tobytes())
 
     @classmethod
     def benchmark(cls):
@@ -494,8 +489,6 @@ class AggregatedTimeSerie(TimeSerie):
     _AGG_METHOD_PCT_RE = re.compile(r"([1-9][0-9]?)pct")
 
     PADDED_SERIAL_LEN = struct.calcsize("<?d")
-    COMPRESSED_SERIAL_LEN = struct.calcsize("<Hd")
-    COMPRESSED_TIMESPAMP_LEN = struct.calcsize("<H")
 
     def __init__(self, sampling, aggregation_method, ts=None, max_size=None):
         """A time serie that is downsampled.
@@ -604,20 +597,11 @@ class AggregatedTimeSerie(TimeSerie):
                 # Compressed format
                 uncompressed = lz4.block.decompress(
                     memoryview(data)[1:].tobytes())
-                nb_points = len(uncompressed) // cls.COMPRESSED_SERIAL_LEN
-
-                timestamps_raw = uncompressed[
-                    :nb_points*cls.COMPRESSED_TIMESPAMP_LEN]
-                try:
-                    y = numpy.frombuffer(timestamps_raw, dtype='<H')
-                except ValueError:
-                    raise InvalidData()
-                y = numpy.cumsum(y * sampling) + start
-
-                values_raw = uncompressed[
-                    nb_points*cls.COMPRESSED_TIMESPAMP_LEN:]
-                x = numpy.frombuffer(values_raw, dtype='<d')
-
+                shuffled = numpy.frombuffer(uncompressed, numpy.float64)
+                unshuffled = bitshuffle.bitunshuffle(shuffled)
+                nb_points = len(unshuffled) // 2
+                y = numpy.cumsum(unshuffled[:nb_points] * sampling) + start
+                x = unshuffled[nb_points:]
             else:
                 # Padded format
                 try:
@@ -675,10 +659,11 @@ class AggregatedTimeSerie(TimeSerie):
             timestamps = numpy.insert(
                 numpy.diff(self.ts.index) // offset_div,
                 0, int((self.first.value - start) // offset_div))
-            timestamps = numpy.array(timestamps, dtype='<H')
-            values = numpy.array(self.ts.values, dtype='<d')
-            payload = (timestamps.tobytes() + values.tobytes())
-            return None, b"c" + lz4.block.compress(payload)
+            timestamps = timestamps.view(numpy.uint16)
+            values = self.ts.values.view(numpy.float64)
+            mixed = numpy.append(timestamps, values)
+            shuffled = bitshuffle.bitshuffle(mixed)
+            return None, b"c" + lz4.block.compress(shuffled.tobytes())
         # NOTE(gordc): this binary serializes series based on the split
         # time. the format is 1B True/False flag which denotes whether
         # subsequent 8B is a real float or zero padding. every 9B
