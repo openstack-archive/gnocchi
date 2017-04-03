@@ -323,6 +323,7 @@ def metricd_tester(conf):
     # NOTE(sileht): This method is designed to be profiled, we
     # want to avoid issues with profiler and os.fork(), that
     # why we don't use the MetricdServiceManager.
+    test = 1
     index = indexer.get_driver(conf)
     index.connect()
     s = storage.get_driver(conf)
