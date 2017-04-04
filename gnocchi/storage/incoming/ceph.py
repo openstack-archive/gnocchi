@@ -165,7 +165,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
     @contextlib.contextmanager
     def process_measure_for_metric(self, metric):
         object_prefix = self.MEASURE_PREFIX + "_" + str(metric.id)
-        object_names = list(self._list_object_names_to_process(object_prefix))
+        object_names = self._list_object_names_to_process(object_prefix)
 
         measures = []
         ops = []
