@@ -32,7 +32,7 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
     _MEASURE_SERIAL_FORMAT = "Qd"
     _MEASURE_SERIAL_LEN = struct.calcsize(_MEASURE_SERIAL_FORMAT)
 
-    NUM_SACKS = 2
+    NUM_SACKS = 32
 
     def _unserialize_measures(self, measure_id, data):
         nb_measures = len(data) // self._MEASURE_SERIAL_LEN
