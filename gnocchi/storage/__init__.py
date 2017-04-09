@@ -17,6 +17,7 @@ import operator
 from oslo_config import cfg
 from oslo_log import log
 from stevedore import driver
+from tooz import coordination
 
 from gnocchi import exceptions
 from gnocchi import indexer
@@ -190,6 +191,8 @@ class StorageDriver(object):
         for m in metrics_to_expunge:
             try:
                 self.delete_metric(m, sync)
+            except coordination.LockAcquiredFailed:
+                continue  # another process is working on it.
             except Exception:
                 if sync:
                     raise
