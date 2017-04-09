@@ -23,7 +23,6 @@ from oslo_config import cfg
 from oslo_log import log
 from oslo_utils import timeutils
 import six
-from tooz import coordination
 
 from gnocchi import archive_policy
 from gnocchi import genconfig
@@ -146,6 +145,7 @@ class MetricProcessor(MetricProcessBase):
             worker_id, conf, conf.metricd.metric_processing_delay)
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
+        self.release_delay = conf.metricd.metric_processing_delay
 
     def _lock(self, sack):
         lock_name = b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
@@ -157,18 +157,17 @@ class MetricProcessor(MetricProcessBase):
             s_count = 0
             in_ = self.store.incoming
             for s in six.moves.range(in_.NUM_SACKS):
-                # TODO(gordc): make tooz support delay release lock so we don't
-                # process a sack right after it's another process
-                try:
-                    with self._lock(s)(blocking=False):
-                        metrics = in_.list_metric_with_measures_to_process(s)
-                        sack_size = len(metrics)
-                        self.store.process_background_tasks(self.index,
-                                                            metrics)
-                        m_count += sack_size
-                        s_count += 1
-                except coordination.LockAcquireFailed:
-                    pass  # don't care, let others try & try again next time
+                lock = self._lock(s)
+                if not lock.acquire(blocking=False):
+                    continue
+                metrics = in_.list_metric_with_measures_to_process(s)
+                sack_size = len(metrics)
+                self.store.process_background_tasks(self.index, metrics)
+                m_count += sack_size
+                s_count += 1
+                # delay releasing of lock so another process does not work on
+                # same sack immediately after another.
+                threading.Timer(self.release_delay, lock.release).start()
             LOG.debug("%d metrics processed from %d sacks", m_count, s_count)
         except Exception:
             LOG.error("Unexpected error processing assigned job",
