@@ -61,7 +61,7 @@ inject_data() {
     } | gnocchi measures batch-resources-metrics -
 
     echo "* Waiting for measures computation"
-    while [ $(gnocchi status -f value -c "storage/total number of measures to process") -gt 0 ]; do sleep 1 ; done
+    while [ $(gnocchi status -f value -c "storage/total number of measures to process") -gt 0 ]; do gnocchi status && sleep 5 ; done
 }
 
 pifpaf_stop(){
