@@ -170,7 +170,7 @@ class MetricScheduler(MetricProcessBase):
                      'with up to %s metrics', self.block_index,
                      self.block_size)
         except Exception:
-            LOG.warning('Error getting block to work on, defaulting to first')
+            LOG.error('Error getting block to work on, defaulting to first')
             self.block_index = 0
             self.block_size = self.block_size_default
 
