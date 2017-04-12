@@ -563,6 +563,7 @@ class MetricsController(rest.RestController):
             attr_filter['creator'] = provided_creator
         attr_filter.update(get_pagination_options(
             kwargs, METRIC_DEFAULT_PAGINATION))
+        attr_filter['status'] = kwargs.get('status', 'active')
         try:
             return pecan.request.indexer.list_metrics(**attr_filter)
         except indexer.IndexerException as e:
