@@ -669,9 +669,18 @@ tests:
     - name: delete single archive policy cleanup
       DELETE: /v1/archive_policy/gabbilive
       poll:
-          count: 360
+          count: 60
           delay: 1
       status: 204
+
+    - name: get all metrics to verify
+      verbose: True
+      GET: /v1/metric
+      status: 200
+
+    - name: get all resources to verify
+      verbose: True
+      GET: /v1/resource/generic
 
     # It really is gone
 
