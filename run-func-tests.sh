@@ -42,7 +42,7 @@ for storage in ${GNOCCHI_TEST_STORAGE_DRIVERS}; do
         esac
 
         eval $(pifpaf -e INDEXER run $indexer)
-        eval $(pifpaf -e GNOCCHI run gnocchi --indexer-url $INDEXER_URL --storage-url $STORAGE_URL)
+        eval $(pifpaf --debug -e GNOCCHI run gnocchi --indexer-url $INDEXER_URL --storage-url $STORAGE_URL)
 
         export GNOCCHI_SERVICE_URL=$GNOCCHI_ENDPOINT
         export GNOCCHI_SERVICE_TOKEN="" # Just make gabbi happy
