@@ -183,4 +183,4 @@ Then, you can start devstack:
 
     ./stack.sh
 
-.. _devstack: http://devstack.org
+.. _devstack: https://devstack.org

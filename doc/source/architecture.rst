@@ -61,7 +61,7 @@ Gnocchi processes. In any case, it is obvious that S3, Ceph and Swift drivers
 are largely more scalable. Ceph also offers better consistency, and hence is
 the recommended driver.
 
-.. _OpenStack Swift: http://docs.openstack.org/developer/swift/
+.. _OpenStack Swift: https://docs.openstack.org/developer/swift/
 .. _Ceph: https://ceph.com
 .. _`S3`: https://aws.amazon.com/s3/
 .. _`Redis`: https://redis.io

@@ -35,7 +35,7 @@ You can join Gnocchi's community via the following channels:
 - Bug tracker: https://bugs.launchpad.net/gnocchi
 - IRC: #gnocchi on `Freenode <https://freenode.net>`_
 - Mailing list: `openstack-dev@lists.openstack.org
-  <http://lists.openstack.org/cgi-bin/mailman/listinfo/openstack-dev>`_ with
+  <https://lists.openstack.org/cgi-bin/mailman/listinfo/openstack-dev>`_ with
   *[gnocchi]* in the `Subject` header.
 
 Why Gnocchi?

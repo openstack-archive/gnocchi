@@ -1,4 +1,4 @@
-=================
+================
 Grafana support
 =================
 
@@ -31,12 +31,12 @@ steps:
    Grafana::
 
      [cors]
-     allowed_origin = http://example.com/grafana
+     allowed_origin = https://example.com/grafana
 
 2. Configure the CORS middleware in Keystone to allow request from Grafana too:
 
      [cors]
-     allowed_origin = http://example.com/grafana
+     allowed_origin = https://example.com/grafana
 
 3. Configure a new datasource in Grafana with the Keystone URL, a user, a
    project and a password. Your browser will query Keystone for a token, and
