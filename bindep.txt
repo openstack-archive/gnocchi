@@ -8,3 +8,6 @@ librados-dev [platform:dpkg]
 ceph [platform:dpkg]
 redis-server [platform:dpkg]
 liberasurecode-dev [platform:dpkg]
+
+nodejs [test]
+npm [test]
