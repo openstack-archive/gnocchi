@@ -16,6 +16,7 @@ do
                 then
                     mkdir npm-s3rver
                     export NPM_CONFIG_PREFIX=npm-s3rver
+                    npm install npm@latest -g
                     npm install s3rver --global
                     export PATH=$PWD/npm-s3rver/bin:$PATH
                 fi
