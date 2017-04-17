@@ -16,7 +16,8 @@ do
                 then
                     mkdir npm-s3rver
                     export NPM_CONFIG_PREFIX=npm-s3rver
-                    npm install s3rver --global
+                    npm install npm@latest -g
+                    $PWD/npm-s3rver/bin/npm install s3rver --global
                     export PATH=$PWD/npm-s3rver/bin:$PATH
                 fi
                 pifpaf -e GNOCCHI_STORAGE run s3rver -- \
