@@ -339,14 +339,15 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def delete_metric(self, metric, sync=False):
         LOG.debug("Deleting metric %s", metric)
-        lock = self._lock(metric.id)
+        lock = self.incoming.get_sack_lock(
+            self.coord, self.incoming.sack_for_metric(metric.id))
         if not lock.acquire(blocking=sync):
             raise storage.LockedMetric(metric)
-        try:
-            self._delete_metric(metric)
-            self.incoming.delete_unprocessed_measures_for_metric_id(metric.id)
-        finally:
-            lock.release()
+        # NOTE(gordc): no need to hold lock because we know nothing can work
+        #              on metric going forward.
+        lock.release()
+        self._delete_metric(metric)
+        self.incoming.delete_unprocessed_measures_for_metric_id(metric.id)
 
     @staticmethod
     def _delete_metric_measures(metric, timestamp_key,
