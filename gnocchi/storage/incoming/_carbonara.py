@@ -34,6 +34,10 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
 
     NUM_SACKS = 8
 
+    @staticmethod
+    def sack_lock(sack):
+        return b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
+
     def _unserialize_measures(self, measure_id, data):
         nb_measures = len(data) // self._MEASURE_SERIAL_LEN
         try:

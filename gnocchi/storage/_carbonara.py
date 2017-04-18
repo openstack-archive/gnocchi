@@ -70,10 +70,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def stop(self):
         self.coord.stop()
 
-    def _lock(self, metric_id):
-        lock_name = b"gnocchi-" + str(metric_id).encode('ascii')
-        return self.coord.get_lock(lock_name)
-
     @staticmethod
     def _get_measures(metric, timestamp_key, aggregation, granularity,
                       version=3):
@@ -337,7 +333,10 @@ class CarbonaraBasedStorage(storage.StorageDriver):
 
     def delete_metric(self, metric, sync=False):
         LOG.debug("Deleting metric %s", metric)
-        with self._lock(metric.id)(blocking=sync):
+        # NOTE(gordc): lock sack so janitors don't overlap and because metric
+        # may have been scheduled, validated but deleted before processed.
+        sack = self.incoming.compute_sack(metric.id)
+        with self.coord.get_lock(self.incoming.sack_lock(sack))(blocking=sync):
             self._delete_metric(metric)
             self.incoming.delete_unprocessed_measures_for_metric_id(metric.id)
 
@@ -352,12 +351,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         # measures will be skipped until cleaned by janitor.
         metrics = indexer.list_metrics(ids=metrics_to_process)
         for metric in metrics:
-            lock = self._lock(metric.id)
-            # Do not block if we cannot acquire the lock, that means some other
-            # worker is doing the job. We'll just ignore this metric and may
-            # get back later to it if needed.
-            if not lock.acquire(blocking=sync):
-                continue
             try:
                 locksw = timeutils.StopWatch().start()
                 LOG.debug("Processing measures for %s", metric)
@@ -372,8 +365,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 if sync:
                     raise
                 LOG.error("Error processing new measures", exc_info=True)
-            finally:
-                lock.release()
 
     def _compute_and_store_timeseries(self, metric, measures):
         # NOTE(mnaser): The metric could have been handled by
