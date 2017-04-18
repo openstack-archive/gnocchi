@@ -21,7 +21,6 @@ import uuid
 from concurrent import futures
 import jsonpatch
 from oslo_utils import dictutils
-from oslo_utils import strutils
 import pecan
 from pecan import rest
 import pyparsing
@@ -139,7 +138,7 @@ def get_header_option(name, params):
     type, options = werkzeug.http.parse_options_header(
         pecan.request.headers.get('Accept'))
     try:
-        return strutils.bool_from_string(
+        return utils.strtobool(
             options.get(name, params.pop(name, 'false')),
             strict=True)
     except ValueError as e:
@@ -427,7 +426,7 @@ class MetricController(rest.RestController):
             except ValueError as e:
                 abort(400, e)
 
-        if strutils.bool_from_string(refresh):
+        if utils.strtobool(refresh):
             pecan.request.storage.process_new_measures(
                 pecan.request.indexer, [six.text_type(self.metric.id)], True)
 
@@ -1366,7 +1365,7 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
                 names=names, resource_id=resource_id)
 
             known_names = [m.name for m in metrics]
-            if strutils.bool_from_string(create_metrics):
+            if utils.strtobool(create_metrics):
                 already_exists_names = []
                 for name in names:
                     if name not in known_names:
@@ -1603,7 +1602,7 @@ class AggregationController(rest.RestController):
                     abort(400, "fill must be a float or \'null\': %s" % e)
 
         try:
-            if strutils.bool_from_string(refresh):
+            if utils.strtobool(refresh):
                 pecan.request.storage.process_new_measures(
                     pecan.request.indexer,
                     [six.text_type(m.id) for m in metrics], True)
@@ -1667,7 +1666,7 @@ class StatusController(rest.RestController):
         enforce("get status", {})
         try:
             report = pecan.request.storage.incoming.measures_report(
-                strutils.bool_from_string(details))
+                utils.strtobool(details))
         except incoming.ReportGenerationError:
             abort(503, 'Unable to generate status. Please retry.')
         report_dict = {"storage": {"summary": report['summary']}}
