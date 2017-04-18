@@ -66,6 +66,11 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
     def clean_old_sacks(num_sacks):
         raise NotImplementedError
 
+    @staticmethod
+    def get_sack_lock(coord, sack):
+        lock_name = b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
+        return coord.get_lock(lock_name)
+
     def _unserialize_measures(self, measure_id, data):
         nb_measures = len(data) // self._MEASURE_SERIAL_LEN
         try:
