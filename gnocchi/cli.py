@@ -247,7 +247,10 @@ class MetricScheduler(MetricProcessBase):
         if self.periodic:
             self.periodic.stop()
             self.periodic.wait()
-        self._coord.leave_group(self.GROUP_ID)
+        try:
+            self._coord.leave_group(self.GROUP_ID)
+        except tooz.NotImplemented:
+            pass
         self._coord.stop()
 
 
