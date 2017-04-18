@@ -146,10 +146,6 @@ class MetricProcessor(MetricProcessBase):
         self._coord, self._my_id = utils.get_coordinator_and_start(
             conf.storage.coordination_url)
 
-    def _sack_lock(self, sack):
-        lock_name = b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
-        return self._coord.get_lock(lock_name)
-
     def _run_job(self):
         m_count = 0
         s_count = 0
@@ -157,7 +153,7 @@ class MetricProcessor(MetricProcessBase):
         for s in six.moves.range(in_store.NUM_SACKS):
             # TODO(gordc): support delay release lock so we don't
             # process a sack right after another process
-            lock = self._sack_lock(s)
+            lock = in_store.get_sack_lock(self._coord, s)
             if not lock.acquire(blocking=False):
                 continue
             try:
