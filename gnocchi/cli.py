@@ -162,9 +162,11 @@ class MetricScheduler(MetricProcessBase):
         self.block_index = 0
         self.block_size_default = self.workers * self.TASKS_PER_WORKER
         self.block_size = self.block_size_default
+        self.block_synced = threading.Event()
         self.periodic = None
 
     def set_block(self, event):
+        self.block_synced.clear()
         get_members_req = self._coord.get_members(self.GROUP_ID)
         try:
             members = sorted(get_members_req.get())
@@ -175,11 +177,16 @@ class MetricScheduler(MetricProcessBase):
                 cap = msgpack.loads(req.get(), encoding='utf-8')
                 max_workers = max(cap['workers'], self.workers)
             self.block_size = max_workers * self.TASKS_PER_WORKER
+            self.block_synced.set()
             LOG.info('New set of agents detected. Now working on block: %s, '
                      'with up to %s metrics', self.block_index,
                      self.block_size)
         except Exception:
-            LOG.warning('Error getting block to work on, defaulting to first')
+            # FIXME(sileht): looks like if something wrong occurs we never
+            # recover is no worker join/leave. We should mark this
+            # process as 'dirty worker' and retry later to fix it
+            LOG.error('Error getting block to work on (%s), '
+                      'defaulting to first', exc_info=True)
             self.block_index = 0
             self.block_size = self.block_size_default
 
@@ -195,7 +202,9 @@ class MetricScheduler(MetricProcessBase):
 
             @periodics.periodic(spacing=self.SYNC_RATE, run_immediately=True)
             def run_watchers():
-                self._coord.run_watchers()
+                done = self._coord.run_watchers()
+                if not done and not self.block_synced.is_set():
+                    self.set_block(None)
 
             self.periodic = periodics.PeriodicWorker.create([])
             self.periodic.add(run_watchers)
@@ -221,6 +230,8 @@ class MetricScheduler(MetricProcessBase):
 
     def _run_job(self):
         try:
+            if not self.block_synced:
+                self.set_block(None)
             metrics = set(
                 self.store.incoming.list_metric_with_measures_to_process(
                     self.block_size, self.block_index))
