@@ -178,8 +178,14 @@ class MetricScheduler(MetricProcessBase):
             LOG.info('New set of agents detected. Now working on block: %s, '
                      'with up to %s metrics', self.block_index,
                      self.block_size)
-        except Exception:
-            LOG.warning('Error getting block to work on, defaulting to first')
+        except Exception as e:
+            # FIXME(sileht): looks like if something wrong occurs we never
+            # recover is no worker join/leave. We should mark this
+            # process as 'dirty worker' and retry later to fix it
+            LOG.warning('Error getting block to work on (%s), '
+                        'defaulting to first',
+                        str(e),
+                        exc_info=LOG.isEnabledFor(log.DEBUG))
             self.block_index = 0
             self.block_size = self.block_size_default
 
