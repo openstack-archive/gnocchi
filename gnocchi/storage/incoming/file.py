@@ -35,6 +35,12 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         utils.ensure_paths([self._sack_path(i)
                             for i in six.moves.range(self.NUM_SACKS)])
         utils.ensure_paths([self.basepath_tmp])
+        # upgrade gnocchi 3.x incoming path
+        measure_path_v3 = os.path.join(self.basepath, 'measure')
+        for metric in self._list_target(measure_path_v3):
+            sack = self.compute_sack(uuid.UUID(metric))
+            os.rename(os.path.join(measure_path_v3, metric),
+                      os.path.join(self._sack_path(sack), metric))
 
     def _sack_path(self, sack):
         return os.path.join(self.basepath, self.SACK_PREFIX % sack)
