@@ -54,6 +54,26 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         # we are safe and good.
         self.OMAP_WRITE_FLAGS = rados.LIBRADOS_OPERATION_SKIPRWLOCKS
 
+    def upgrade(self, index):
+        super(CephStorage, self).upgrade(index)
+        with rados.ReadOpCtx() as op:
+            omaps, ret = self.ioctx.get_omap_vals(op, '', '', -1)
+            try:
+                self.ioctx.operate_read_op(op, "measure",
+                                           flag=self.OMAP_READ_FLAGS)
+            except rados.ObjectNotFound:
+                # nothing to upgrade
+                return
+
+        for k, __ in omaps:
+            metric = k.split('_', 2)[1]
+            sack = self.compute_sack(uuid.UUID(metric))
+            with rados.WriteOpCtx() as op:
+                self.ioctx.set_omap(op, (k,), (b"",))
+                self.ioctx.operate_write_op(op, self.SACK_PREFIX % sack,
+                                            flags=self.OMAP_WRITE_FLAGS)
+        self.ioctx.remove_object("measure")
+
     def stop(self):
         ceph.close_rados_connection(self.rados, self.ioctx)
         super(CephStorage, self).stop()
