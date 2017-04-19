@@ -86,6 +86,13 @@ def list_opts():
                        required=True,
                        help="How many seconds to wait between "
                        "cleaning of expired data"),
+            cfg.IntOpt('partition_replicas',
+                       default=3,
+                       min=1,
+                       help="Number of workers that share a task. A higher "
+                       "value may improve worker utilization but may also "
+                       "increase load on coordination backend. Value is "
+                       "capped by number of workers globally."),
         )),
         ("api", (
             cfg.StrOpt('paste_config',
