@@ -121,7 +121,7 @@ def upgrade():
             new_original_resource_id = new_original_resource_id.encode('utf-8')
         new_id = sa.literal(uuidtype.process_bind_param(
             str(utils.ResourceUUID(
-                new_original_resource_id, resource.creator)),
+                new_original_resource_id, resource.creator or "")),
             connection.dialect))
 
         # resource table
