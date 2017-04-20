@@ -37,6 +37,14 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         super(SwiftStorage, self).upgrade(index)
         for i in six.moves.range(self.NUM_SACKS):
             self.swift.put_container(self._sack(i))
+        __, files = self.swift.get_container('measure', full_listing=True)
+        for f in files:
+            name = f['name']
+            sack = self.compute_sack(uuid.UUID(name.split('/', 1)[0]))
+            self.swift.copy_object('measure', name,
+                                   '/'.join('', self._sack(sack), name))
+            self.swift.delete_object('measure', name)
+        self.swift.delete_container('measure')
 
     def _store_new_measures(self, metric, data):
         now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
