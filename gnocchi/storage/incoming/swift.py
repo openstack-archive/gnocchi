@@ -31,7 +31,7 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         self.swift = swift.get_connection(conf)
 
     def _sack(self, sack):
-        return self.SACK_PREFIX % sack
+        return self.SACK_PATH % sack
 
     def upgrade(self, index):
         super(SwiftStorage, self).upgrade(index)

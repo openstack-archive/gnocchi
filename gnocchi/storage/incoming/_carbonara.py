@@ -17,22 +17,37 @@
 import itertools
 import struct
 
+from oslo_config import cfg
 from oslo_log import log
 import pandas
 import six.moves
 
 from gnocchi.storage import incoming
 
+
+OPTS = [
+    cfg.IntOpt('sacks',
+               default=128, min=8,
+               help='Number of partitions to distribute incoming measures '
+                    'across. Value should be greater than total number of '
+                    'metricd workers. WARNING: modifying this value after '
+                    'initial start up may result in a loss of data. See '
+                    'documentation for best practices.'),
+]
+
 LOG = log.getLogger(__name__)
 
 
 class CarbonaraBasedStorage(incoming.StorageDriver):
     MEASURE_PREFIX = "measure"
-    SACK_PREFIX = "incoming-%s"
+    SACK_PREFIX = "incoming"
     _MEASURE_SERIAL_FORMAT = "Qd"
     _MEASURE_SERIAL_LEN = struct.calcsize(_MEASURE_SERIAL_FORMAT)
 
-    NUM_SACKS = 8
+    def __init__(self, conf):
+        super(CarbonaraBasedStorage, self).__init__(conf)
+        self.NUM_SACKS = conf.sacks
+        self.SACK_PATH = self.SACK_PREFIX + str(self.NUM_SACKS) + '-%s'
 
     @staticmethod
     def sack_lock(sack):

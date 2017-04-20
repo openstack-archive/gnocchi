@@ -133,6 +133,51 @@ process is continuously increasing, you will need to (maybe temporarily)
 increase the number of `gnocchi-metricd` daemons. You can run any number of
 metricd daemon on any number of servers.
 
+How many sacks do we need to create
+===================================
+
+Measurement data pushed to Gnocchi is divided into sacks for better
+distribution. The number of partitions is controlled by the `sacks` option
+under the `[incoming]` section. This value should be set based on the
+number of active metrics the system will capture. Additionally, the number of
+`sacks`, should be higher than the total number of active metricd workers.
+
+In general, use the following equation to determine the appropriate `sacks`
+value to set:
+
+.. math::
+
+   sacks value = number of **active** metrics / 300
+
+If the estimated number of metrics is the absolute maximum, divide the value
+by 500 instead. If the estimated number of active metrics is conservative and
+expected to grow, divide the value by 100 instead to accommodate growth.
+
+.. warning::
+
+   The `sacks` option should be consistent across all services: api, metricd,
+   etc... Having a different value across services may result in a loss of data
+
+How do we change sack size
+==========================
+
+In the event your system grows to capture signficantly more metrics than
+originally anticipated, the number of sacks can be changed to maintain good
+distribution. To avoid any loss of data when modifying `sacks` option. The
+option should be changed in the following order::
+
+  1. Set `sacks` to new value
+
+  2. Stop all input services (api, statsd)
+
+  3. Restart all input services (api, statsd) with new configuration
+
+  4. Let metricd agents clear backlog from original deployment. This can be
+     verified based on periodic reporting logs in metricd agent.
+
+  5. Stop metricd agents when backlog cleared and restart with new
+     configuration
+
 How to monitor Gnocchi
 ======================
 

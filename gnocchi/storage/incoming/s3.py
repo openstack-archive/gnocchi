@@ -29,11 +29,10 @@ botocore = s3.botocore
 
 class S3Storage(_carbonara.CarbonaraBasedStorage):
 
-    # NOTE(gordc): override to follow s3 partitioning logic
-    SACK_PREFIX = '%s/'
-
     def __init__(self, conf):
         super(S3Storage, self).__init__(conf)
+        # NOTE(gordc): override to follow s3 partitioning logic
+        self.SACK_PATH = '%s-' + ('%s/' % self.NUM_SACKS)
         self.s3, self._region_name, self._bucket_prefix = (
             s3.get_connection(conf)
         )
@@ -43,7 +42,7 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
         )
 
     def _sack_prefix(self, i):
-        return self.SACK_PREFIX % i
+        return self.SACK_PATH % i
 
     def upgrade(self, indexer):
         super(S3Storage, self).upgrade(indexer)

@@ -76,7 +76,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         with rados.WriteOpCtx() as op:
             self.ioctx.set_omap(op, (name,), (b"",))
             self.ioctx.operate_write_op(
-                op, self.SACK_PREFIX % self.compute_sack(metric.id),
+                op, self.SACK_PATH % self.compute_sack(metric.id),
                 flags=self.OMAP_WRITE_FLAGS)
 
     def _build_report(self, details):
@@ -110,7 +110,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             omaps, ret = self.ioctx.get_omap_vals(op, marker, prefix, limit)
             try:
                 self.ioctx.operate_read_op(
-                    op, self.SACK_PREFIX % sack, flag=self.OMAP_READ_FLAGS)
+                    op, self.SACK_PATH % sack, flag=self.OMAP_READ_FLAGS)
             except rados.ObjectNotFound:
                 # API have still written nothing
                 return ()
@@ -149,7 +149,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             # NOTE(sileht): come on Ceph, no return code
             # for this operation ?!!
             self.ioctx.remove_omap_keys(op, tuple(object_names))
-            self.ioctx.operate_write_op(op, self.SACK_PREFIX % sack,
+            self.ioctx.operate_write_op(op, self.SACK_PATH % sack,
                                         flags=self.OMAP_WRITE_FLAGS)
 
         for n in object_names:
@@ -200,7 +200,7 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
             # NOTE(sileht): come on Ceph, no return code
             # for this operation ?!!
             self.ioctx.remove_omap_keys(op, tuple(object_names))
-            self.ioctx.operate_write_op(op, self.SACK_PREFIX % sack,
+            self.ioctx.operate_write_op(op, self.SACK_PATH % sack,
                                         flags=self.OMAP_WRITE_FLAGS)
 
         for n in object_names:

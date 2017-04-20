@@ -37,7 +37,7 @@ class FileStorage(_carbonara.CarbonaraBasedStorage):
         utils.ensure_paths([self.basepath_tmp])
 
     def _sack_path(self, sack):
-        return os.path.join(self.basepath, self.SACK_PREFIX % sack)
+        return os.path.join(self.basepath, self.SACK_PATH % sack)
 
     def _measure_path(self, sack, metric_id):
         return os.path.join(self._sack_path(sack), six.text_type(metric_id))
