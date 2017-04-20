@@ -133,6 +133,53 @@ process is continuously increasing, you will need to (maybe temporarily)
 increase the number of `gnocchi-metricd` daemons. You can run any number of
 metricd daemon on any number of servers.
 
+How to scale measure processing
+===============================
+
+Measurement data pushed to Gnocchi is divided into sacks for better
+distribution. The number of partitions is controlled by the `sacks` option
+under the `[incoming]` section. This value should be set based on the
+number of active metrics the system will capture. Additionally, the number of
+`sacks`, should be higher than the total number of active metricd workers.
+distribution. Incoming metrics are pushed to specific sacks and each sack
+is assigned to one or more `gnocchi-metricd` daemons for processing.
+
+How many sacks do we need to create
+-----------------------------------
+
+This number of sacks enabled should be set based on the number of active
+metrics the system will capture. Additionally, the number of sacks, should
+be higher than the total number of active `gnocchi-metricd` workers.
+
+In general, use the following equation to determine the appropriate `sacks`
+value to set:
+
+.. math::
+
+   sacks value = number of **active** metrics / 300
+
+If the estimated number of metrics is the absolute maximum, divide the value
+by 500 instead. If the estimated number of active metrics is conservative and
+expected to grow, divide the value by 100 instead to accommodate growth.
+
+How do we change sack size
+--------------------------
+
+In the event your system grows to capture signficantly more metrics than
+originally anticipated, the number of sacks can be changed to maintain good
+distribution. To avoid any loss of data when modifying `sacks` option. The
+option should be changed in the following order::
+
+  1. Stop all input services (api, statsd)
+
+  2. Stop all metricd services once backlog is cleared
+
+  3. Run gnocchi-change-sack-size <number of sacks> to set new sack size. Note
+     that sack value can only be changed if the backlog is empty.
+
+  4. Restart all gnocchi services (api, statsd, metricd) with new configuration
+
+
 How to monitor Gnocchi
 ======================
 

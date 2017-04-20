@@ -30,11 +30,6 @@ class SwiftStorage(_carbonara.CarbonaraBasedStorage):
         super(SwiftStorage, self).__init__(conf)
         self.swift = swift.get_connection(conf)
 
-    def upgrade(self, index):
-        super(SwiftStorage, self).upgrade(index)
-        for i in six.moves.range(self.NUM_SACKS):
-            self.swift.put_container(self.get_sack_name(i))
-
     def _store_new_measures(self, metric, data):
         now = datetime.datetime.utcnow().strftime("_%Y%m%d_%H:%M:%S")
         self.swift.put_object(
