@@ -16,6 +16,7 @@ import contextlib
 import datetime
 import errno
 import functools
+import json
 import uuid
 
 import six
@@ -57,6 +58,16 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
     def stop(self):
         ceph.close_rados_connection(self.rados, self.ioctx)
         super(CephStorage, self).stop()
+
+    def get_storage_sacks(self):
+        try:
+            return json.loads(self.ioctx.read(self.CFG_PREFIX))[self.CFG_SACKS]
+        except rados.ObjectNotFound:
+            return
+
+    def set_storage_settings(self, num_sacks):
+        self.ioctx.write_full(self.CFG_PREFIX,
+                              json.dumps({self.CFG_SACKS: num_sacks}).encode())
 
     def _store_new_measures(self, metric, data):
         # NOTE(sileht): list all objects in a pool is too slow with
