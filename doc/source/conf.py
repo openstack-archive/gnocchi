@@ -184,3 +184,6 @@ scv_banner_greatest_tag = True
 scv_priority = 'branches'
 scv_whitelist_branches = ('master', '^stable/(2\.1|2\.2|[3-9]\.)')
 scv_whitelist_tags = ("^[2-9]\.",)
+# Override some conf for old version
+scv_overflow = ("-D", "html_theme=sphinx_rtd_theme",
+                "-D", "html_theme_options.logo_only=True")
