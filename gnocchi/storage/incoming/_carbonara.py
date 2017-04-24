@@ -19,7 +19,7 @@ import struct
 
 from oslo_log import log
 import pandas
-import six.moves
+import six
 
 from gnocchi.storage import incoming
 
@@ -45,12 +45,16 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
             pandas.to_datetime(measures[::2], unit='ns'),
             itertools.islice(measures, 1, len(measures), 2))
 
-    def add_measures(self, metric, measures):
+    def _encode_measures(self, measures):
         measures = list(measures)
-        data = struct.pack(
+        return struct.pack(
             "<" + self._MEASURE_SERIAL_FORMAT * len(measures),
             *list(itertools.chain.from_iterable(measures)))
-        self._store_new_measures(metric, data)
+
+    def add_measures_batch(self, metrics_and_measures):
+        for metric, measures in six.iteritems(metrics_and_measures):
+            self._store_new_measures(
+                metric, self._encode_measures(measures))
 
     @staticmethod
     def _store_new_measures(metric, data):

@@ -18,7 +18,6 @@ import functools
 import itertools
 import uuid
 
-from concurrent import futures
 import jsonpatch
 from oslo_utils import dictutils
 from oslo_utils import strutils
@@ -1422,12 +1421,10 @@ class ResourcesMetricsMeasuresBatchController(rest.RestController):
         for metric in known_metrics:
             enforce("post measures", metric)
 
-        storage = pecan.request.storage.incoming
-        with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
-            list(executor.map(lambda x: storage.add_measures(*x),
-                              ((metric,
-                                body_by_rid[metric.resource_id][metric.name])
-                               for metric in known_metrics)))
+        pecan.request.storage.incoming.add_measures_batch(
+            dict((metric,
+                 body_by_rid[metric.resource_id][metric.name])
+                 for metric in known_metrics))
 
         pecan.response.status = 202
 
@@ -1456,11 +1453,9 @@ class MetricsMeasuresBatchController(rest.RestController):
         for metric in metrics:
             enforce("post measures", metric)
 
-        storage = pecan.request.storage.incoming
-        with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
-            list(executor.map(lambda x: storage.add_measures(*x),
-                              ((metric, body[metric.id]) for metric in
-                               metrics)))
+        pecan.request.storage.incoming.add_measures_batch(
+            dict((metric, body[metric.id]) for metric in
+                 metrics))
 
         pecan.response.status = 202
 
