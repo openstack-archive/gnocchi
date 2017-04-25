@@ -69,6 +69,14 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         self.ioctx.write_full(self.CFG_PREFIX,
                               json.dumps({self.CFG_SACKS: num_sacks}).encode())
 
+    def clean_old_sacks(self, num_sacks):
+        prefix = self.get_sack_prefix(num_sacks)
+        for i in six.moves.xrange(num_sacks):
+            try:
+                self.ioctx.remove_object(prefix % i)
+            except rados.ObjectNotFound:
+                pass
+
     def _store_new_measures(self, metric, data):
         # NOTE(sileht): list all objects in a pool is too slow with
         # many objects (2min for 20000 objects in 50osds cluster),
