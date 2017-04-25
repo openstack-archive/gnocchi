@@ -59,6 +59,10 @@ class CarbonaraBasedStorage(incoming.StorageDriver):
         raise NotImplementedError
 
     @staticmethod
+    def clean_old_sacks(num_sacks):
+        raise NotImplementedError
+
+    @staticmethod
     def get_sack_lock(coord, sack):
         lock_name = b'gnocchi-sack-%s-lock' % str(sack).encode('ascii')
         return coord.get_lock(lock_name)
