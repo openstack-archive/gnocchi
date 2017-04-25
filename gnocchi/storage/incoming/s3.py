@@ -58,6 +58,10 @@ class S3Storage(_carbonara.CarbonaraBasedStorage):
         # NOTE(gordc): override to follow s3 partitioning logic
         return '%s-' + ('%s/' % (num_sacks if num_sacks else self.NUM_SACKS))
 
+    def clean_old_sacks(self, num_sacks):
+        # nothing to cleanup since sacks are part of path
+        pass
+
     def upgrade(self, indexer):
         try:
             s3.create_bucket(self.s3, self._bucket_name_measures,
