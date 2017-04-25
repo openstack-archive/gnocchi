@@ -70,6 +70,14 @@ class CephStorage(_carbonara.CarbonaraBasedStorage):
         self.ioctx.write_full(self.CFG_PREFIX,
                               json.dumps({self.CFG_SACKS: num_sacks}).encode())
 
+    def clean_old_sacks(self, num_sacks):
+        prefix = self.get_sack_prefix(num_sacks)
+        for i in six.moves.xrange(num_sacks):
+            try:
+                self.ioctx.remove_object(prefix % i)
+            except rados.ObjectNotFound:
+                pass
+
     def add_measures_batch(self, metrics_and_measures):
         names_by_sack = defaultdict(list)
         for metric, measures in six.iteritems(metrics_and_measures):
