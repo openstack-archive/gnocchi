@@ -45,7 +45,7 @@ for storage in ${GNOCCHI_TEST_STORAGE_DRIVERS}; do
         export GNOCCHI_SERVICE_TOKEN="" # Just make gabbi happy
         export GNOCCHI_AUTHORIZATION="basic YWRtaW46" # admin in base64
         export OS_TEST_PATH=gnocchi/tests/functional_live
-        pifpaf -e GNOCCHI run gnocchi --indexer-url $INDEXER_URL --storage-url $STORAGE_URL -- ./tools/pretty_tox.sh $*
+        pifpaf -e GNOCCHI run gnocchi --indexer-url $INDEXER_URL --storage-url $STORAGE_URL --coordination-driver redis --coordination-port 9542 -- ./tools/pretty_tox.sh $* # coordination-port not necessary when pifpaf>1.0.0
 
         cleanup
     done
