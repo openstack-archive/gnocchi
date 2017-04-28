@@ -281,6 +281,9 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
         conf.set_override("connection",
                           self.dress_url(conf.indexer.url),
                           "database")
+        conf.set_override(group='database',
+                          name='mysql_enable_ndb',
+                          override=conf.indexer.mysql_enable_ndb)
         self.conf = conf
         self.facade = PerInstanceFacade(conf)
 

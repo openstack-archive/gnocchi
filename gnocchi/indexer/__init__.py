@@ -31,6 +31,10 @@ OPTS = [
                required=True,
                default=os.getenv("GNOCCHI_INDEXER_URL"),
                help='Indexer driver to use'),
+    cfg.BoolOpt('mysql_enable_ndb',
+                default=False,
+                help='If True, transparently enables support for handling '
+                     'MySQL Cluster (NDB).'),
 ]
 
 
