@@ -677,15 +677,13 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
             if ids is not None:
                 q = q.filter(Metric.id.in_(ids))
             if creator is not None:
-                escaped_creator = creator.replace("%", "\\%")
                 if creator[0] == ":":
-                    q = q.filter(Metric.creator.like(
-                        "%%%s" % escaped_creator, escape="\\"))
+                    q = q.filter(Metric.creator.like("%%%s" % creator))
                 elif creator[-1] == ":":
-                    q = q.filter(Metric.creator.like(
-                        "%s%%" % escaped_creator, escape="\\"))
+                    q = q.filter(Metric.creator.like("%s%%" % creator))
                 else:
                     q = q.filter(Metric.creator == creator)
+
             for attr in kwargs:
                 q = q.filter(getattr(Metric, attr) == kwargs[attr])
             if details:
