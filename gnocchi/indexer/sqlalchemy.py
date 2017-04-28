@@ -683,6 +683,7 @@ class SQLAlchemyIndexer(indexer.IndexerDriver):
                     q = q.filter(Metric.creator.like("%s%%" % creator))
                 else:
                     q = q.filter(Metric.creator == creator)
+
             for attr in kwargs:
                 q = q.filter(getattr(Metric, attr) == kwargs[attr])
             if details:
