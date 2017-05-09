@@ -70,10 +70,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
     def stop(self):
         self.coord.stop()
 
-    def _lock(self, metric_id):
-        lock_name = b"gnocchi-" + str(metric_id).encode('ascii')
-        return self.coord.get_lock(lock_name)
-
     @staticmethod
     def _get_measures(metric, timestamp_key, aggregation, granularity,
                       version=3):
@@ -361,12 +357,7 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         # measures will be skipped until cleaned by janitor.
         metrics = indexer.list_metrics(ids=metrics_to_process)
         for metric in metrics:
-            lock = self._lock(metric.id)
-            # Do not block if we cannot acquire the lock, that means some other
-            # worker is doing the job. We'll just ignore this metric and may
-            # get back later to it if needed.
-            if not lock.acquire(blocking=sync):
-                continue
+            # NOTE(gordc): must lock at sack level
             try:
                 locksw = timeutils.StopWatch().start()
                 LOG.debug("Processing measures for %s", metric)
@@ -381,8 +372,6 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                 if sync:
                     raise
                 LOG.error("Error processing new measures", exc_info=True)
-            finally:
-                lock.release()
 
     def _compute_and_store_timeseries(self, metric, measures):
         # NOTE(mnaser): The metric could have been handled by
