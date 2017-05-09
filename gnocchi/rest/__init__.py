@@ -159,6 +159,18 @@ def strtobool(varname, v):
         abort(400, "Unable to parse `%s': %s" % (varname, six.text_type(e)))
 
 
+def refresh_metric(indexer, storage, metric):
+    s = storage.incoming.sack_for_metric(metric.id)
+    lock = storage.incoming.get_sack_lock(storage.coord, s)
+    if not lock.acquire(blocking=60):
+        abort(500, 'Unable to refresh metric: %s. Metric is locked. '
+              'Please try again.' % metric.id)
+    try:
+        storage.process_new_measures(indexer, [six.text_type(metric.id)], True)
+    finally:
+        lock.release()
+
+
 RESOURCE_DEFAULT_PAGINATION = ['revision_start:asc',
                                'started_at:asc']
 
@@ -426,10 +438,10 @@ class MetricController(rest.RestController):
             except ValueError as e:
                 abort(400, e)
 
-        if strtobool("refresh", refresh):
-            pecan.request.storage.process_new_measures(
-                pecan.request.indexer, [six.text_type(self.metric.id)], True)
-
+        if (strtobool("refresh", refresh) and
+                pecan.request.storage.incoming.has_unprocessed(self.metric)):
+            refresh_metric(pecan.reqest.indexer, pecan.request.storage,
+                           self.metric)
         try:
             if aggregation in self.custom_agg:
                 measures = self.custom_agg[aggregation].compute(
@@ -1616,9 +1628,12 @@ class AggregationController(rest.RestController):
 
         try:
             if strtobool("refresh", refresh):
-                pecan.request.storage.process_new_measures(
-                    pecan.request.indexer,
-                    [six.text_type(m.id) for m in metrics], True)
+                store = pecan.request.storage
+                metrics_to_update = [
+                    m for m in metrics if store.incoming.has_unprocessed(m)]
+                for m in metrics_to_update:
+                    refresh_metric(pecan.request.indexer,
+                                   pecan.request.storage, m)
             if number_of_metrics == 1:
                 # NOTE(sileht): don't do the aggregation if we only have one
                 # metric
