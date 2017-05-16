@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    A new default archive policy is created on fresh install named `sum`. It
+    is configured to use only the aggregation method "sum" which counts the
+    number of point sent during an aggregation period. This is useful to 
