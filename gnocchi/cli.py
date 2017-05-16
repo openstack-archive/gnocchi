@@ -21,7 +21,6 @@ import cotyledon
 from cotyledon import oslo_config_glue
 from oslo_config import cfg
 from oslo_log import log
-from oslo_utils import timeutils
 import six
 
 from gnocchi import archive_policy
@@ -94,10 +93,9 @@ class MetricProcessBase(cotyledon.Service):
         time.sleep(self.startup_delay)
 
         while not self._shutdown.is_set():
-            with timeutils.StopWatch() as timer:
+            with utils.StopWatch() as timer:
                 self._run_job()
-                self._shutdown.wait(max(0, self.interval_delay -
-                                        timer.elapsed()))
+            self._shutdown.wait(max(0, self.interval_delay - timer.elapsed()))
         self._shutdown_done.set()
 
     def terminate(self):
