@@ -23,7 +23,6 @@ from concurrent import futures
 import iso8601
 from oslo_config import cfg
 from oslo_log import log
-from oslo_utils import timeutils
 import six
 import six.moves
 
@@ -91,17 +90,18 @@ class CarbonaraBasedStorage(storage.StorageDriver):
         be retrieved, returns None.
 
         """
-        with timeutils.StopWatch() as sw:
-            raw_measures = (
-                self._get_unaggregated_timeserie(
-                    metric)
-            )
-            if not raw_measures:
-                return
-            LOG.debug(
-                "Retrieve unaggregated measures "
-                "for %s in %.2fs",
-                metric.id, sw.elapsed())
+        start = time.time()
+        raw_measures = (
+            self._get_unaggregated_timeserie(
+                metric)
+        )
+        if not raw_measures:
+            return
+        elapsed = time.time() - start
+        LOG.debug(
+            "Retrieve unaggregated measures "
+            "for %s in %.2fs",
+            metric.id, elapsed)
         try:
             return carbonara.BoundTimeSerie.unserialize(
                 raw_measures, block_size, back_window)
@@ -366,20 +366,19 @@ class CarbonaraBasedStorage(storage.StorageDriver):
             if not lock.acquire(blocking=sync):
                 continue
             try:
-                locksw = timeutils.StopWatch().start()
+                lock_start = time.time()
                 LOG.debug("Processing measures for %s", metric)
                 with self.incoming.process_measure_for_metric(metric) \
                         as measures:
                     self._compute_and_store_timeseries(metric, measures)
-                LOG.debug("Metric %s locked during %.2f seconds",
-                          metric.id, locksw.elapsed())
             except Exception:
-                LOG.debug("Metric %s locked during %.2f seconds",
-                          metric.id, locksw.elapsed())
                 if sync:
                     raise
                 LOG.error("Error processing new measures", exc_info=True)
             finally:
+                elapsed = time.time() - start
+                LOG.debug("Metric %s locked during %.2f seconds",
+                          metric.id, locksw.elapsed())
                 lock.release()
 
     def _compute_and_store_timeseries(self, metric, measures):
@@ -444,23 +443,23 @@ class CarbonaraBasedStorage(storage.StorageDriver):
                         new_first_block_timestamp)
                         for aggregation in agg_methods))
 
-        with timeutils.StopWatch() as sw:
-            ts.set_values(measures,
-                          before_truncate_callback=_map_add_measures,
-                          ignore_too_old_timestamps=True)
+        start = time.time()
+        ts.set_values(measures,
+                      before_truncate_callback=_map_add_measures,
+                      ignore_too_old_timestamps=True)
 
-            elapsed = sw.elapsed()
-            number_of_operations = (len(agg_methods) * len(definition))
-            perf = ""
-            if elapsed > 0:
-                perf = " (%d points/s, %d measures/s)" % (
-                    ((number_of_operations * computed_points['number']) /
-                        elapsed),
-                    ((number_of_operations * len(measures)) / elapsed)
-                )
-            LOG.debug("Computed new metric %s with %d new measures "
-                      "in %.2f seconds%s",
-                      metric.id, len(measures), elapsed, perf)
+        elapsed = time.time() - start
+        number_of_operations = (len(agg_methods) * len(definition))
+        perf = ""
+        if elapsed > 0:
+            perf = " (%d points/s, %d measures/s)" % (
+                ((number_of_operations * computed_points['number']) /
+                    elapsed),
+                ((number_of_operations * len(measures)) / elapsed)
+            )
+        LOG.debug("Computed new metric %s with %d new measures "
+                  "in %.2f seconds%s",
+                  metric.id, len(measures), elapsed, perf)
 
         self._store_unaggregated_timeserie(metric, ts.serialize())
 

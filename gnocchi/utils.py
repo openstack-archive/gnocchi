@@ -26,7 +26,6 @@ import uuid
 import iso8601
 import numpy
 from oslo_log import log
-from oslo_utils import timeutils
 import pandas as pd
 import six
 import tenacity
@@ -160,8 +159,16 @@ def to_timespan(value):
 
 
 def utcnow():
-    """Better version of utcnow() that returns utcnow with a correct TZ."""
-    return timeutils.utcnow(True)
+    """Version of utcnow() that returns utcnow with a correct TZ."""
+    return datetime.datetime.now(tz=iso8601.iso8601.UTC)
+
+
+def normalize_time(timestamp):
+    """Normalize time in arbitrary timezone to UTC naive object."""
+    offset = timestamp.utcoffset()
+    if offset is None:
+        return timestamp
+    return timestamp.replace(tzinfo=None) - offset
 
 
 def datetime_utc(*args):
