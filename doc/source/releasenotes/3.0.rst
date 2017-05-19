@@ -1,6 +1,0 @@
-===================================
- 3.0 Series Release Notes
-===================================
-
-.. release-notes::
-   :branch: origin/stable/3.0
