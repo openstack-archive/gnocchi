@@ -1,4 +1,0 @@
----
-other:
-  - ceph driver now uses the rados async api to retrieve
-    measurements to process in parallel.

@@ -1,5 +1,0 @@
----
-upgrade:
-  - >-
-    The new `auth_type` option specifies which authentication system to use for
-    the REST API. Its default is still `noauth`.
