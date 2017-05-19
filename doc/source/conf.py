@@ -30,6 +30,7 @@ extensions = [
     'gnocchi.gendoc',
     'sphinxcontrib.httpdomain',
     'sphinx.ext.autodoc',
+    'sphinx.ext.imgmath',
     'reno.sphinxext',
 ]
 
