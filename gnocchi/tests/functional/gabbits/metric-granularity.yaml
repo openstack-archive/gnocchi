@@ -1,0 +1,60 @@
+fixtures:
+    - ConfigFixture
+
+defaults:
+  request_headers:
+      x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+      x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+
+tests:
+    - name: create archive policy
+      desc: for later use
+      POST: /v1/archive_policy
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: cookies
+          definition:
+              - granularity: 1 second
+      status: 201
+
+    - name: create valid metric
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: cookies
+      status: 201
+
+    - name: push measurements to metric
+      POST: /v1/metric/$RESPONSE['$.id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:33:57"
+            value: 43.1
+          - timestamp: "2015-03-06T14:34:12"
+            value: 12
+      status: 202
+
+    - name: get metric list
+      GET: /v1/metric
+      status: 200
+
+    - name: get measurements invalid granularity
+      GET: /v1/metric/$RESPONSE['$[0].id']/measures?granularity=42
+      status: 404
+      response_strings:
+        - Granularity '42.0' for metric $RESPONSE['$[0].id'] does not exist
+
+    - name: get measurements granularity
+      GET: /v1/metric/$HISTORY['get metric list'].$RESPONSE['$[0].id']/measures?granularity=1
+      status: 200
+      poll:
+          count: 50
+          delay: .1
+      response_json_paths:
+          $:
+            - ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
+            - ["2015-03-06T14:34:12+00:00", 1.0, 12.0]

@@ -1,0 +1,772 @@
+#
+# Test the resource type API to achieve coverage of just the
+# ResourceTypesController and ResourceTypeController class code.
+#
+
+fixtures:
+    - ConfigFixture
+
+defaults:
+  request_headers:
+      x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+      x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+
+tests:
+
+    - name: list resource type
+      desc: only legacy resource types are present
+      GET: /v1/resource_type
+      response_json_paths:
+          $.`len`: 1
+
+# Some bad cases
+
+    - name: post resource type as non-admin
+      POST: $LAST_URL
+      data:
+          name: my_custom_resource
+      request_headers:
+          content-type: application/json
+      status: 403
+
+    - name: post resource type with existing name
+      POST: /v1/resource_type
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+          attributes:
+              project_id:
+                  type: string
+      status: 400
+
+    - name: post resource type bad string
+      POST: $LAST_URL
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+          attributes:
+              foo:
+                  type: string
+                  max_length: 32
+                  min_length: 5
+                  noexist: foo
+      status: 400
+      response_strings:
+          # NOTE(sileht): We would prefer to have a better message but voluptuous seems a bit lost when
+          # an Any have many dict with the same key, here "type"
+          # - "Invalid input: extra keys not allowed @ data[u'attributes'][u'foo'][u'noexist']"
+          # - "Invalid input: not a valid value for dictionary value @ data[u'attributes'][u'foo'][u'type']"
+          - "Invalid input:"
+
+    - name: post resource type bad min_length value
+      POST: $LAST_URL
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+          attributes:
+              name:
+                  type: string
+                  required: true
+                  max_length: 2
+                  min_length: 5
+      status: 400
+
+    - name: post resource type bad min value
+      POST: $LAST_URL
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+          attributes:
+              int:
+                  type: number
+                  required: false
+                  max: 3
+                  min: 8
+      status: 400
+
+# Create a type
+
+    - name: post resource type
+      POST: $LAST_URL
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+          attributes:
+              name:
+                  type: string
+                  required: true
+                  max_length: 5
+                  min_length: 2
+              foobar:
+                  type: string
+                  required: false
+              uuid:
+                  type: uuid
+              int:
+                  type: number
+                  required: false
+                  min: -2
+                  max: 3
+              intnomin:
+                  type: number
+                  required: false
+                  max: 3
+              float:
+                  type: number
+                  required: false
+                  min: -2.3
+              bool:
+                  type: bool
+                  required: false
+      status: 201
+      response_json_paths:
+          $.name: my_custom_resource
+          $.state: active
+          $.attributes:
+              name:
+                  type: string
+                  required: True
+                  max_length: 5
+                  min_length: 2
+              foobar:
+                  type: string
+                  required: False
+                  max_length: 255
+                  min_length: 0
+              uuid:
+                  type: uuid
+                  required: True
+              int:
+                  type: number
+                  required: False
+                  min: -2
+                  max: 3
+              intnomin:
+                  type: number
+                  required: False
+                  min:
+                  max: 3
+              float:
+                  type: number
+                  required: false
+                  min: -2.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
+
+      response_headers:
+          location: $SCHEME://$NETLOC/v1/resource_type/my_custom_resource
+
+# Control the created type
+
+    - name: relist resource types
+      desc: we have a resource type now
+      GET: $LAST_URL
+      response_json_paths:
+          $.`len`: 2
+          $.[1].name: my_custom_resource
+          $.[1].state: active
+
+    - name: get the custom resource type
+      GET: /v1/resource_type/my_custom_resource
+      response_json_paths:
+          $.name: my_custom_resource
+          $.state: active
+          $.attributes:
+              name:
+                  type: string
+                  required: True
+                  min_length: 2
+                  max_length: 5
+              foobar:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              uuid:
+                  type: uuid
+                  required: True
+              int:
+                  type: number
+                  required: False
+                  min: -2
+                  max: 3
+              intnomin:
+                  type: number
+                  required: False
+                  min:
+                  max: 3
+              float:
+                  type: number
+                  required: false
+                  min: -2.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
+
+# Some bad case case on the type
+
+    - name: delete as non-admin
+      DELETE: $LAST_URL
+      status: 403
+
+# Bad resources for this type
+
+    - name: post invalid resource
+      POST: /v1/resource/my_custom_resource
+      request_headers:
+          content-type: application/json
+      data:
+          id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          name: toolong!!!
+          foobar: what
+          uuid: 07eb339e-23c0-4be2-be43-cd8247afae3b
+      status: 400
+      response_strings:
+          # split to not match the u' in py2
+          - "Invalid input: length of value must be at most 5 for dictionary value @ data["
+          - "'name']"
+
+    - name: post invalid resource uuid
+      POST: $LAST_URL
+      request_headers:
+          content-type: application/json
+      data:
+          id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          name: too
+          foobar: what
+          uuid: really!
+      status: 400
+      response_strings:
+          # split to not match the u' in py2
+          - "Invalid input: not a valid value for dictionary value @ data["
+          - "'uuid']"
+
+# Good resources for this type
+
+    - name: post custom resource
+      POST: $LAST_URL
+      request_headers:
+          content-type: application/json
+      data:
+          id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          name: bar
+          foobar: what
+          uuid: e495ebad-be64-46c0-81d6-b079beb48df9
+          int: 1
+      status: 201
+      response_json_paths:
+          $.id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $.name: bar
+          $.foobar: what
+
+    - name: patch custom resource
+      PATCH: /v1/resource/my_custom_resource/d11edfca-4393-4fda-b94d-b05a3a1b3747
+      request_headers:
+          content-type: application/json
+      data:
+          name: foo
+      status: 200
+      response_json_paths:
+          $.id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $.name: foo
+          $.foobar: what
+          $.uuid: e495ebad-be64-46c0-81d6-b079beb48df9
+          $.int: 1
+
+    - name: get resource
+      GET: $LAST_URL
+      request_headers:
+          content-type: application/json
+      response_json_paths:
+          $.id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $.name: foo
+          $.foobar: what
+          $.uuid: e495ebad-be64-46c0-81d6-b079beb48df9
+          $.int: 1
+
+    - name: post resource with default
+      POST: /v1/resource/my_custom_resource
+      request_headers:
+          content-type: application/json
+      data:
+          id: c4110aec-6e5c-43fa-b8c5-ffdfbca3ce59
+          name: foo
+          uuid: e495ebad-be64-46c0-81d6-b079beb48df9
+      status: 201
+      response_json_paths:
+          $.id: c4110aec-6e5c-43fa-b8c5-ffdfbca3ce59
+          $.name: foo
+          $.foobar:
+          $.uuid: e495ebad-be64-46c0-81d6-b079beb48df9
+          $.int:
+
+    - name: list resource history
+      GET: /v1/resource/my_custom_resource/d11edfca-4393-4fda-b94d-b05a3a1b3747/history?sort=revision_end:asc-nullslast
+      request_headers:
+          content-type: application/json
+      response_json_paths:
+          $.`len`: 2
+          $[0].id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $[0].name: bar
+          $[0].foobar: what
+          $[1].id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $[1].name: foo
+          $[1].foobar: what
+
+# CRUD resource type attributes
+
+    - name: post a new resource attribute
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: add
+          path: /attributes/newstuff
+          value:
+            type: string
+            required: False
+            min_length: 0
+            max_length: 255
+        - op: add
+          path: /attributes/newfilled
+          value:
+            type: string
+            required: False
+            min_length: 0
+            max_length: 255
+            options:
+              fill: "filled"
+        - op: add
+          path: /attributes/newbool
+          value:
+            type: bool
+            required: True
+            options:
+              fill: True
+        - op: add
+          path: /attributes/newint
+          value:
+            type: number
+            required: True
+            min: 0
+            max: 255
+            options:
+              fill: 15
+        - op: add
+          path: /attributes/newstring
+          value:
+            type: string
+            required: True
+            min_length: 0
+            max_length: 255
+            options:
+              fill: "foobar"
+        - op: add
+          path: /attributes/newuuid
+          value:
+            type: uuid
+            required: True
+            options:
+              fill: "00000000-0000-0000-0000-000000000000"
+        - op: remove
+          path: /attributes/foobar
+      status: 200
+      response_json_paths:
+          $.name: my_custom_resource
+          $.attributes:
+              name:
+                  type: string
+                  required: True
+                  min_length: 2
+                  max_length: 5
+              uuid:
+                  type: uuid
+                  required: True
+              int:
+                  type: number
+                  required: False
+                  min: -2
+                  max: 3
+              intnomin:
+                  type: number
+                  required: False
+                  min:
+                  max: 3
+              float:
+                  type: number
+                  required: false
+                  min: -2.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
+              newstuff:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              newfilled:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              newstring:
+                  type: string
+                  required: True
+                  min_length: 0
+                  max_length: 255
+              newbool:
+                  type: bool
+                  required: True
+              newint:
+                  type: number
+                  required: True
+                  min: 0
+                  max: 255
+              newuuid:
+                  type: uuid
+                  required: True
+
+    - name: post a new resource attribute with missing fill
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: add
+          path: /attributes/missing
+          value:
+            type: bool
+            required: True
+            options: {}
+      status: 400
+      response_strings:
+        - "Invalid input: Option 'fill' of resource attribute missing is invalid: must not be empty if required=True"
+
+    - name: post a new resource attribute with incorrect fill
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: add
+          path: /attributes/incorrect
+          value:
+            type: number
+            required: True
+            options:
+              fill: "a-string"
+      status: 400
+      response_strings:
+        - "Invalid input: Option 'fill' of resource attribute incorrect is invalid: expected Real"
+
+    - name: get the new custom resource type
+      GET: /v1/resource_type/my_custom_resource
+      response_json_paths:
+          $.name: my_custom_resource
+          $.attributes:
+              name:
+                  type: string
+                  required: True
+                  min_length: 2
+                  max_length: 5
+              uuid:
+                  type: uuid
+                  required: True
+              int:
+                  type: number
+                  required: False
+                  min: -2
+                  max: 3
+              intnomin:
+                  type: number
+                  required: False
+                  min:
+                  max: 3
+              float:
+                  type: number
+                  required: false
+                  min: -2.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
+              newstuff:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              newfilled:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              newstring:
+                  type: string
+                  required: True
+                  min_length: 0
+                  max_length: 255
+              newbool:
+                  type: bool
+                  required: True
+              newint:
+                  type: number
+                  required: True
+                  min: 0
+                  max: 255
+              newuuid:
+                  type: uuid
+                  required: True
+
+    - name: control new attributes of existing resource
+      GET: /v1/resource/my_custom_resource/d11edfca-4393-4fda-b94d-b05a3a1b3747
+      request_headers:
+          content-type: application/json
+      status: 200
+      response_json_paths:
+          $.id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $.name: foo
+          $.newstuff: null
+          $.newfilled: "filled"
+          $.newbool: true
+          $.newint: 15
+          $.newstring: foobar
+          $.newuuid: "00000000-0000-0000-0000-000000000000"
+
+    - name: control new attributes of existing resource history
+      GET: /v1/resource/my_custom_resource/d11edfca-4393-4fda-b94d-b05a3a1b3747/history?sort=revision_end:asc-nullslast
+      request_headers:
+          content-type: application/json
+      response_json_paths:
+          $.`len`: 2
+          $[0].id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $[0].name: bar
+          $[0].newstuff: null
+          $[0].newfilled: "filled"
+          $[0].newbool: true
+          $[0].newint: 15
+          $[0].newstring: foobar
+          $[0].newuuid: "00000000-0000-0000-0000-000000000000"
+          $[1].id: d11edfca-4393-4fda-b94d-b05a3a1b3747
+          $[1].name: foo
+          $[1].newstuff: null
+          $[1].newfilled: "filled"
+          $[1].newbool: true
+          $[1].newint: 15
+          $[1].newstring: foobar
+          $[1].newuuid: "00000000-0000-0000-0000-000000000000"
+
+# Invalid patch
+
+    - name: add/delete the same resource attribute
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: add
+          path: /attributes/what
+          value:
+            type: string
+            required: False
+            min_length: 0
+            max_length: 255
+        - op: remove
+          path: /attributes/what
+      status: 200
+      response_json_paths:
+          $.name: my_custom_resource
+          $.attributes:
+              name:
+                  type: string
+                  required: True
+                  min_length: 2
+                  max_length: 5
+              uuid:
+                  type: uuid
+                  required: True
+              int:
+                  type: number
+                  required: False
+                  min: -2
+                  max: 3
+              intnomin:
+                  type: number
+                  required: False
+                  min:
+                  max: 3
+              float:
+                  type: number
+                  required: false
+                  min: -2.3
+                  max:
+              bool:
+                  type: bool
+                  required: false
+              newstuff:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              newfilled:
+                  type: string
+                  required: False
+                  min_length: 0
+                  max_length: 255
+              newstring:
+                  type: string
+                  required: True
+                  min_length: 0
+                  max_length: 255
+              newbool:
+                  type: bool
+                  required: True
+              newint:
+                  type: number
+                  required: True
+                  min: 0
+                  max: 255
+              newuuid:
+                  type: uuid
+                  required: True
+
+    - name: delete/add the same resource attribute
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: remove
+          path: /attributes/what
+        - op: add
+          path: /attributes/what
+          value:
+            type: string
+            required: False
+            min_length: 0
+            max_length: 255
+      status: 400
+      response_strings:
+       - "can't remove non-existent object 'what'"
+
+    - name: patch a resource attribute replace
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: replace
+          path: /attributes/newstuff
+          value:
+            type: string
+            required: False
+            min_length: 0
+            max_length: 255
+      status: 400
+      response_strings:
+       - "Invalid input: not a valid value for dictionary value @ data[0]["
+       - "'op']"
+
+    - name: patch a resource attribute type not exist
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: add
+          path: /attributes/newstuff
+          value:
+            type: notexist
+            required: False
+            min_length: 0
+            max_length: 255
+      status: 400
+
+    - name: patch a resource attribute type unknown
+      PATCH: /v1/resource_type/my_custom_resource
+      request_headers:
+          x-roles: admin
+          content-type: application/json-patch+json
+      data:
+        - op: remove
+          path: /attributes/unknown
+      status: 400
+      response_strings:
+       - "can't remove non-existent object 'unknown'"
+
+# Ensure we can't delete the type
+
+    - name: delete in use resource_type
+      DELETE: /v1/resource_type/my_custom_resource
+      request_headers:
+        x-roles: admin
+      status: 400
+      response_strings:
+          - Resource type my_custom_resource is still in use
+
+# Delete associated resources
+
+    - name: delete the resource
+      DELETE: /v1/resource/my_custom_resource/d11edfca-4393-4fda-b94d-b05a3a1b3747
+      request_headers:
+        x-roles: admin
+      status: 204
+
+    - name: delete the second resource
+      DELETE: /v1/resource/my_custom_resource/c4110aec-6e5c-43fa-b8c5-ffdfbca3ce59
+      request_headers:
+        x-roles: admin
+      status: 204
+
+# Now we can deleted the type
+
+    - name: delete the custom resource type
+      DELETE: /v1/resource_type/my_custom_resource
+      request_headers:
+        x-roles: admin
+      status: 204
+
+    - name: delete non-existing custom resource type
+      DELETE: $LAST_URL
+      request_headers:
+        x-roles: admin
+      status: 404
+
+    - name: delete missing custom resource type utf8
+      DELETE: /v1/resource_type/%E2%9C%94%C3%A9%C3%B1%E2%98%83
+      request_headers:
+        x-roles: admin
+      status: 404
+      response_strings:
+          - Resource type ✔éñ☃ does not exist
+
+# Can we readd and delete the same resource type again
+
+    - name: post resource type again
+      POST: /v1/resource_type
+      request_headers:
+          x-roles: admin
+          content-type: application/json
+      data:
+          name: my_custom_resource
+      status: 201
+
+    - name: delete the custom resource type again
+      DELETE: /v1/resource_type/my_custom_resource
+      request_headers:
+        x-roles: admin
+      status: 204

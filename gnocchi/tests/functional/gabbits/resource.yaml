@@ -1,0 +1,1106 @@
+#
+# Test the resource API to achieve coverage of just the
+# ResourcesController and ResourceController class code.
+#
+
+fixtures:
+    - ConfigFixture
+
+tests:
+
+# We will need an archive for use in later tests so we create it
+# here. This could be done in a fixture but since the API allows it
+# may as well use it.
+
+    - name: create archive policy
+      desc: for later use
+      POST: /v1/archive_policy
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: medium
+          definition:
+              - granularity: 1 second
+      status: 201
+
+    - name: create archive policy rule
+      POST: /v1/archive_policy_rule
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+        name: test_rule
+        metric_pattern: "disk.io.*"
+        archive_policy_name: medium
+      status: 201
+
+# The top of the API is a bit confusing and presents some URIs which
+# are not very useful. This isn't strictly a bug but does represent
+# a measure of unfriendliness that we may wish to address. Thus the
+# xfails.
+
+    - name: root of all
+      GET: /
+      response_headers:
+          content-type: /application/json/
+      response_json_paths:
+          $.versions[0].links[0].href: $SCHEME://$NETLOC/v1/
+
+    - name: root of v1
+      GET: /v1
+      redirects: true
+      response_json_paths:
+          $.version: "1.0"
+          $.links.`len`: 11
+          $.links[0].href: $SCHEME://$NETLOC/v1
+          $.links[7].href: $SCHEME://$NETLOC/v1/resource
+
+    - name: root of resource
+      GET: /v1/resource
+      response_json_paths:
+          $.generic: $SCHEME://$NETLOC/v1/resource/generic
+
+    - name: typo of resource
+      GET: /v1/resoue
+      status: 404
+
+    - name: typo of resource extra
+      GET: /v1/resource/foobar
+      status: 404
+
+# Explore that GETting a list of resources demonstrates the expected
+# behaviors notably with regard to content negotiation.
+
+    - name: generic resource list
+      desc: there are no generic resources yet
+      GET: /v1/resource/generic
+      response_strings:
+          - "[]"
+
+    - name: generic resource bad accept
+      desc: Expect 406 on bad accept type
+      GET: $LAST_URL
+      request_headers:
+          accept: text/plain
+      status: 406
+      response_strings:
+          - 406 Not Acceptable
+
+    - name: generic resource complex accept
+      desc: failover accept media type appropriately
+      GET: $LAST_URL
+      request_headers:
+          accept: text/plain, application/json; q=0.8
+      response_strings:
+          - "[]"
+
+# Try creating a new generic resource in various ways.
+
+    - name: generic resource
+      desc: there are no generic resources yet
+      GET: /v1/resource/generic
+      response_strings:
+          - "[]"
+
+    - name: post resource no user-id
+      desc: https://bugs.launchpad.net/gnocchi/+bug/1424005
+      POST: $LAST_URL
+      request_headers:
+          # Only provide one of these auth headers
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          content-type: application/json
+      data:
+          id: f93454f2-d8a5-4d67-9985-02511241e7f3
+          started_at: "2014-01-03T02:02:02.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: post generic resource
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-d8a5-4d67-9985-02511241e7d1
+          started_at: "2014-01-03T02:02:02.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+      response_headers:
+          location: $SCHEME://$NETLOC/v1/resource/generic/f93450f2-d8a5-4d67-9985-02511241e7d1
+          content-type: /^application\/json/
+      response_json_paths:
+          $.created_by_project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          $.created_by_user_id: 0fbb231484614b1a80131fc22f6afc9c
+          $.user_id: 0fbb231484614b1a80131fc22f6afc9c
+
+    - name: post same resource refuse
+      desc: We can only post one identified resource once
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-d8a5-4d67-9985-02511241e7d1
+          started_at: "2014-01-03T02:02:02.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 409
+
+    - name: post generic resource bad content type
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: text/plain
+      data: '{"id": "f93450f2-d8a5-4d67-9985-02511241e7d1", "started_at": "2014-01-03T02:02:02.000000", "user_id": "0fbb231484614b1a80131fc22f6afc9c", "project_id": "f3d41b770cc14f0bb94a1d5be9c0e3ea"}'
+      status: 415
+
+# Create a new generic resource, demonstrate that including no data
+# gets a useful 400 response.
+
+    - name: post generic resource no data
+      POST: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 400
+
+    - name: post generic with invalid metric name
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              "disk/iops":
+                  archive_policy_name: medium
+      status: 400
+      response_strings:
+          - "'/' is not supported in metric name"
+
+    - name: post generic resource to modify
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 75C44741-CC60-4033-804E-2D3098C7D2E9
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+      response_json_paths:
+          $.metrics: {} # empty dictionary
+
+# PATCH that generic resource to change its attributes and to
+# associate metrics. If a metric does not exist there should be a
+# graceful failure.
+    - name: patch generic resource
+      PATCH: $LOCATION
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          user_id: foobar
+      status: 200
+      response_json_paths:
+          user_id: foobar
+
+    - name: patch generic resource with same data
+      desc: Ensure no useless revision have been created
+      PATCH: /v1/resource/generic/75C44741-CC60-4033-804E-2D3098C7D2E9
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          user_id: foobar
+      status: 200
+      response_json_paths:
+          user_id: foobar
+          revision_start: $RESPONSE['$.revision_start']
+
+    - name: patch generic resource with id
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: foobar
+      status: 400
+      response_strings:
+          - "Invalid input: extra keys not allowed @ data["
+          - "'id']"
+
+    - name: patch generic with metrics
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              disk.iops:
+                  archive_policy_name: medium
+      status: 200
+      response_strings:
+        - '"disk.iops": '
+
+    - name: get generic history
+      desc: Ensure we can get the history
+      GET: /v1/resource/generic/75C44741-CC60-4033-804E-2D3098C7D2E9/history?sort=revision_end:asc-nullslast
+      request_headers:
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      response_json_paths:
+        $.`len`: 2
+        $[1].revision_end: null
+        $[1].metrics.'disk.iops': $RESPONSE["metrics.'disk.iops'"]
+
+    - name: patch generic bad metric association
+      PATCH: /v1/resource/generic/75C44741-CC60-4033-804E-2D3098C7D2E9
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              disk.iops: f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea
+      status: 400
+      response_strings:
+          - Metric f3d41b77-0cc1-4f0b-b94a-1d5be9c0e3ea does not exist
+
+    - name: patch generic with bad archive policy
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              disk.iops:
+                  archive_policy_name: noexist
+      status: 400
+      response_strings:
+          - Archive policy noexist does not exist
+
+    - name: patch generic with no archive policy rule
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              disk.iops: {}
+      status: 400
+      response_strings:
+          - No archive policy name specified and no archive policy rule found matching the metric name disk.iops
+
+    - name: patch generic with archive policy rule
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              disk.io.rate: {}
+      status: 200
+
+    - name: get patched resource
+      desc: confirm the patched resource is properly patched
+      GET: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          user_id: foobar
+
+    - name: patch resource empty dict
+      desc: an empty dict in patch is an existence check
+      PATCH:  $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data: "{}"
+      status: 200
+      data:
+          user_id: foobar
+
+    - name: patch resource without change with metrics in response
+      desc: an empty dict in patch is an existence check
+      PATCH:  $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data: "{}"
+      status: 200
+      response_json_paths:
+          $.metrics.'disk.io.rate': $RESPONSE["$.metrics.'disk.io.rate'"]
+
+    - name: patch generic with invalid metric name
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          metrics:
+              "disk/iops":
+                  archive_policy_name: medium
+      status: 400
+      response_strings:
+          - "'/' is not supported in metric name"
+
+# Failure modes for history
+
+    - name: post generic history
+      desc: should don't work
+      POST: /v1/resource/generic/75C44741-CC60-4033-804E-2D3098C7D2E9/history
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 405
+
+    - name: delete generic history
+      desc: should don't work
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 405
+
+# Failure modes for PATCHing a resource
+
+    - name: patch resource no data
+      desc: providing no data is an error
+      PATCH: /v1/resource/generic/75C44741-CC60-4033-804E-2D3098C7D2E9
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 400
+      response_strings:
+          - "Unable to decode body:"
+
+    - name: patch resource bad data
+      desc: providing data that is not a dict is an error
+      PATCH: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 400
+      data:
+          - Beer and pickles
+      response_strings:
+          - "Invalid input: expected a dictionary"
+
+    - name: patch noexit resource
+      desc: "patching something that doesn't exist is a 404"
+      PATCH: /v1/resource/generic/77777777-CC60-4033-804E-2D3098C7D2E9
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 404
+
+# GET single resource failure modes
+
+    - name: get noexist resource
+      desc: if a resource does not exist 404
+      GET: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 404
+      response_strings:
+          - The resource could not be found.
+
+    - name: get bad resource id
+      desc: https://bugs.launchpad.net/gnocchi/+bug/1425588
+      GET:  /v1/resource/generic/noexist
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 404
+      response_strings:
+          - The resource could not be found.
+
+    - name: get metrics for this not-existing resource
+      GET: /v1/resource/generic/77777777-CC60-4033-804E-2D3098C7D2E9/metric/cpu.util
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 404
+
+# List resources
+
+    - name: list generic resources no auth
+      GET: /v1/resource/generic
+      response_strings:
+          - "[]"
+
+    - name: list generic resources
+      GET: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      response_json_paths:
+          $[0].user_id: 0fbb231484614b1a80131fc22f6afc9c
+          $[-1].user_id: foobar
+
+    - name: list all resources
+      GET: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      response_strings:
+          - '"type": "generic"'
+
+# Metric handling when POSTing resources.
+
+    - name: post new generic with non-existent metrics
+      POST: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 85C44741-CC60-4033-804E-2D3098C7D2E9
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          metrics:
+              cpu.util: 10
+      status: 400
+
+    - name: post new generic with metrics bad policy
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 85C44741-CC60-4033-804E-2D3098C7D2E9
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          metrics:
+              cpu.util:
+                  archive_policy_name: noexist
+      status: 400
+
+    - name: post new generic with metrics no policy rule
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 85BABE39-F7F7-455A-877B-62C22E11AA40
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          metrics:
+              cpu.util: {}
+      status: 400
+      response_strings:
+        - No archive policy name specified and no archive policy rule found matching the metric name cpu.util
+
+    - name: post new generic with metrics using policy rule
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 85BABE39-F7F7-455A-877B-62C22E11AA40
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          metrics:
+              disk.io.rate: {}
+      status: 201
+
+    - name: post new generic with metrics
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: d13982cb-4cce-4f84-a96e-7581be1e599c
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          metrics:
+              disk.util:
+                  archive_policy_name: medium
+      status: 201
+      response_json_paths:
+          created_by_user_id: 0fbb231484614b1a80131fc22f6afc9c
+          created_by_project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+
+    - name: post new generic with metrics and un-normalized user/project id from keystone middleware
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 85C44741-CC60-4033-804E-2D3098C7D2E9
+          metrics:
+              cpu.util:
+                  archive_policy_name: medium
+      status: 201
+      response_json_paths:
+          created_by_user_id: 0fbb231484614b1a80131fc22f6afc9c
+          created_by_project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+
+
+    - name: get metrics for this resource
+      desc: with async measure handling this is a null test
+      GET: /v1/resource/generic/$RESPONSE['$.id']/metric/cpu.util/measures
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      response_strings:
+          - "[]"
+
+# Interrogate the NamedMetricController
+
+    - name: list the generics
+      GET: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+
+    - name: request metrics from one of the generics
+      GET: /v1/resource/generic/$RESPONSE['$[-1].id']/metric
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      response_json_paths:
+          $.`len`: 1
+          $[0].name: cpu.util
+          $[0].resource_id: 85c44741-cc60-4033-804e-2d3098c7d2e9
+
+    - name: request metrics from non uuid metrics
+      desc: 404 from GenericResourceController
+      GET: /v1/resource/generic/not.a.uuid/metric
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 404
+
+    - name: request cpuutil metric from generic
+      GET: /v1/resource/generic/85C44741-CC60-4033-804E-2D3098C7D2E9/metric/cpu.util
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      response_json_paths:
+          $.created_by_project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          $.archive_policy.name: medium
+
+    - name: try post cpuutil metric to generic
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 405
+
+    - name: request cpuutil measures from generic
+      desc: with async measure handling this is a null test
+      GET: /v1/resource/generic/85C44741-CC60-4033-804E-2D3098C7D2E9/metric/cpu.util/measures
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      response_strings:
+          - "[]"
+
+    - name: post cpuutil measures
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:33:57"
+            value: 43.1
+          - timestamp: "2015-03-06T14:34:12"
+            value: 12
+      status: 202
+
+    - name: request cpuutil measures again
+      GET: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      poll:
+          count: 50
+          delay: .1
+      response_json_paths:
+          $[0][0]: "2015-03-06T14:33:57+00:00"
+          $[0][1]: 1.0
+          $[0][2]: 43.100000000000001
+
+    - name: post metric at generic
+      POST: /v1/resource/generic/85C44741-CC60-4033-804E-2D3098C7D2E9/metric
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 204
+      data:
+          electron.spin:
+              archive_policy_name: medium
+      response_headers:
+
+    - name: post metric at generic with empty definition
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 400
+      data:
+          foo.bar: {}
+      response_strings:
+        - No archive policy name specified and no archive policy rule found matching the metric name foo.bar
+
+    - name: post metric at generic using archive policy rule
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 204
+      data:
+          disk.io.rate: {}
+
+    - name: duplicate metrics at generic
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 409
+      data:
+          electron.spin:
+              archive_policy_name: medium
+      response_strings:
+          - Named metric electron.spin already exists
+
+    - name: post metrics at generic bad policy
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 400
+      data:
+          electron.charge:
+              archive_policy_name: high
+      response_strings:
+          - Archive policy high does not exist
+
+# Check bad timestamps
+
+    - name: post new generic with bad timestamp
+      POST: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: 95C44741-CC60-4033-804E-2D3098C7D2E9
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          metrics:
+              cpu.util:
+                  archive_policy_name: medium
+          ended_at: "2001-12-15T02:59:43"
+          started_at: "2014-12-15T02:59:43"
+      status: 400
+      response_strings:
+          - Start timestamp cannot be after end timestamp
+
+# Post metrics to unknown resource
+
+    - name: post to non uuid metrics
+      desc: 404 from GenericResourceController
+      POST: /v1/resource/generic/not.a.uuid/metric
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          some.metric:
+              archive_policy_name: medium
+      status: 404
+
+    - name: post to missing uuid metrics
+      desc: 404 from NamedMetricController
+      POST: /v1/resource/generic/d5a5994e-ee90-11e4-88cf-685b35afa334/metric
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          some.metric:
+              archive_policy_name: medium
+      status: 404
+
+# Post measurements on unknown things
+
+    - name: post measure on unknown metric
+      desc: 404 from NamedMetricController with metric error
+      POST: /v1/resource/generic/85C44741-CC60-4033-804E-2D3098C7D2E9/metric/unknown/measures
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:33:57"
+            value: 43.1
+      status: 404
+      response_strings:
+          - Metric unknown does not exist
+
+# DELETE-ing generics
+
+    - name: delete generic
+      DELETE: /v1/resource/generic/75C44741-CC60-4033-804E-2D3098C7D2E9
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 204
+
+    - name: delete noexist generic
+      DELETE: /v1/resource/generic/77777777-CC60-4033-804E-2D3098C7D2E9
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 404
+
+# Delete a batch of resources by attributes filter
+
+    - name: create resource one
+      desc: before test batch delete, create some resources using a float in started_at
+      POST: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-aaaa-4d67-9985-02511241e7d1
+          started_at: 1388714522.0
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: create resource two
+      desc: before test batch delete, create some resources
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-bbbb-4d67-9985-02511241e7d1
+          started_at: "2014-01-03T02:02:02.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: create resource three
+      desc: before test batch delete, create some resources
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-cccc-4d67-9985-02511241e7d1
+          started_at: "2014-08-04T00:00:00.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: create resource four
+      desc: before test batch delete, create some resources
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-dddd-4d67-9985-02511241e7d1
+          started_at: "2014-08-04T00:00:00.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: create resource five
+      desc: before test batch delete, create some resources
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-eeee-4d67-9985-02511241e7d1
+          started_at: "2015-08-14T00:00:00.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: create resource six
+      desc: before test batch delete, create some resources
+      POST: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          id: f93450f2-ffff-4d67-9985-02511241e7d1
+          started_at: "2015-08-14T00:00:00.000000"
+          user_id: 0fbb231484614b1a80131fc22f6afc9c
+          project_id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+      status: 201
+
+    - name: get resource one
+      desc: ensure the resources exists
+      GET: /v1/resource/generic/f93450f2-aaaa-4d67-9985-02511241e7d1
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 200
+
+    - name: get resource two
+      desc: ensure the resources exists
+      GET: /v1/resource/generic/f93450f2-bbbb-4d67-9985-02511241e7d1
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 200
+
+    - name: get resource three
+      desc: ensure the resources exists
+      GET: /v1/resource/generic/f93450f2-cccc-4d67-9985-02511241e7d1
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 200
+
+    - name: get resource four
+      desc: ensure the resources exists
+      GET: /v1/resource/generic/f93450f2-dddd-4d67-9985-02511241e7d1
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 200
+
+    - name: get resource five
+      desc: ensure the resources exists
+      GET: /v1/resource/generic/f93450f2-eeee-4d67-9985-02511241e7d1
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 200
+
+    - name: get resource six
+      desc: ensure the resources exists
+      GET: /v1/resource/generic/f93450f2-ffff-4d67-9985-02511241e7d1
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      status: 200
+
+    - name: delete random data structure
+      desc: delete an empty list test
+      DELETE: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          resource_ids:
+              []
+          attrs:
+              test
+      status: 400
+
+    - name: delete something empty
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data: ""
+      status: 400
+
+    - name: delete something empty a
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in:
+             id: []
+      status: 200
+      response_json_paths:
+        $.deleted: 0
+
+    - name: delete something empty b
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in: {}
+      status: 400
+
+    - name: delete something empty c
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in:
+              and: []
+      status: 400
+
+    - name: delete something empty d
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in:
+              and:
+                  - or: []
+                  - id:
+                      =: ""
+      status: 400
+
+    - name: delete something empty e
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          and: []
+      status: 400
+
+    - name: delete something empty f
+      desc: use  empty filter for delete
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          and:
+              - in:
+                  id: []
+              - started_at: ""
+      status: 400
+
+    - name: delete batch of resources filter by started_at
+      desc: delete the created resources
+      DELETE: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          eq:
+            started_at: "2014-08-04"
+      status: 200
+      response_json_paths:
+        $.deleted: 2
+
+    - name: delete batch of resources filter by multiple ids
+      desc: delete the created resources
+      DELETE: /v1/resource/generic
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in:
+            id:
+              - f93450f2-aaaa-4d67-9985-02511241e7d1
+              - f93450f2-bbbb-4d67-9985-02511241e7d1
+      status: 200
+      response_json_paths:
+        $.deleted: 2
+
+    - name: delete both existent and non-existent data
+      desc: delete exits and non-exist data
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in:
+            id:
+              - f93450f2-eeee-4d67-9985-02511241e7d1
+              - f93450f2-ffff-4d67-9985-02511241e7d1
+              - f93450f2-yyyy-4d67-9985-02511241e7d1
+              - f93450f2-xxxx-4d67-9985-02511241e7d1
+      status: 200
+      response_json_paths:
+        $.deleted: 2
+
+    - name: delete multiple non-existent resources
+      desc: delete a batch of non-existent resources
+      DELETE: $LAST_URL
+      request_headers:
+          x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+          x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+          content-type: application/json
+      data:
+          in:
+            id:
+              - f93450f2-zzzz-4d67-9985-02511241e7d1
+              - f93450f2-kkkk-4d67-9985-02511241e7d1
+      status: 200
+      response_json_paths:
+        $.deleted: 0
