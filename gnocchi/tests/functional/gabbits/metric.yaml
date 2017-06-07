@@ -1,0 +1,331 @@
+fixtures:
+    - ConfigFixture
+
+defaults:
+  request_headers:
+      x-user-id: 0fbb231484614b1a80131fc22f6afc9c
+      x-project-id: f3d41b770cc14f0bb94a1d5be9c0e3ea
+
+tests:
+    - name: wrong metric
+      desc: https://bugs.launchpad.net/gnocchi/+bug/1429949
+      GET: /v1/metric/foobar
+      status: 404
+
+    - name: create archive policy
+      desc: for later use
+      POST: /v1/archive_policy
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: cookies
+          definition:
+              - granularity: 1 second
+      status: 201
+
+    - name: create archive policy rule
+      POST: /v1/archive_policy_rule
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+        name: test_rule
+        metric_pattern: "disk.io.*"
+        archive_policy_name: cookies
+      status: 201
+
+    - name: create alt archive policy
+      POST: /v1/archive_policy
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+          name: cream
+          definition:
+              - granularity: 5 second
+      status: 201
+
+    - name: create alt archive policy rule
+      desc: extra rule that won't be matched
+      POST: /v1/archive_policy_rule
+      request_headers:
+          content-type: application/json
+          x-roles: admin
+      data:
+        name: test_ignore_rule
+        metric_pattern: "disk.*"
+        archive_policy_name: cream
+      status: 201
+
+    - name: get metric empty
+      GET: /v1/metric
+      status: 200
+      response_strings:
+          - "[]"
+
+    - name: get metric list with nonexistent sort key
+      GET: /v1/metric?sort=nonexistent_key:asc
+      status: 400
+      response_strings:
+          - "Sort key supplied is invalid: nonexistent_key"
+
+    - name: create metric with name and unit
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          name: "disk.io.rate"
+          unit: "B/s"
+      status: 201
+      response_json_paths:
+          $.archive_policy_name: cookies
+          $.name: disk.io.rate
+          $.unit: B/s
+
+    - name: create metric with invalid name
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          name: "disk/io/rate"
+          unit: "B/s"
+      status: 400
+      response_strings:
+        - "'/' is not supported in metric name"
+
+    - name: create metric with name and over length unit
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          name: "disk.io.rate"
+          unit: "over_length_unit_over_length_unit"
+      status: 400
+      response_strings:
+          # split to not match the u' in py2
+          - "Invalid input: length of value must be at most 31 for dictionary value @ data["
+          - "'unit']"
+
+    - name: create metric with name no rule
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          name: "volume.io.rate"
+      status: 400
+      response_strings:
+          - No archive policy name specified and no archive policy rule found matching the metric name volume.io.rate
+
+    - name: create metric bad archive policy
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: bad-cookie
+      status: 400
+      response_strings:
+          - Archive policy bad-cookie does not exist
+
+    - name: create metric bad content-type
+      POST: /v1/metric
+      request_headers:
+          content-type: plain/text
+      data: '{"archive_policy_name": "cookies"}'
+      status: 415
+
+    - name: create valid metric
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: cookies
+      status: 201
+      response_json_paths:
+          $.archive_policy_name: cookies
+
+    - name: get valid metric id
+      GET: /v1/metric/$RESPONSE['$.id']
+      status: 200
+      response_json_paths:
+        $.archive_policy.name: cookies
+
+    - name: push measurements to metric before epoch
+      POST: /v1/metric/$RESPONSE['$.id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: "1915-03-06T14:33:57"
+            value: 43.1
+      status: 400
+      response_strings:
+        - Timestamp must be after Epoch
+
+    - name: list valid metrics
+      GET: /v1/metric
+      response_json_paths:
+          $[0].archive_policy.name: cookies
+
+    - name: push measurements to metric with bad timestamp
+      POST: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: "1915-100-06T14:33:57"
+            value: 43.1
+      status: 400
+
+    - name: push measurements to metric epoch format
+      POST: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: 1425652437.0
+            value: 43.1
+      status: 202
+
+    - name: push measurements to metric
+      POST: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:34:12"
+            value: 12
+      status: 202
+
+    - name: get measurements by start
+      GET: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures?refresh=true&start=2015-03-06T14:34
+      response_json_paths:
+        $:
+          - ["2015-03-06T14:34:12+00:00", 1.0, 12.0]
+
+    - name: get measurements by start with epoch
+      GET: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures?refresh=true&start=1425652440
+      response_json_paths:
+        $:
+          - ["2015-03-06T14:34:12+00:00", 1.0, 12.0]
+
+    - name: get measurements from metric
+      GET: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures?refresh=true
+      response_json_paths:
+        $:
+          - ["2015-03-06T14:33:57+00:00", 1.0, 43.1]
+          - ["2015-03-06T14:34:12+00:00", 1.0, 12.0]
+
+    - name: push measurements to metric again
+      POST: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:34:15"
+            value: 16
+          - timestamp: "2015-03-06T14:35:12"
+            value: 9
+          - timestamp: "2015-03-06T14:35:15"
+            value: 11
+      status: 202
+
+    - name: get measurements from metric and resample
+      GET: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures?refresh=true&resample=60&granularity=1
+      response_json_paths:
+        $:
+          - ["2015-03-06T14:33:00+00:00", 60.0, 43.1]
+          - ["2015-03-06T14:34:00+00:00", 60.0, 14.0]
+          - ["2015-03-06T14:35:00+00:00", 60.0, 10.0]
+
+    - name: get measurements from metric and resample no granularity
+      GET: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures?resample=60
+      status: 400
+      response_strings:
+        - A granularity must be specified to resample
+
+    - name: get measurements from metric and bad resample
+      GET: /v1/metric/$HISTORY['list valid metrics'].$RESPONSE['$[0].id']/measures?resample=abc
+      status: 400
+
+    - name: create valid metric two
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: cookies
+      status: 201
+      response_json_paths:
+          $.archive_policy_name: cookies
+
+    - name: push invalid measurements to metric
+      POST: /v1/metric/$RESPONSE['$.id']/measures
+      request_headers:
+           content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:33:57"
+            value: 12
+          - timestamp: "2015-03-06T14:34:12"
+            value: "foobar"
+      status: 400
+
+    - name: create valid metric three
+      POST: /v1/metric
+      request_headers:
+          content-type: application/json
+      data:
+          archive_policy_name: cookies
+      status: 201
+      response_json_paths:
+          $.archive_policy_name: cookies
+
+    - name: push invalid measurements to metric bis
+      POST: /v1/metric/$RESPONSE['$.id']/measures
+      request_headers:
+           content-type: application/json
+      data: 1
+      status: 400
+
+    - name: add measure unknown metric
+      POST: /v1/metric/fake/measures
+      request_headers:
+          content-type: application/json
+      data:
+          - timestamp: "2015-03-06T14:33:57"
+            value: 43.1
+      status: 404
+
+    - name: get metric list for authenticated user
+      request_headers:
+          x-user-id: foo
+          x-project-id: bar
+      GET: /v1/metric
+
+    - name: get measures unknown metric
+      GET: /v1/metric/fake/measures
+      status: 404
+
+    - name: get metric list for aggregates
+      GET: /v1/metric
+      status: 200
+      response_json_paths:
+          $[0].archive_policy.name: cookies
+
+    - name: get measure unknown aggregates
+      GET: /v1/aggregation/metric?metric=$HISTORY['get metric list for aggregates'].$RESPONSE['$[0].id']&aggregation=last
+      status: 404
+      response_strings:
+          - Aggregation method 'last' for metric $RESPONSE['$[0].id'] does not exist
+
+    - name: aggregate measure unknown metric
+      GET: /v1/aggregation/metric?metric=cee6ef1f-52cc-4a16-bbb5-648aedfd1c37
+      status: 404
+      response_strings:
+          - Metric cee6ef1f-52cc-4a16-bbb5-648aedfd1c37 does not exist
+
+    - name: delete metric
+      DELETE: /v1/metric/$HISTORY['get metric list for aggregates'].$RESPONSE['$[0].id']
+      status: 204
+
+    - name: delete metric again
+      DELETE: $LAST_URL
+      status: 404
+
+    - name: delete non existent metric
+      DELETE: /v1/metric/foo
+      status: 404
